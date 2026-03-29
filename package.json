@@ -1,0 +1,27 @@
+{
+  "name": "pos-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "npm install && npm install --prefix backend && npm install --prefix device && npm run generate --prefix backend && npm run migrate --prefix backend && npm run seed --prefix backend",
+    "dev": "concurrently -k -n backend,device,vite \"npm run dev --prefix backend\" \"npm run dev --prefix device\" \"vite\"",
+    "device-agent": "node ../device-agent/server.mjs",
+    "build": "vite build",
+    "build:electron": "vite build --base ./",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "vite": "^5.4.10"
+  }
+}

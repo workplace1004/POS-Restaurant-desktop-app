@@ -1,0 +1,10969 @@
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Dropdown } from './Dropdown';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { KeyboardWithNumpad } from './KeyboardWithNumpad';
+import { SmallKeyboardWithNumpad } from './SmallKeyboardWithNumpad';
+import { CalendarModal } from './CalendarModal';
+import { PaginationArrows } from './PaginationArrows';
+import { PrinterModal } from './PrinterModal';
+import { useLanguage } from '../contexts/LanguageContext';
+
+const API = '/api';
+
+/** Seeded KDS admin credential (same id as `seed.js`); hidden from Configuration → Kitchen list. */
+const KITCHEN_ADMIN_CREDENTIAL_ID = 'kitchen-kds-admin';
+
+const CONTROL_SIDEBAR_ITEMS = [
+  { id: 'personalize', label: 'Personalize Cash Register', icon: 'monitor' },
+  // { id: 'reports', label: 'Reports', icon: 'chart' },
+  { id: 'users', label: 'Users', icon: 'users' },
+  { id: 'language', label: 'Language', icon: 'language' }
+];
+
+const LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'nl', label: 'Dutch' },
+  { value: 'fr', label: 'French' },
+  { value: 'tr', label: 'Turkish' }
+];
+
+const TOP_NAV_ITEMS = [
+  { id: 'categories-products', label: 'Categories and products', icon: 'box' },
+  { id: 'cash-register', label: 'Cash Register Settings', icon: 'gear' },
+  { id: 'external-devices', label: 'External Devices', icon: 'printer' },
+  { id: 'tables', label: 'Tables', icon: 'table' }
+];
+
+const SUB_NAV_ITEMS = [
+  'Price Groups',
+  'Categories',
+  'Products',
+  'Subproducts',
+  'Discounts',
+  'Kitchen'
+];
+
+const CASH_REGISTER_SUB_NAV_ITEMS = [
+  'Template Settings',
+  'Device Settings',
+  'System Settings',
+  'Payment types',
+  'Production messages'
+];
+
+const EXTERNAL_DEVICES_SUB_NAV_ITEMS = [
+  'Printer',
+  'Price Display',
+  'RFID Reader',
+  'Barcode Scanner',
+  'Credit Card',
+  'Libra',
+  'Cashmatic',
+  'Payworld'
+];
+
+const PRINTER_TAB_DEFS = [
+  { id: 'General', labelKey: 'control.printerTabs.general', fallback: 'General' },
+  { id: 'Final tickets', labelKey: 'control.printerTabs.finalTickets', fallback: 'Final tickets' },
+  { id: 'Production Tickets', labelKey: 'control.printerTabs.productionTickets', fallback: 'Production Tickets' },
+  { id: 'Labels', labelKey: 'control.printerTabs.labels', fallback: 'Labels' },
+];
+
+const PRINTING_ORDER_OPTIONS = [
+  { value: 'as-registered', labelKey: 'control.external.asRegistered', fallback: 'As Registered' },
+  { value: 'reverse', labelKey: 'control.external.reverse', fallback: 'Reverse' }
+];
+
+const PRINTER_DISABLED_OPTIONS = [
+  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' }
+];
+
+const SUBPRODUCT_VAT_OPTIONS = [
+  { value: '', label: '--' },
+  { value: '0', label: '0%' },
+  { value: '6', label: '6%' },
+  { value: '12', label: '12%' },
+  { value: '21', label: '21%' }
+];
+
+const GROUPING_RECEIPT_OPTIONS = [
+  { value: 'enable', labelKey: 'control.external.enable', fallback: 'Enable' },
+  { value: 'disable', labelKey: 'control.external.disable', fallback: 'Disable' }
+];
+
+const SCHEDULED_ORDERS_PRODUCTION_FLOW_OPTIONS = [
+  { value: 'scheduled-orders-print', labelKey: 'control.device.scheduledOrders.scheduledOrdersPrint', fallback: 'Scheduled orders…' },
+  { value: 'default', labelKey: 'control.device.scheduledOrders.default', fallback: 'Default' }
+];
+
+const SCHEDULED_ORDERS_LOADING_OPTIONS = [
+  { value: '0', labelKey: 'control.device.scheduledOrders.daysAgo0', fallback: '0 days ago' },
+  { value: '1', labelKey: 'control.device.scheduledOrders.daysAgo1', fallback: '1 day ago' },
+  { value: '7', labelKey: 'control.device.scheduledOrders.daysAgo7', fallback: '7 days ago' },
+  { value: '30', labelKey: 'control.device.scheduledOrders.daysAgo30', fallback: '30 days ago' }
+];
+
+const SCHEDULED_ORDERS_MODE_OPTIONS = [
+  { value: 'labels', labelKey: 'control.device.scheduledOrders.labels', fallback: 'Labels' },
+  { value: 'list', labelKey: 'control.device.scheduledOrders.list', fallback: 'List' }
+];
+
+const SCHEDULED_ORDERS_INVOICE_LAYOUT_OPTIONS = [
+  { value: 'standard', labelKey: 'control.device.scheduledOrders.standard', fallback: 'Standard' },
+  { value: 'compact', labelKey: 'control.device.scheduledOrders.compact', fallback: 'Compact' }
+];
+
+const SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS = [
+  { value: 'delivery-note', labelKey: 'control.device.scheduledOrders.deliveryNote', fallback: 'Delivery note' },
+  { value: 'order-date', labelKey: 'control.device.scheduledOrders.orderDate', fallback: 'Order date' }
+];
+
+const PRICE_DISPLAY_TYPE_OPTIONS = [
+  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' }
+];
+
+const RFID_READER_TYPE_OPTIONS = [
+  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
+  { value: 'serial', labelKey: 'control.external.serial', fallback: 'Serial' },
+  { value: 'usb-nfc', labelKey: 'control.external.rfidReaderType.usbNfc', fallback: 'USB NFC' }
+];
+
+const BARCODE_SCANNER_TYPE_OPTIONS = [
+  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
+  { value: 'serial', labelKey: 'control.external.serial', fallback: 'Serial' },
+  { value: 'keyboard-input', labelKey: 'control.external.barcodeScannerType.keyboardInput', fallback: 'Keyboard input' },
+  { value: 'tcp-ip', labelKey: 'control.external.barcodeScannerType.tcpIp', fallback: 'TCP / IP' }
+];
+
+const CREDIT_CARD_TYPE_OPTIONS = [
+  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
+  { value: 'payworld', labelKey: 'control.external.creditCardType.payworld', fallback: 'Payworld' },
+  { value: 'viva-wallet', labelKey: 'control.external.creditCardType.vivaWallet', fallback: 'Viva wallet' }
+];
+
+const SCALE_TYPE_OPTIONS = [
+  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
+  { value: 'toshiba-sl4700', labelKey: 'control.external.scaleType.toshibaSl4700', fallback: 'Toshiba SL4700' },
+  { value: 'marques-b0', labelKey: 'control.external.scaleType.marquesB0', fallback: 'Marques B0' },
+  { value: 'cas-protocol', labelKey: 'control.external.scaleType.casProtocol', fallback: 'CAS Protocol' },
+  { value: 'aurora', labelKey: 'control.external.scaleType.aurora', fallback: 'Aurora' },
+  { value: 'longfly', labelKey: 'control.external.scaleType.longfly', fallback: 'Longfly' },
+  { value: 'dollar', labelKey: 'control.external.scaleType.dollar', fallback: 'Dollar' },
+  { value: 'elzab', labelKey: 'control.external.scaleType.elzab', fallback: 'Elzab' },
+  { value: 'marques-mobba-mode-a', labelKey: 'control.external.scaleType.marquesMobbaModeA', fallback: 'Marques Mobba Mode A' },
+  { value: 'adam-azextra', labelKey: 'control.external.scaleType.adamAzextra', fallback: 'Adam AZextra' },
+  { value: 'dialog-06', labelKey: 'control.external.scaleType.dialog06', fallback: 'Dialog 06' }
+];
+
+const SCALE_PORT_OPTIONS = [
+  { value: '', label: '' },
+  { value: 'COM 1', label: 'COM 1' },
+  { value: 'COM 2', label: 'COM 2' },
+  { value: 'COM 3', label: 'COM 3' },
+  { value: 'COM 4', label: 'COM 4' }
+];
+
+const REPORT_TABS = [
+  { id: 'financial', label: 'Financial Reports', icon: 'document' },
+  { id: 'user', label: 'User Reports', icon: 'person' },
+  { id: 'periodic', label: 'Periodic Reports', icon: 'chart' },
+  { id: 'settings', label: 'Settings', icon: 'gear' }
+];
+
+const REPORT_GENERATE_UNTIL_OPTIONS = [
+  { value: 'current-time', labelKey: 'control.reports.currentTime', fallback: 'Current time' }
+];
+
+const PERIODIC_REPORT_TIME_OPTIONS = Array.from({ length: 25 }, (_, i) => {
+  const h = i === 24 ? '24' : String(i).padStart(2, '0');
+  const label = i === 24 ? '24:00' : `${h}:00`;
+  return { value: label, label };
+});
+
+const USER_AVATAR_COLORS = ['#ef4444', '#22c55e', '#38bdf8', '#ec4899', '#a78bfa'];
+// User modal privilege avatars: blue, green, yellow, red, gray, dark gray, orange, magenta, pink
+const USER_PRIVILEGE_AVATAR_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#9ca3af', '#4b5563', '#f97316', '#d946ef', '#f472b6'];
+
+const USER_PRIVILEGE_OPTIONS = [
+  { id: 'roundTables', label: 'Rounding tables:' },
+  { id: 'adjustCustomers', label: 'Customize customers:' },
+  { id: 'openDrawer', label: 'Open drawer:' },
+  { id: 'discount', label: 'Discount:' },
+  { id: 'tableReturns', label: 'Table returns:' },
+  { id: 'historyReturns', label: 'History of returns:' },
+  { id: 'looseReturns', label: 'Individual returns:' },
+  { id: 'showInSellerList', label: 'Show in seller list:' },
+  { id: 'cancelPlannedOrders', label: 'Canceling planned orders:' },
+  { id: 'cashMachineReceiveManually', label: 'With cash machine recieve cash manually:' },
+  { id: 'createNewCustomer', label: 'Create new customer:' },
+  { id: 'revenueVisible', label: 'Turnover visible:' }
+];
+
+const DEFAULT_USER_PRIVILEGES = Object.fromEntries(USER_PRIVILEGE_OPTIONS.map((p) => [p.id, true]));
+
+const DISCOUNT_TRIGGER_OPTIONS = [
+  { value: 'number', label: 'Number' },
+  { value: 'weight', label: 'Weight' },
+  { value: 'min-amount', label: 'Minimum amount' },
+  { value: 'time', label: 'Time' }
+];
+
+const DISCOUNT_TYPE_OPTIONS = [
+  { value: 'amount', label: 'Amount' },
+  { value: 'percent', label: 'Percent' },
+  { value: 'free_products', label: 'Free products' },
+  { value: 'number', label: '+ Number' },
+  { value: 'weight', label: '+ Weight' },
+  { value: 'different_price_group', label: 'Different price group' },
+];
+
+const DISCOUNT_ON_OPTIONS = [
+  { value: 'products', label: 'Products' },
+  { value: 'categories', label: 'Categories' },
+  { value: 'all-products', label: 'All products' }
+];
+
+const REPORT_SETTINGS_ROWS = [
+  { id: 'category-totals', labelKey: 'control.reports.settings.categoryTotals', fallback: 'Category totals:' },
+  { id: 'product-totals', labelKey: 'control.reports.settings.productTotals', fallback: 'Product totals:' },
+  { id: 'vat-totals', labelKey: 'control.reports.settings.vatTotals', fallback: 'VAT totals:' },
+  { id: 'payments', labelKey: 'control.reports.settings.payments', fallback: 'Payments:' },
+  { id: 'ticket-types', labelKey: 'control.reports.settings.ticketTypes', fallback: 'Ticket types:' },
+  { id: 'eat-in-take-out', labelKey: 'control.reports.settings.eatInTakeOut', fallback: 'Eat-in / Take-out:' },
+  { id: 'open-tables', labelKey: 'control.reports.settings.openTables', fallback: 'Open tables:' },
+  { id: 'hour-totals', labelKey: 'control.reports.settings.hourTotals', fallback: 'Hour totals:' },
+  { id: 'hour-totals-per-user', labelKey: 'control.reports.settings.hourTotalsPerUser', fallback: 'Hour totals per user:' }
+];
+
+const DEFAULT_REPORT_SETTINGS = Object.fromEntries(
+  REPORT_SETTINGS_ROWS.map((row) => {
+    const allChecked = ['vat-totals', 'payments', 'ticket-types', 'eat-in-take-out'].includes(row.id);
+    return [row.id, { z: allChecked, x: allChecked, periodic: allChecked }];
+  })
+);
+
+const DEFAULT_LABELS_LIST = [
+  { id: 'lbl1', sizeLabel: '5.6cm x 3.5cm', sortOrder: 0 }
+];
+
+const DEFAULT_PRINTERS = [
+  { id: 'p1', name: 'RP4xx Series 200DPI TSC', isDefault: false, sortOrder: 0 },
+  { id: 'p2', name: 'ip printer', isDefault: true, sortOrder: 1 },
+  { id: 'p3', name: 'Xprinter XP-420B', isDefault: false, sortOrder: 2 },
+  { id: 'p4', name: 'bar printer', isDefault: false, sortOrder: 3 },
+  { id: 'p5', name: 'extra kitchen printer', isDefault: false, sortOrder: 4 },
+  { id: 'p6', name: 'extra printer', isDefault: false, sortOrder: 5 }
+];
+
+const VAT_OPTIONS = [
+  { value: 'standard', labelKey: 'control.external.standard', fallback: 'Standard' },
+  { value: 'take-out', labelKey: 'control.external.takeOut', fallback: 'Take-out' },
+  { value: 'eat-in', labelKey: 'control.external.eatIn', fallback: 'Eat-in' }
+];
+
+const DEVICE_SETTINGS_TABS = [
+  'General',
+  'Printer',
+  'Category display',
+  'Orders in waiting',
+  'Scheduled orders',
+  'Option buttons',
+  'Function buttons'
+];
+const DEVICE_SETTINGS_TAB_LABEL_KEYS = {
+  General: 'control.deviceSettingsTab.general',
+  Printer: 'control.deviceSettingsTab.printer',
+  'Category display': 'control.deviceSettingsTab.categoryDisplay',
+  'Orders in waiting': 'control.deviceSettingsTab.ordersInWaiting',
+  'Scheduled orders': 'control.deviceSettingsTab.scheduledOrders',
+  'Option buttons': 'control.deviceSettingsTab.optionButtons',
+  'Function buttons': 'control.deviceSettingsTab.functionButtons'
+};
+
+const FUNCTION_BUTTON_ITEMS = [
+  { id: 'tables', labelKey: 'control.functionButton.tables', fallbackLabel: 'Tafels' },
+  { id: 'weborders', labelKey: 'control.functionButton.weborders', fallbackLabel: 'Weborders' },
+  { id: 'in-wacht', labelKey: 'control.functionButton.inWaiting', fallbackLabel: 'In Wacht' },
+  { id: 'geplande-orders', labelKey: 'control.functionButton.scheduledOrders', fallbackLabel: 'Geplande orders' },
+  { id: 'reservaties', labelKey: 'control.functionButton.reservations', fallbackLabel: 'Reservaties' },
+  { id: 'verkopers', labelKey: 'control.functionButton.sellers', fallbackLabel: 'Verkopers' }
+];
+
+const FUNCTION_BUTTON_SLOT_COUNT = 4;
+const FUNCTION_BUTTON_ITEM_IDS = FUNCTION_BUTTON_ITEMS.map((item) => item.id);
+const FUNCTION_BUTTON_ITEM_BY_ID = Object.fromEntries(
+  FUNCTION_BUTTON_ITEMS.map((item) => [item.id, item])
+);
+
+const OPTION_BUTTON_ITEMS = [
+  { id: 'extra-bc-bedrag', labelKey: 'control.optionButton.extraBcAmount', fallbackLabel: 'Extra BC amount' },
+  { id: 'bc-refund', labelKey: 'control.optionButton.bcRefund', fallbackLabel: 'BC Refund' },
+  { id: 'stock-retour', labelKey: 'control.optionButton.stockRetour', fallbackLabel: 'Stock return' },
+  { id: 'product-labels', labelKey: 'control.optionButton.productLabels', fallbackLabel: 'Product Labels' },
+  { id: 'ticket-afdrukken', labelKey: 'control.optionButton.printTicket', fallbackLabel: 'Add ticket' },
+  { id: 'tegoed', labelKey: 'control.optionButton.credit', fallbackLabel: 'Credit' },
+  { id: 'tickets-optellen', labelKey: 'control.optionButton.sumTickets', fallbackLabel: 'Ticket To' },
+  { id: 'product-info', labelKey: 'control.optionButton.productInfo', fallbackLabel: 'Product info' },
+  { id: 'personeel-ticket', labelKey: 'control.optionButton.staffTicket', fallbackLabel: 'Staff consumables' },
+  { id: 'productie-bericht', labelKey: 'control.optionButton.productionMessage', fallbackLabel: 'Production message' },
+  { id: 'prijs-groep', labelKey: 'control.optionButton.priceGroup', fallbackLabel: 'Price group' },
+  { id: 'discount', labelKey: 'control.optionButton.discount', fallbackLabel: 'Discount' },
+  { id: 'kadobon', labelKey: 'control.optionButton.giftVoucher', fallbackLabel: 'Gift voucher' },
+  { id: 'various', labelKey: 'control.optionButton.various', fallbackLabel: 'Miscellaneous' },
+  { id: 'plu', labelKey: 'control.optionButton.plu', fallbackLabel: 'PLU' },
+  { id: 'product-zoeken', labelKey: 'control.optionButton.searchProduct', fallbackLabel: 'Search Product' },
+  { id: 'lade', labelKey: 'control.optionButton.drawer', fallbackLabel: 'Drawer' },
+  { id: 'klanten', labelKey: 'control.optionButton.customers', fallbackLabel: 'Customers' },
+  { id: 'historiek', labelKey: 'control.optionButton.history', fallbackLabel: 'History' },
+  { id: 'subtotaal', labelKey: 'control.optionButton.subtotal', fallbackLabel: 'Subtotaal' },
+  { id: 'terugname', labelKey: 'control.optionButton.return', fallbackLabel: 'Return name' },
+  { id: 'meer', labelKey: 'control.optionButton.more', fallbackLabel: 'Meer...' },
+  { id: 'eat-in-take-out', labelKey: 'control.optionButton.eatInTakeOut', fallbackLabel: 'Take Out' },
+  { id: 'externe-apps', labelKey: 'control.optionButton.externalApps', fallbackLabel: 'External Apps' },
+  { id: 'voor-verpakken', labelKey: 'control.optionButton.forPacking', fallbackLabel: 'Pre-packaging' },
+  { id: 'leeggoed-terugnemen', labelKey: 'control.optionButton.depositReturn', fallbackLabel: 'Return empty containers' },
+  { id: 'webshop-tijdsloten', labelKey: 'control.optionButton.webshopTimeslots', fallbackLabel: 'Webshop time slots' }
+];
+const OPTION_BUTTON_SLOT_COUNT = 28;
+const OPTION_BUTTON_LOCKED_ID = 'meer';
+const OPTION_BUTTON_ITEM_IDS = OPTION_BUTTON_ITEMS.map((item) => item.id);
+const OPTION_BUTTON_ITEM_BY_ID = Object.fromEntries(
+  OPTION_BUTTON_ITEMS.map((item) => [item.id, item])
+);
+const DEFAULT_OPTION_BUTTON_LAYOUT = [
+  'extra-bc-bedrag', '', 'bc-refund', 'stock-retour', 'product-labels', '', '',
+  'ticket-afdrukken', '', 'tegoed', 'tickets-optellen', '', 'product-info', 'personeel-ticket',
+  'productie-bericht', 'prijs-groep', 'discount', 'kadobon', 'various', 'plu', 'product-zoeken',
+  'lade', 'klanten', 'historiek', 'subtotaal', 'terugname', '', 'meer'
+];
+
+function normalizeFunctionButtonSlots(value) {
+  if (!Array.isArray(value)) return Array(FUNCTION_BUTTON_SLOT_COUNT).fill('');
+  const next = Array(FUNCTION_BUTTON_SLOT_COUNT).fill('');
+  const used = new Set();
+  for (let i = 0; i < FUNCTION_BUTTON_SLOT_COUNT; i += 1) {
+    const candidate = String(value[i] || '').trim();
+    if (!candidate) continue;
+    if (!FUNCTION_BUTTON_ITEM_IDS.includes(candidate)) continue;
+    if (used.has(candidate)) continue;
+    next[i] = candidate;
+    used.add(candidate);
+  }
+  return next;
+}
+
+function normalizeOptionButtonSlots(value) {
+  if (!Array.isArray(value)) return [...DEFAULT_OPTION_BUTTON_LAYOUT];
+  const next = Array(OPTION_BUTTON_SLOT_COUNT).fill('');
+  const used = new Set();
+  for (let i = 0; i < OPTION_BUTTON_SLOT_COUNT; i += 1) {
+    const candidate = String(value[i] || '').trim();
+    if (!candidate) continue;
+    if (!OPTION_BUTTON_ITEM_IDS.includes(candidate)) continue;
+    if (used.has(candidate)) continue;
+    next[i] = candidate;
+    used.add(candidate);
+  }
+  if (!next.includes(OPTION_BUTTON_LOCKED_ID)) {
+    next[OPTION_BUTTON_SLOT_COUNT - 1] = OPTION_BUTTON_LOCKED_ID;
+  }
+  return next;
+}
+
+const SYSTEM_SETTINGS_TABS = ['General', 'Prices', 'Ticket'];
+const SYSTEM_SETTINGS_TAB_LABEL_KEYS = {
+  General: 'control.systemSettingsTab.general',
+  Prices: 'control.systemSettingsTab.prices',
+  Ticket: 'control.systemSettingsTab.ticket'
+};
+
+const LEEGGOED_OPTIONS = [
+  { value: 'by-customers-name', labelKey: 'control.sys.deposit.byCustomersName', fallback: 'By customers name' },
+  { value: 'other', labelKey: 'control.sys.deposit.other', fallback: 'Other' }
+];
+
+const SAVINGS_DISCOUNT_OPTIONS = [
+  { value: '', labelKey: 'control.external.disabled', fallback: 'Disabled' },
+  { value: 'percentage', labelKey: 'control.sys.savings.percentage', fallback: 'Percentage' },
+  { value: 'amount', labelKey: 'control.sys.savings.amount', fallback: 'Amount' }
+];
+
+const TICKET_VOUCHER_VALIDITY_OPTIONS = [
+  { value: '1', labelKey: 'control.sys.voucher.month1', fallback: '1 month' },
+  { value: '3', labelKey: 'control.sys.voucher.month3', fallback: '3 months' },
+  { value: '6', labelKey: 'control.sys.voucher.month6', fallback: '6 months' },
+  { value: '12', labelKey: 'control.sys.voucher.month12', fallback: '12 months' }
+];
+
+const TICKET_SCHEDULED_PRINT_MODE_OPTIONS = [
+  { value: 'Production ticket', labelKey: 'control.sys.scheduledPrint.productionTicket', fallback: 'Production ticket' },
+  { value: 'label-small', labelKey: 'control.sys.scheduledPrint.smallLabel', fallback: 'Small label' },
+  { value: 'label-large', labelKey: 'control.sys.scheduledPrint.largeLabel', fallback: 'Large label' },
+  { value: 'label-Production ticket + Small label', labelKey: 'control.sys.scheduledPrint.prodPlusSmall', fallback: 'Production ticket + Small label' },
+  { value: 'Production ticket + Large label', labelKey: 'control.sys.scheduledPrint.prodPlusLarge', fallback: 'Production ticket + Large label' }
+];
+
+const TICKET_SCHEDULED_CUSTOMER_SORT_OPTIONS = [
+  { value: 'as-registered', labelKey: 'control.external.asRegistered', fallback: 'As Registered' },
+  { value: 'Alphabetical first name', labelKey: 'control.sys.customerSort.alphabeticalFirstName', fallback: 'Alphabetical first name' },
+  { value: 'Alphabetical last name', labelKey: 'control.sys.customerSort.alphabeticalLastName', fallback: 'Alphabetical last name' }
+];
+
+const BARCODE_TYPE_OPTIONS = [
+  { value: 'Code39', label: 'Code39' },
+  { value: 'Code93', label: 'Code93' },
+  { value: 'Code128', label: 'Code128' },
+  { value: 'Interleaved2of5', label: 'Interleaved 2 of 5' }
+];
+
+const TABLE_LOCATION_BACKGROUND_OPTIONS = [
+  { value: '', labelKey: 'control.tables.backgroundDefault', fallback: 'Default' },
+  { value: 'white', labelKey: 'control.tables.backgroundWhite', fallback: 'White' },
+  { value: 'gray', labelKey: 'control.tables.backgroundGray', fallback: 'Gray' },
+  { value: 'blue', labelKey: 'control.tables.backgroundBlue', fallback: 'Blue' }
+];
+
+const SET_TABLES_ZOOM_MIN = 50;
+const SET_TABLES_ZOOM_MAX = 150;
+const SET_TABLES_ZOOM_STEP = 10;
+
+const TABLE_TEMPLATE_OPTIONS = [
+  { id: '4table', src: '/4table.svg', chairs: 4, width: 130, height: 155 },
+  { id: '5table', src: '/5table.svg', chairs: 5, width: 145, height: 173 },
+  { id: '6table', src: '/6table.svg', chairs: 6, width: 150, height: 179 }
+];
+
+const TABLE_BOARD_COLOR_OPTIONS = [
+  '#facc15', // yellow
+  '#22c55e', // green
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#a855f7', // purple
+  '#ffffff'  // white
+];
+
+const createDefaultBoard = (table, color = '#facc15') => {
+  const tableW = Math.max(60, Number(table?.width) || 120);
+  const tableH = Math.max(40, Number(table?.height) || 80);
+  const boardW = Math.max(120, Math.round(tableW + 40));
+  const boardH = Math.max(120, Math.round(tableH + 40));
+  return {
+    id: `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    color,
+    x: 0,
+    y: 0,
+    width: boardW,
+    height: boardH,
+    rotation: 0
+  };
+};
+
+const normalizeBoardToItem = (b, defaultColor = '#facc15') => ({
+  id: b?.id && typeof b.id === 'string' ? b.id : `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  color: typeof b?.color === 'string' && b.color.trim() ? b.color.trim() : defaultColor,
+  x: Number(b?.x) || 0,
+  y: Number(b?.y) || 0,
+  width: Math.max(10, Number(b?.width) || 120),
+  height: Math.max(10, Number(b?.height) || 120),
+  rotation: Number(b?.rotation) || 0
+});
+
+const createDefaultFlowerPot = () => ({
+  id: `flowerpot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  x: 0,
+  y: 0,
+  width: 60,
+  height: 72,
+  rotation: 0
+});
+
+const normalizeFlowerPotToItem = (fp) => ({
+  id: fp?.id && typeof fp.id === 'string' ? fp.id : `flowerpot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  x: Number(fp?.x) || 0,
+  y: Number(fp?.y) || 0,
+  width: Math.max(10, Number(fp?.width) || 60),
+  height: Math.max(10, Number(fp?.height) || 72),
+  rotation: Number(fp?.rotation) || 0
+});
+
+const createDefaultLayoutTable = (index = 1, templateType = '4table') => {
+  const tpl = TABLE_TEMPLATE_OPTIONS.find((item) => item.id === templateType) || TABLE_TEMPLATE_OPTIONS[0];
+  return {
+    id: `tbl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: `T-${String(index).padStart(2, '0')}`,
+    x: 120 + (index - 1) * 180,
+    y: 120 + ((index - 1) % 3) * 120,
+    width: tpl.width,
+    height: tpl.height,
+    chairs: tpl.chairs,
+    rotation: 0,
+    round: false,
+    templateType: tpl.id,
+    boards: [],
+    flowerPots: []
+  };
+};
+
+const normalizeLayoutEditorDraft = (raw, locationName = 'Restaurant') => {
+  const hasTablesArray = Array.isArray(raw?.tables);
+  const tables = Array.isArray(raw?.tables)
+    ? raw.tables.map((table, index) => ({
+      id: String(table?.id || `tbl-${index + 1}`),
+      name: String(table?.name || `T-${String(index + 1).padStart(2, '0')}`),
+      x: Number(table?.x) || 0,
+      y: Number(table?.y) || 0,
+      width: Math.max(60, Number(table?.width) || 120),
+      height: Math.max(40, Number(table?.height) || 80),
+      chairs: Math.max(0, Number(table?.chairs) || 4),
+      rotation: Number(table?.rotation) || 0,
+      round: !!table?.round,
+      templateType: TABLE_TEMPLATE_OPTIONS.some((tpl) => tpl.id === table?.templateType)
+        ? table.templateType
+        : ((Number(table?.chairs) || 4) >= 6 ? '6table' : (Number(table?.chairs) || 4) >= 5 ? '5table' : '4table'),
+      boards: (() => {
+        if (Array.isArray(table?.boards) && table.boards.length > 0) {
+          return table.boards.map((b) => normalizeBoardToItem(b));
+        }
+        if (table?.board && typeof table.board === 'object') {
+          return [normalizeBoardToItem(table.board)];
+        }
+        if (typeof table?.boardColor === 'string' && table.boardColor.trim()) {
+          return [normalizeBoardToItem(createDefaultBoard(table, table.boardColor.trim()))];
+        }
+        return [];
+      })(),
+      flowerPots: Array.isArray(table?.flowerPots) && table.flowerPots.length > 0
+        ? table.flowerPots.map((fp) => normalizeFlowerPotToItem(fp))
+        : (table?.flowerPot && typeof table.flowerPot === 'object' ? [normalizeFlowerPotToItem(table.flowerPot)] : [])
+    }))
+    : [];
+  return {
+    floorName: String(raw?.floorName || locationName || 'Restaurant'),
+    floorWidth: Math.min(979, Math.max(400, Number(raw?.floorWidth) ?? 979)),
+    floorHeight: Number(raw?.floorHeight) ?? 595.5,
+    bookingCapacity: Math.max(0, Number(raw?.bookingCapacity) || 0),
+    floors: Math.max(1, Number(raw?.floors) || 1),
+    tables: hasTablesArray ? tables : [createDefaultLayoutTable(1)]
+  };
+};
+
+const PAYMENT_INTEGRATION_OPTIONS = [
+  { value: 'manual_cash', labelKey: 'control.paymentTypes.integration.manual_cash', fallback: 'Manual Cash' },
+  { value: 'cashmatic', labelKey: 'control.paymentTypes.integration.cashmatic', fallback: 'Cashmatic' },
+  { value: 'payworld', labelKey: 'control.paymentTypes.integration.payworld', fallback: 'Payworld' },
+  { value: 'generic', labelKey: 'control.paymentTypes.integration.generic', fallback: 'Manual Card' }
+];
+
+const VAT_PERCENT_OPTIONS = [
+  { value: '', label: '--' },
+  { value: '0', label: '0%' },
+  { value: '6', label: '6%' },
+  { value: '9', label: '9%' },
+  { value: '12', label: '12%' },
+  { value: '21', label: '21%' }
+];
+
+const EXTRA_PRICE_PRINTER_OPTIONS = [
+  { value: 'Disabled', label: 'Disabled' }
+];
+
+const VERVALTYPE_OPTIONS = [
+  { value: 'Shelf life', label: 'Shelf life' },
+  { value: 'Expiration date', label: 'Expiration date' }
+];
+
+const PURCHASE_UNIT_OPTIONS = [
+  { value: 'Piece', label: 'Piece' },
+  { value: 'Kg', label: 'Kg' },
+  { value: 'Liter', label: 'Liter' },
+  { value: 'Meter', label: 'Meter' }
+];
+
+const PURCHASE_SUPPLIER_OPTIONS = [
+  { value: '', label: '--' }
+];
+
+const KIOSK_SUBS_OPTIONS = [
+  { value: 'unlimited', label: 'Unlimited' },
+  ...Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))
+];
+
+function IconMonitor({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function IconChart({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+      <g fill="currentColor" fillRule="evenodd">
+        <rect x="15" rx="1" width="3" height="18" />
+        <rect x="10" y="5" width="3" height="13" rx="1" />
+        <rect x="5" y="9" width="3" height="9" rx="1" />
+        <rect y="13" width="3" height="5" rx="1.001" />
+      </g>
+    </svg>
+  );
+}
+
+function IconUsers({ className }) {
+  return (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 00-3-3.87" />
+      <path d="M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  );
+}
+
+function IconBox({ className }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 16 16">
+      <path fillRule="evenodd" clipRule="evenodd" d="M9.02.678a2.25 2.25 0 00-2.04 0L1.682 3.374A1.25 1.25 0 001 4.488v6.717c0 .658.37 1.26.956 1.56l5.023 2.557a2.25 2.25 0 002.042 0l5.023-2.557a1.75 1.75 0 00.956-1.56V4.488c0-.47-.264-.9-.683-1.114L9.021.678zM7.66 2.015a.75.75 0 01.68 0l4.436 2.258-1.468.734-4.805-2.403 1.157-.59zM4.84 3.45l-1.617.823L8 6.661l1.631-.815-4.79-2.396zM2.5 5.588v5.617c0 .094.053.18.137.223l4.613 2.348V7.964L2.5 5.588zm10.863 5.84L8.75 13.776V7.964l4.75-2.375v5.617a.25.25 0 01-.137.223z" />
+    </svg>
+  );
+}
+
+function IconGear({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  );
+}
+
+function IconPrinter({ className }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 70 70">
+      <path d="M62.597,21.583H8.46c-3.954,0-6.877,3.133-6.877,6.979v20.137c0,3.751,2.968,6.884,6.877,6.884h4.123v4.485c0,3.828,3.521,6.515,7.349,6.515h30.137c3.828,0,6.515-2.687,6.515-6.515v-4.485h6.014c3.481,0,4.986-2.268,4.986-6.884V28.563C67.583,23.216,64.771,21.583,62.597,21.583z M52.583,60.068c0,1.619-0.896,2.515-2.515,2.515H19.932c-1.619,0-3.349-0.896-3.349-2.515V46.932c0-1.619,1.729-3.349,3.349-3.349h30.137c1.619,0,2.515,1.729,2.515,3.349V60.068z M62.597,51.583h-6.014v-4.651c0-3.828-2.687-7.349-6.515-7.349H19.932c-3.828,0-7.349,3.521-7.349,7.349v4.651H8.46c-1.7,0-2.877-1.32-2.877-2.884V28.563c0-1.228,0.968-2.979,2.877-2.979h54.137c1.294,0,0.986,1.028,0.986,2.979v20.137C63.583,49.733,64.09,51.583,62.597,51.583z" />
+      <path d="M14.583,20.417c1.104,0,2-0.896,2-2V9.563c0-1.228,0.521-2.979,3.877-2.979h30.137c1.294,0,1.986,1.028,1.986,2.979v8.854c0,1.104,0.896,2,2,2s2-0.896,2-2V9.563c0-5.347-1.667-6.979-5.986-6.979H20.46c-5.543,0-7.877,2.084-7.877,6.979v8.854C12.583,19.521,13.479,20.417,14.583,20.417z" />
+      <path d="M17.417,31.583c0.552,0,1-0.447,1-1s-0.448-1-1-1h-3c-0.552,0-1,0.447-1,1s0.448,1,1,1H17.417z" />
+      <path d="M21.417,31.583h3c0.552,0,1-0.447,1-1s-0.448-1-1-1h-3c-0.552,0-1,0.447-1,1S20.865,31.583,21.417,31.583z" />
+      <path d="M55.417,33.583h-40c-0.552,0-1,0.447-1,1s0.448,1,1,1h40c0.552,0,1-0.447,1-1S55.969,33.583,55.417,33.583z" />
+      <path d="M22.417,49.583h12c0.552,0,1-0.447,1-1s-0.448-1-1-1h-12c-0.552,0-1,0.447-1,1S21.865,49.583,22.417,49.583z" />
+      <path d="M47.417,47.583h-9c-0.552,0-1,0.447-1,1s0.448,1,1,1h9c0.552,0,1-0.447,1-1S47.969,47.583,47.417,47.583z" />
+      <path d="M22.417,54.583h6c0.552,0,1-0.447,1-1s-0.448-1-1-1h-6c-0.552,0-1,0.447-1,1S21.865,54.583,22.417,54.583z" />
+      <path d="M31.417,53.583c0,0.553,0.448,1,1,1h7c0.552,0,1-0.447,1-1s-0.448-1-1-1h-7C31.865,52.583,31.417,53.03,31.417,53.583z" />
+      <path d="M32.417,57.583h-10c-0.552,0-1,0.447-1,1s0.448,1,1,1h10c0.552,0,1-0.447,1-1S32.969,57.583,32.417,57.583z" />
+      <path d="M43.417,57.583h-7c-0.552,0-1,0.447-1,1s0.448,1,1,1h7c0.552,0,1-0.447,1-1S43.969,57.583,43.417,57.583z" />
+      <path d="M47.417,52.583h-4c-0.552,0-1,0.447-1,1s0.448,1,1,1h4c0.552,0,1-0.447,1-1S47.969,52.583,47.417,52.583z" />
+    </svg>
+  );
+}
+
+function IconTable({ className }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 491.413 491.413">
+      <path d="M491.413,133.867c0-62.4-126.613-96.107-245.653-96.107S0,71.467,0,133.867c0,60.48,118.72,93.973,234.453,96v125.76c-0.213,0.747-0.533,1.387-0.853,2.133c-4.587,0.32-8.533,3.52-9.6,8.107c-1.173,4.16-2.773,8.107-4.8,11.947c-1.067,0.533-2.24,0.853-3.413,1.067c-12.373,1.6-30.08-17.707-36.693-27.307c-3.307-4.907-10.027-6.08-14.827-2.773c-4.8,3.307-6.08,10.027-2.773,14.827c2.347,3.413,20.373,29.013,42.987,35.2c-13.013,14.08-34.027,28.373-67.84,33.6c-5.867,0.853-9.813,6.293-8.96,12.16c0.747,5.227,5.333,9.067,10.56,9.067c0.533,0,1.067,0,1.6-0.107c56.853-8.64,83.733-39.68,95.787-61.227c3.627-3.093,6.827-6.613,9.387-10.667c2.56,3.947,5.76,7.573,9.387,10.667c12.16,21.547,39.04,52.587,95.893,61.227c0.533,0.107,1.067,0.107,1.6,0.107c5.867,0,10.667-4.8,10.667-10.667c0-5.333-3.84-9.813-9.067-10.56c-33.92-5.227-55.04-19.52-67.947-33.6c22.613-6.293,40.747-31.893,43.093-35.307c3.307-4.907,2.027-11.52-2.773-14.827c-4.907-3.307-11.52-2.027-14.827,2.773c-6.507,9.6-24.213,29.013-36.693,27.307c-1.173-0.107-2.453-0.533-3.52-1.067c-1.92-3.84-3.52-7.787-4.693-11.947c-1.067-4.48-5.013-7.787-9.6-8c-0.32-0.747-0.533-1.387-0.853-2.133l0.107-125.653C371.84,228.16,491.413,194.56,491.413,133.867z M248.32,208.747c-1.707-0.747-3.733-0.747-5.44,0C112.747,208,22.187,169.067,22.187,134.08c0-35.307,91.947-74.667,224-74.667s224,39.36,224,74.667C470.187,169.173,379.2,208.32,248.32,208.747z" />
+    </svg>
+  );
+}
+
+function IconDocument({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function IconPerson({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  );
+}
+
+function IconLanguage({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+    </svg>
+  );
+}
+
+function ReportTabIcon({ id, className }) {
+  if (id === 'document') return <IconDocument className={className} />;
+  if (id === 'person') return <IconPerson className={className} />;
+  if (id === 'chart') return <IconChart className={className} />;
+  if (id === 'gear') return <IconGear className={className} />;
+  return null;
+}
+
+function SidebarIcon({ id, className }) {
+  if (id === 'monitor') return <IconMonitor className={className} />;
+  if (id === 'chart') return <IconChart className={className} />;
+  if (id === 'users') return <IconUsers className={className} />;
+  if (id === 'language') return <IconLanguage className={className} />;
+  return null;
+}
+
+function TopNavIcon({ id, className }) {
+  if (id === 'box') return <IconBox className={className} />;
+  if (id === 'gear') return <IconGear className={className} />;
+  if (id === 'printer') return <IconPrinter className={className} />;
+  if (id === 'table') return <IconTable className={className} />;
+  return null;
+}
+
+export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, fetchTables, onFunctionButtonsSaved }) {
+  const { lang, setLang, t } = useLanguage();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [controlSidebarId, setControlSidebarId] = useState('personalize');
+  const [appLanguage, setAppLanguage] = useState(() => (LANGUAGE_OPTIONS.some((o) => o.value === lang) ? lang : 'en'));
+  const [savingAppLanguage, setSavingAppLanguage] = useState(false);
+  const [topNavId, setTopNavId] = useState('categories-products');
+  const [subNavId, setSubNavId] = useState('Price Groups');
+  const [reportTabId, setReportTabId] = useState('financial');
+  const [reportGenerateUntil, setReportGenerateUntil] = useState('current-time');
+  const [periodicReportStartTime, setPeriodicReportStartTime] = useState('00:00');
+  const [periodicReportStartDate, setPeriodicReportStartDate] = useState(() => {
+    const d = new Date();
+    return [String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear()].join('-');
+  });
+  const [periodicReportEndTime, setPeriodicReportEndTime] = useState('24:00');
+  const [periodicReportEndDate, setPeriodicReportEndDate] = useState(() => {
+    const d = new Date();
+    return [String(d.getDate()).padStart(2, '0'), String(d.getMonth() + 1).padStart(2, '0'), d.getFullYear()].join('-');
+  });
+  const [reportSettings, setReportSettings] = useState(() => ({ ...DEFAULT_REPORT_SETTINGS }));
+  const [savingReportSettings, setSavingReportSettings] = useState(false);
+
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const usersListRef = useRef(null);
+  const [canUsersScrollUp, setCanUsersScrollUp] = useState(false);
+  const [canUsersScrollDown, setCanUsersScrollDown] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [userName, setUserName] = useState('');
+  const [userPin, setUserPin] = useState('');
+  const [savingUser, setSavingUser] = useState(false);
+  const [deleteConfirmUserId, setDeleteConfirmUserId] = useState(null);
+  const [userModalTab, setUserModalTab] = useState('general');
+  const [userAvatarColorIndex, setUserAvatarColorIndex] = useState(0);
+  const [userModalActiveField, setUserModalActiveField] = useState(null);
+  const [userPrivileges, setUserPrivileges] = useState(() => ({ ...DEFAULT_USER_PRIVILEGES }));
+
+  const [discounts, setDiscounts] = useState([]);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [editingDiscountId, setEditingDiscountId] = useState(null);
+  const [discountName, setDiscountName] = useState('');
+  const [discountTrigger, setDiscountTrigger] = useState('number');
+  const [discountType, setDiscountType] = useState('amount');
+  const [discountValue, setDiscountValue] = useState('');
+  const [discountStartDate, setDiscountStartDate] = useState('');
+  const [discountEndDate, setDiscountEndDate] = useState('');
+  const [discountOn, setDiscountOn] = useState('products');
+  const [discountPieces, setDiscountPieces] = useState('');
+  const [discountCombinable, setDiscountCombinable] = useState(false);
+  const [discountTargetId, setDiscountTargetId] = useState('');
+  const [discountTargetIds, setDiscountTargetIds] = useState([]);
+  const [discountProductOptions, setDiscountProductOptions] = useState([]);
+  const discountTargetListRef = useRef(null);
+  const [canDiscountTargetScrollUp, setCanDiscountTargetScrollUp] = useState(false);
+  const [canDiscountTargetScrollDown, setCanDiscountTargetScrollDown] = useState(false);
+  const [discountKeyboardValue, setDiscountKeyboardValue] = useState('');
+  const [savingDiscount, setSavingDiscount] = useState(false);
+  const [deleteConfirmDiscountId, setDeleteConfirmDiscountId] = useState(null);
+  const [discountCalendarField, setDiscountCalendarField] = useState(null); // 'start' | 'end' | null
+  const discountsListRef = useRef(null);
+  const [canDiscountsScrollUp, setCanDiscountsScrollUp] = useState(false);
+  const [canDiscountsScrollDown, setCanDiscountsScrollDown] = useState(false);
+
+  const [kitchens, setKitchens] = useState([]);
+  const [deleteConfirmKitchenId, setDeleteConfirmKitchenId] = useState(null);
+  const [showKitchenModal, setShowKitchenModal] = useState(false);
+  const [editingKitchenId, setEditingKitchenId] = useState(null);
+  const [kitchenModalName, setKitchenModalName] = useState('');
+  const [savingKitchen, setSavingKitchen] = useState(false);
+  const kitchenListRef = useRef(null);
+  const [canKitchenScrollUp, setCanKitchenScrollUp] = useState(false);
+  const [canKitchenScrollDown, setCanKitchenScrollDown] = useState(false);
+  const [showKitchenProductsModal, setShowKitchenProductsModal] = useState(false);
+  const [kitchenProductsKitchen, setKitchenProductsKitchen] = useState(null);
+  const [kitchenProductsCatalog, setKitchenProductsCatalog] = useState([]);
+  const [kitchenProductsModalCategories, setKitchenProductsModalCategories] = useState([]);
+  const [kitchenProductsCategoryFilter, setKitchenProductsCategoryFilter] = useState('');
+  const [kitchenProductsLinked, setKitchenProductsLinked] = useState([]);
+  const [kitchenProductsLeftSelectedIds, setKitchenProductsLeftSelectedIds] = useState(() => new Set());
+  const [kitchenProductsRightSelectedIds, setKitchenProductsRightSelectedIds] = useState(() => new Set());
+  const [loadingKitchenProductsCatalog, setLoadingKitchenProductsCatalog] = useState(false);
+  const [savingKitchenProducts, setSavingKitchenProducts] = useState(false);
+  const kitchenProductsLeftListRef = useRef(null);
+  const kitchenProductsRightListRef = useRef(null);
+
+  const [priceGroups, setPriceGroups] = useState([]);
+  const [priceGroupsLoading, setPriceGroupsLoading] = useState(false);
+  const priceGroupsListRef = useRef(null);
+  const [canPriceGroupsScrollUp, setCanPriceGroupsScrollUp] = useState(false);
+  const [canPriceGroupsScrollDown, setCanPriceGroupsScrollDown] = useState(false);
+  const [showPriceGroupModal, setShowPriceGroupModal] = useState(false);
+  const [editingPriceGroupId, setEditingPriceGroupId] = useState(null);
+  const [priceGroupName, setPriceGroupName] = useState('');
+  const [priceGroupTax, setPriceGroupTax] = useState('standard');
+  const [savingPriceGroup, setSavingPriceGroup] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryNextCourse, setCategoryNextCourse] = useState('');
+  const [categoryInWebshop, setCategoryInWebshop] = useState(true);
+  const [categoryDisplayOnCashRegister, setCategoryDisplayOnCashRegister] = useState(true);
+  const [categoryActiveField, setCategoryActiveField] = useState('name');
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [deleteConfirmCategoryId, setDeleteConfirmCategoryId] = useState(null);
+  const categoriesListRef = useRef(null);
+  const [canCategoriesScrollUp, setCanCategoriesScrollUp] = useState(false);
+  const [canCategoriesScrollDown, setCanCategoriesScrollDown] = useState(false);
+  const productsListRef = useRef(null);
+  const productsCategoryTabsRef = useRef(null);
+  const [canProductsScrollUp, setCanProductsScrollUp] = useState(false);
+  const [canProductsScrollDown, setCanProductsScrollDown] = useState(false);
+  const subproductsListRef = useRef(null);
+  const subproductsGroupTabsRef = useRef(null);
+  const [canSubproductsScrollUp, setCanSubproductsScrollUp] = useState(false);
+  const [canSubproductsScrollDown, setCanSubproductsScrollDown] = useState(false);
+
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [productHasSubproductsById, setProductHasSubproductsById] = useState({});
+  const [showProductSubproductsModal, setShowProductSubproductsModal] = useState(false);
+  const [productSubproductsProduct, setProductSubproductsProduct] = useState(null);
+  const [productSubproductsGroupId, setProductSubproductsGroupId] = useState('');
+  const [productSubproductsOptions, setProductSubproductsOptions] = useState([]);
+  const [productSubproductsByGroup, setProductSubproductsByGroup] = useState({});
+  const [productSubproductsLeftSelectedIds, setProductSubproductsLeftSelectedIds] = useState(() => new Set());
+  const [productSubproductsRightSelectedIds, setProductSubproductsRightSelectedIds] = useState(() => new Set());
+  const [productSubproductsLinked, setProductSubproductsLinked] = useState([]);
+  const productSubproductsLeftListRef = useRef(null);
+  const productSubproductsListRef = useRef(null);
+  const [loadingProductSubproductsLinked, setLoadingProductSubproductsLinked] = useState(false);
+  const [savingProductSubproducts, setSavingProductSubproducts] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showProductPositioningModal, setShowProductPositioningModal] = useState(false);
+  const [positioningCategoryId, setPositioningCategoryId] = useState(null);
+  const [positioningSelectedProductId, setPositioningSelectedProductId] = useState(null);
+  const [positioningSelectedCellIndex, setPositioningSelectedCellIndex] = useState(null);
+  const [positioningSelectedPoolItemId, setPositioningSelectedPoolItemId] = useState(null);
+  const [positioningSubproducts, setPositioningSubproducts] = useState([]);
+  const [positioningLayoutByCategory, setPositioningLayoutByCategory] = useState({});
+  const [positioningColorByCategory, setPositioningColorByCategory] = useState({});
+  const [savingPositioningLayout, setSavingPositioningLayout] = useState(false);
+  const [positioningLayoutSaveMessage, setPositioningLayoutSaveMessage] = useState('');
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [productTab, setProductTab] = useState('general');
+  const [productTabsUnlocked, setProductTabsUnlocked] = useState(false);
+  const [productDisplayNumber, setProductDisplayNumber] = useState(null);
+  const [productName, setProductName] = useState('');
+  const [productKeyName, setProductKeyName] = useState('');
+  const [productProductionName, setProductProductionName] = useState('');
+  const [productPrice, setProductPrice] = useState('');
+  const [productVatTakeOut, setProductVatTakeOut] = useState('');
+  const [productVatEatIn, setProductVatEatIn] = useState('');
+  const [productCategoryIds, setProductCategoryIds] = useState(['']);
+  const [productAddition, setProductAddition] = useState('Subproducts');
+  const [productBarcode, setProductBarcode] = useState('');
+  const [productPrinter1, setProductPrinter1] = useState('');
+  const [productPrinter2, setProductPrinter2] = useState('');
+  const [productPrinter3, setProductPrinter3] = useState('');
+  const [productActiveField, setProductActiveField] = useState('name');
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [deleteConfirmProductId, setDeleteConfirmProductId] = useState(null);
+  const [productSearch, setProductSearch] = useState('');
+  const [showProductSearchKeyboard, setShowProductSearchKeyboard] = useState(false);
+  const [barcodeButtonSpinning, setBarcodeButtonSpinning] = useState(false);
+  const [productFieldErrors, setProductFieldErrors] = useState({ name: false, keyName: false, productionName: false, vatTakeOut: false, vatEatIn: false });
+  const [advancedOpenPrice, setAdvancedOpenPrice] = useState(false);
+  const [advancedWeegschaal, setAdvancedWeegschaal] = useState(false);
+  const [advancedSubproductRequires, setAdvancedSubproductRequires] = useState(false);
+  const [advancedLeeggoedPrijs, setAdvancedLeeggoedPrijs] = useState('0.00');
+  const [advancedPagerVerplicht, setAdvancedPagerVerplicht] = useState(false);
+  const [advancedBoldPrint, setAdvancedBoldPrint] = useState(false);
+  const [advancedGroupingReceipt, setAdvancedGroupingReceipt] = useState(true);
+  const [advancedLabelExtraInfo, setAdvancedLabelExtraInfo] = useState('');
+  const [advancedVoorverpakVervaltype, setAdvancedVoorverpakVervaltype] = useState('Shelf life');
+  const [advancedHoudbareDagen, setAdvancedHoudbareDagen] = useState('0');
+  const [advancedBewarenGebruik, setAdvancedBewarenGebruik] = useState('');
+  const [advancedKassaPhotoPreview, setAdvancedKassaPhotoPreview] = useState(null);
+
+  const [extraPricesRows, setExtraPricesRows] = useState([]);
+  const [extraPricesSelectedIndex, setExtraPricesSelectedIndex] = useState(0);
+  const extraPricesScrollRef = useRef(null);
+  const [extraPricesScrollEdges, setExtraPricesScrollEdges] = useState({ atTop: true, atBottom: true });
+
+  const syncExtraPricesScrollEdges = useCallback(() => {
+    const el = extraPricesScrollRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    if (scrollHeight <= clientHeight + 1) {
+      setExtraPricesScrollEdges({ atTop: true, atBottom: true });
+      return;
+    }
+    setExtraPricesScrollEdges({
+      atTop: scrollTop <= 1,
+      atBottom: scrollTop + clientHeight >= scrollHeight - 1
+    });
+  }, []);
+
+  const [purchaseVat, setPurchaseVat] = useState('');
+  const [purchasePriceExcl, setPurchasePriceExcl] = useState('0.00');
+  const [purchasePriceIncl, setPurchasePriceIncl] = useState('0.00');
+  const [profitPct, setProfitPct] = useState('0.00');
+  const [purchaseUnit, setPurchaseUnit] = useState('Piece');
+  const [unitContent, setUnitContent] = useState('0');
+  const [stock, setStock] = useState('0');
+  const [purchaseSupplier, setPurchaseSupplier] = useState('');
+  const [supplierCode, setSupplierCode] = useState('');
+  const [stockNotification, setStockNotification] = useState(true);
+  const [expirationDate, setExpirationDate] = useState('');
+  const [declarationExpiryDays, setDeclarationExpiryDays] = useState('0');
+  const [notificationSoldOutPieces, setNotificationSoldOutPieces] = useState('');
+
+  const [productInWebshop, setProductInWebshop] = useState(false);
+  const [webshopOnlineOrderable, setWebshopOnlineOrderable] = useState(true);
+  const [websiteRemark, setWebsiteRemark] = useState('');
+  const [websiteOrder, setWebsiteOrder] = useState('0');
+  const [shortWebText, setShortWebText] = useState('');
+  const [websitePhotoFileName, setWebsitePhotoFileName] = useState('');
+
+  const [kioskInfo, setKioskInfo] = useState('');
+  const [kioskTakeAway, setKioskTakeAway] = useState(true);
+  const [kioskEatIn, setKioskEatIn] = useState('');
+  const [kioskSubtitle, setKioskSubtitle] = useState('');
+  const [kioskPictureFileName, setKioskPictureFileName] = useState('');
+  const [kioskMinSubs, setKioskMinSubs] = useState('unlimited');
+  const [kioskMaxSubs, setKioskMaxSubs] = useState('unlimited');
+
+  const [tableLocations, setTableLocations] = useState([]);
+  const [tableLocationsLoading, setTableLocationsLoading] = useState(false);
+  const [showTableLocationModal, setShowTableLocationModal] = useState(false);
+  const [editingTableLocationId, setEditingTableLocationId] = useState(null);
+  const [tableLocationName, setTableLocationName] = useState('');
+  const [tableLocationSelectionStart, setTableLocationSelectionStart] = useState(0);
+  const [tableLocationSelectionEnd, setTableLocationSelectionEnd] = useState(0);
+  const [tableLocationBackground, setTableLocationBackground] = useState('');
+  const [tableLocationTextColor, setTableLocationTextColor] = useState('light');
+  const [savingTableLocation, setSavingTableLocation] = useState(false);
+  const [deleteConfirmTableLocationId, setDeleteConfirmTableLocationId] = useState(null);
+  const tableLocationsListRef = useRef(null);
+  const [canTableLocationsScrollUp, setCanTableLocationsScrollUp] = useState(false);
+  const [canTableLocationsScrollDown, setCanTableLocationsScrollDown] = useState(false);
+  const tableLocationNameInputRef = useRef(null);
+  const [showSetTablesModal, setShowSetTablesModal] = useState(false);
+  const [setTablesLocationId, setSetTablesLocationId] = useState(null);
+  const [setTablesLocationName, setSetTablesLocationName] = useState('');
+  const [setTablesDraft, setSetTablesDraft] = useState(() => normalizeLayoutEditorDraft(null, 'Restaurant'));
+  const [setTablesSelectedTableId, setSetTablesSelectedTableId] = useState(null);
+  const [setTablesSelectedBoardIndex, setSetTablesSelectedBoardIndex] = useState(null);
+  const [setTablesSelectedFlowerPotIndex, setSetTablesSelectedFlowerPotIndex] = useState(null);
+  const [showSetTableTypeModal, setShowSetTableTypeModal] = useState(false);
+  const [showSetBoardColorModal, setShowSetBoardColorModal] = useState(false);
+  const setTablesCanvasRef = useRef(null);
+  const setTablesDragRef = useRef(null);
+  const [setTablesCanvasZoom, setSetTablesCanvasZoom] = useState(100);
+  const [setTablesDraggingId, setSetTablesDraggingId] = useState(null);
+  const [setTablesDraggingType, setSetTablesDraggingType] = useState(null);
+
+  const [templateTheme, setTemplateTheme] = useState(() => {
+    try {
+      return (typeof localStorage !== 'undefined' && localStorage.getItem('pos-template-theme')) || 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  const [savingTemplateSettings, setSavingTemplateSettings] = useState(false);
+
+  const [showDeviceSettingsModal, setShowDeviceSettingsModal] = useState(false);
+  const [deviceSettingsTab, setDeviceSettingsTab] = useState('General');
+  const [deviceUseSubproducts, setDeviceUseSubproducts] = useState(true);
+  const [deviceAutoLogoutAfterTransaction, setDeviceAutoLogoutAfterTransaction] = useState(false);
+  const [deviceAutoReturnToTablePlan, setDeviceAutoReturnToTablePlan] = useState(false);
+  const [deviceDisableCashButtonInPayment, setDeviceDisableCashButtonInPayment] = useState(false);
+  const [deviceOpenPriceWithoutPopup, setDeviceOpenPriceWithoutPopup] = useState(false);
+  const [deviceOpenCashDrawerAfterOrder, setDeviceOpenCashDrawerAfterOrder] = useState(true);
+  const [deviceAutoReturnToCounterSale, setDeviceAutoReturnToCounterSale] = useState(false);
+  const [deviceAskSendToKitchen, setDeviceAskSendToKitchen] = useState(false);
+  const [deviceCounterSaleVat, setDeviceCounterSaleVat] = useState('take-out');
+  const [deviceTableSaleVat, setDeviceTableSaleVat] = useState('eat-in');
+  const [deviceTimeoutLogout, setDeviceTimeoutLogout] = useState(0);
+  const [deviceFixedBorder, setDeviceFixedBorder] = useState(true);
+  const [deviceAlwaysOnTop, setDeviceAlwaysOnTop] = useState(true);
+  const [deviceAskInvoiceOrTicket, setDeviceAskInvoiceOrTicket] = useState(false);
+  const [savingDeviceSettings, setSavingDeviceSettings] = useState(false);
+  const [devicePrinterGroupingProducts, setDevicePrinterGroupingProducts] = useState(true);
+  const [devicePrinterShowErrorScreen, setDevicePrinterShowErrorScreen] = useState(true);
+  const [devicePrinterProductionMessageOnVat, setDevicePrinterProductionMessageOnVat] = useState(false);
+  const [devicePrinterNextCourseOrder, setDevicePrinterNextCourseOrder] = useState('as-registered');
+  const [devicePrinterStandardMode, setDevicePrinterStandardMode] = useState('enable');
+  const [devicePrinterQROrderPrinter, setDevicePrinterQROrderPrinter] = useState('');
+  const [devicePrinterReprintWithNextCourse, setDevicePrinterReprintWithNextCourse] = useState(false);
+  const [devicePrinterPrintZeroTickets, setDevicePrinterPrintZeroTickets] = useState(false);
+  const [devicePrinterGiftVoucherAtMin, setDevicePrinterGiftVoucherAtMin] = useState(false);
+  const [deviceCategoryDisplayIds, setDeviceCategoryDisplayIds] = useState([]); // empty = all categories displayed
+  const [deviceOrdersConfirmOnHold, setDeviceOrdersConfirmOnHold] = useState(false);
+  const [deviceOrdersPrintBarcodeAfterCreate, setDeviceOrdersPrintBarcodeAfterCreate] = useState(false);
+  const [deviceOrdersCustomerCanBeModified, setDeviceOrdersCustomerCanBeModified] = useState(false);
+  const [deviceOrdersBookTableToWaiting, setDeviceOrdersBookTableToWaiting] = useState(false);
+  const [deviceOrdersFastCustomerName, setDeviceOrdersFastCustomerName] = useState(false);
+  const [deviceScheduledPrinter, setDeviceScheduledPrinter] = useState('');
+  const [deviceScheduledProductionFlow, setDeviceScheduledProductionFlow] = useState('scheduled-orders-print');
+  const [deviceScheduledLoading, setDeviceScheduledLoading] = useState('0');
+  const [deviceScheduledMode, setDeviceScheduledMode] = useState('labels');
+  const [deviceScheduledInvoiceLayout, setDeviceScheduledInvoiceLayout] = useState('standard');
+  const [deviceScheduledCheckoutAt, setDeviceScheduledCheckoutAt] = useState('delivery-note');
+  const [deviceScheduledPrintBarcodeLabel, setDeviceScheduledPrintBarcodeLabel] = useState(true);
+  const [deviceScheduledDeliveryNoteToTurnover, setDeviceScheduledDeliveryNoteToTurnover] = useState(true);
+  const [deviceScheduledPrintProductionReceipt, setDeviceScheduledPrintProductionReceipt] = useState(true);
+  const [deviceScheduledPrintCustomerProductionReceipt, setDeviceScheduledPrintCustomerProductionReceipt] = useState(true);
+  const [deviceScheduledWebOrderAutoPrint, setDeviceScheduledWebOrderAutoPrint] = useState(true);
+  const [functionButtonSlots, setFunctionButtonSlots] = useState(() =>
+    Array(FUNCTION_BUTTON_SLOT_COUNT).fill('')
+  );
+  const [selectedFunctionButtonSlotIndex, setSelectedFunctionButtonSlotIndex] = useState(null);
+  const [selectedFunctionButtonPoolItemId, setSelectedFunctionButtonPoolItemId] = useState(null);
+  const [optionButtonSlots, setOptionButtonSlots] = useState(() =>
+    normalizeOptionButtonSlots(null)
+  );
+  const [selectedOptionButtonSlotIndex, setSelectedOptionButtonSlotIndex] = useState(null);
+  const [selectedOptionButtonPoolItemId, setSelectedOptionButtonPoolItemId] = useState(null);
+
+  const [showSystemSettingsModal, setShowSystemSettingsModal] = useState(false);
+  const [systemSettingsTab, setSystemSettingsTab] = useState('General');
+  const [sysUseStockManagement, setSysUseStockManagement] = useState(true);
+  const [sysUsePriceGroups, setSysUsePriceGroups] = useState(true);
+  const [sysLoginWithoutCode, setSysLoginWithoutCode] = useState(true);
+  const [sysCategorieenPerKassa, setSysCategorieenPerKassa] = useState(true);
+  const [sysAutoAcceptQROrders, setSysAutoAcceptQROrders] = useState(false);
+  const [sysQrOrdersAutomatischAfrekenen, setSysQrOrdersAutomatischAfrekenen] = useState(false);
+  const [sysEnkelQROrdersKeukenscherm, setSysEnkelQROrdersKeukenscherm] = useState(false);
+  const [sysAspect169Windows, setSysAspect169Windows] = useState(false);
+  const [sysVatRateVariousProducts, setSysVatRateVariousProducts] = useState('12');
+  const [sysArrangeProductsManually, setSysArrangeProductsManually] = useState(true);
+  const [sysLimitOneUserPerTable, setSysLimitOneUserPerTable] = useState(false);
+  const [sysOneWachtorderPerKlant, setSysOneWachtorderPerKlant] = useState(false);
+  const [sysCashButtonVisibleMultiplePayment, setSysCashButtonVisibleMultiplePayment] = useState(true);
+  const [sysUsePlaceSettings, setSysUsePlaceSettings] = useState(false);
+  const [sysTegoedAutomatischInladen, setSysTegoedAutomatischInladen] = useState(true);
+  const [sysNieuwstePrijsGebruiken, setSysNieuwstePrijsGebruiken] = useState(true);
+  const [sysLeeggoedTerugname, setSysLeeggoedTerugname] = useState('by-customers-name');
+  const [sysKlantgegevensQRAfdrukken, setSysKlantgegevensQRAfdrukken] = useState(false);
+  const [savingSystemSettings, setSavingSystemSettings] = useState(false);
+  const [sysPriceTakeAway, setSysPriceTakeAway] = useState('');
+  const [sysPriceDelivery, setSysPriceDelivery] = useState('');
+  const [sysPriceCounterSale, setSysPriceCounterSale] = useState('');
+  const [sysPriceTableSale, setSysPriceTableSale] = useState('');
+  const [sysSavingsPointsPerEuro, setSysSavingsPointsPerEuro] = useState(0);
+  const [sysSavingsPointsPerDiscount, setSysSavingsPointsPerDiscount] = useState(0);
+  const [sysSavingsDiscount, setSysSavingsDiscount] = useState('');
+  const [sysTicketVoucherValidity, setSysTicketVoucherValidity] = useState('3');
+  const [sysTicketScheduledPrintMode, setSysTicketScheduledPrintMode] = useState('label-large');
+  const [sysTicketScheduledCustomerSort, setSysTicketScheduledCustomerSort] = useState('as-registered');
+  const [sysBarcodeType, setSysBarcodeType] = useState('Code39');
+
+  const [paymentTypes, setPaymentTypes] = useState([]);
+  const [paymentTypesLoading, setPaymentTypesLoading] = useState(false);
+  const paymentTypesListRef = useRef(null);
+  const [canPaymentTypesScrollUp, setCanPaymentTypesScrollUp] = useState(false);
+  const [canPaymentTypesScrollDown, setCanPaymentTypesScrollDown] = useState(false);
+  const [showPaymentTypeModal, setShowPaymentTypeModal] = useState(false);
+  const [editingPaymentTypeId, setEditingPaymentTypeId] = useState(null);
+  const [paymentTypeName, setPaymentTypeName] = useState('');
+  const [paymentTypeActive, setPaymentTypeActive] = useState(true);
+  const [paymentTypeIntegration, setPaymentTypeIntegration] = useState('generic');
+  const [savingPaymentType, setSavingPaymentType] = useState(false);
+  const [deleteConfirmPaymentTypeId, setDeleteConfirmPaymentTypeId] = useState(null);
+
+  const [showProductionMessagesModal, setShowProductionMessagesModal] = useState(false);
+  const [productionMessages, setProductionMessages] = useState([]);
+  const [productionMessageInput, setProductionMessageInput] = useState('');
+  const [productionMessagesPage, setProductionMessagesPage] = useState(0);
+  const PRODUCTION_MESSAGES_PAGE_SIZE = 5;
+  const PRODUCTION_MESSAGES_PAGE_SIZE1 = 8;
+  const [editingProductionMessageId, setEditingProductionMessageId] = useState(null);
+  const [deleteConfirmProductionMessageId, setDeleteConfirmProductionMessageId] = useState(null);
+  const productionMessagesListRef = useRef(null);
+  const [canProductionMessagesScrollUp, setCanProductionMessagesScrollUp] = useState(false);
+  const [canProductionMessagesScrollDown, setCanProductionMessagesScrollDown] = useState(false);
+
+  const [printerTab, setPrinterTab] = useState('General');
+  const [printers, setPrinters] = useState(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printers');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch (_) { }
+    return DEFAULT_PRINTERS.map((p, i) => ({ ...p, sortOrder: i }));
+  });
+  const [showPrinterModal, setShowPrinterModal] = useState(false);
+  const [editingPrinterId, setEditingPrinterId] = useState(null);
+  const [deleteConfirmPrinterId, setDeleteConfirmPrinterId] = useState(null);
+  const [printersPage, setPrintersPage] = useState(0);
+  const PRINTERS_PAGE_SIZE = 7;
+
+  const [finalTicketsCompanyData1, setFinalTicketsCompanyData1] = useState('');
+  const [finalTicketsCompanyData2, setFinalTicketsCompanyData2] = useState('');
+  const [finalTicketsCompanyData3, setFinalTicketsCompanyData3] = useState('');
+  const [finalTicketsCompanyData4, setFinalTicketsCompanyData4] = useState('');
+  const [finalTicketsCompanyData5, setFinalTicketsCompanyData5] = useState('');
+  const [finalTicketsThankText, setFinalTicketsThankText] = useState('Thank you and goodbye');
+  const [finalTicketsProforma, setFinalTicketsProforma] = useState(false);
+  const [finalTicketsPrintPaymentType, setFinalTicketsPrintPaymentType] = useState(false);
+  const [finalTicketsTicketTearable, setFinalTicketsTicketTearable] = useState(false);
+  const [finalTicketsPrintLogo, setFinalTicketsPrintLogo] = useState(false);
+  const [finalTicketsPrintingOrder, setFinalTicketsPrintingOrder] = useState('as-registered');
+  const [finalTicketsActiveField, setFinalTicketsActiveField] = useState(null);
+  const [savingFinalTickets, setSavingFinalTickets] = useState(false);
+
+  const [prodTicketsDisplayCategories, setProdTicketsDisplayCategories] = useState(false);
+  const [prodTicketsSpaceAbove, setProdTicketsSpaceAbove] = useState(false);
+  const [prodTicketsTicketTearable, setProdTicketsTicketTearable] = useState(false);
+  const [prodTicketsKeukenprinterBuzzer, setProdTicketsKeukenprinterBuzzer] = useState(false);
+  const [prodTicketsProductenIndividueel, setProdTicketsProductenIndividueel] = useState(false);
+  const [prodTicketsEatInTakeOutOnderaan, setProdTicketsEatInTakeOutOnderaan] = useState(false);
+  const [prodTicketsNextCoursePrinter1, setProdTicketsNextCoursePrinter1] = useState('disabled');
+  const [prodTicketsNextCoursePrinter2, setProdTicketsNextCoursePrinter2] = useState('disabled');
+  const [prodTicketsNextCoursePrinter3, setProdTicketsNextCoursePrinter3] = useState('disabled');
+  const [prodTicketsNextCoursePrinter4, setProdTicketsNextCoursePrinter4] = useState('disabled');
+  const [prodTicketsPrintingOrder, setProdTicketsPrintingOrder] = useState('as-registered');
+  const [prodTicketsGroupingReceipt, setProdTicketsGroupingReceipt] = useState('enable');
+  const [prodTicketsPrinterOverboeken, setProdTicketsPrinterOverboeken] = useState('disabled');
+  const [savingProdTickets, setSavingProdTickets] = useState(false);
+
+  const [labelsType, setLabelsType] = useState('production-labels');
+  const [labelsPrinter, setLabelsPrinter] = useState('p3');
+  const [labelsList, setLabelsList] = useState(() => {
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_labels_list');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch (_) { }
+    return DEFAULT_LABELS_LIST.map((l, i) => ({ ...l, sortOrder: i }));
+  });
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [editingLabelId, setEditingLabelId] = useState(null);
+  const [labelName, setLabelName] = useState('');
+  const [labelHeight, setLabelHeight] = useState('');
+  const [labelWidth, setLabelWidth] = useState('');
+  const [labelStandard, setLabelStandard] = useState(false);
+  const [labelMarginLeft, setLabelMarginLeft] = useState('0');
+  const [labelMarginRight, setLabelMarginRight] = useState('0');
+  const [labelMarginBottom, setLabelMarginBottom] = useState('0');
+  const [labelMarginTop, setLabelMarginTop] = useState('0');
+  const [deleteConfirmLabelId, setDeleteConfirmLabelId] = useState(null);
+  const labelsListRef = useRef(null);
+  const [canLabelsScrollUp, setCanLabelsScrollUp] = useState(false);
+  const [canLabelsScrollDown, setCanLabelsScrollDown] = useState(false);
+  const [labelsListPage, setLabelsListPage] = useState(0);
+
+  const [priceDisplayType, setPriceDisplayType] = useState('disabled');
+  const [priceDisplayKeyboardValue, setPriceDisplayKeyboardValue] = useState('');
+  const [savingPriceDisplay, setSavingPriceDisplay] = useState(false);
+
+  const [rfidReaderType, setRfidReaderType] = useState('disabled');
+  const [rfidReaderKeyboardValue, setRfidReaderKeyboardValue] = useState('');
+  const [savingRfidReader, setSavingRfidReader] = useState(false);
+
+  const [barcodeScannerType, setBarcodeScannerType] = useState('disabled');
+  const [barcodeScannerKeyboardValue, setBarcodeScannerKeyboardValue] = useState('');
+  const [savingBarcodeScanner, setSavingBarcodeScanner] = useState(false);
+
+  const [creditCardType, setCreditCardType] = useState('disabled');
+  const [creditCardKeyboardValue, setCreditCardKeyboardValue] = useState('');
+  const [savingCreditCard, setSavingCreditCard] = useState(false);
+
+  const [scaleType, setScaleType] = useState('disabled');
+  const [scalePort, setScalePort] = useState('');
+  const [scaleKeyboardValue, setScaleKeyboardValue] = useState('');
+  const [savingScale, setSavingScale] = useState(false);
+
+  const [cashmaticName, setCashmaticName] = useState('Cashmatic Terminal');
+  const [cashmaticConnectionType, setCashmaticConnectionType] = useState('tcp');
+  const [cashmaticIpAddress, setCashmaticIpAddress] = useState('');
+  const [cashmaticPort, setCashmaticPort] = useState('');
+  const [cashmaticUsername, setCashmaticUsername] = useState('');
+  const [cashmaticPassword, setCashmaticPassword] = useState('');
+  const [cashmaticUrl, setCashmaticUrl] = useState('');
+  const [cashmaticActiveField, setCashmaticActiveField] = useState('name');
+  const [savingCashmatic, setSavingCashmatic] = useState(false);
+  const [cashmaticTerminalId, setCashmaticTerminalId] = useState(null);
+
+  const [payworldName, setPayworldName] = useState('Payworld Terminal');
+  const [payworldIpAddress, setPayworldIpAddress] = useState('');
+  const [payworldPort, setPayworldPort] = useState('5015');
+  const [payworldActiveField, setPayworldActiveField] = useState('name');
+  const [savingPayworld, setSavingPayworld] = useState(false);
+  const [payworldTerminalId, setPayworldTerminalId] = useState(null);
+
+  const [subproductGroups, setSubproductGroups] = useState([]);
+  const [subproductGroupsLoading, setSubproductGroupsLoading] = useState(false);
+  const [selectedSubproductGroupId, setSelectedSubproductGroupId] = useState(null);
+  const [selectedSubproductId, setSelectedSubproductId] = useState(null);
+  const [subproducts, setSubproducts] = useState([]);
+  const [subproductsLoading, setSubproductsLoading] = useState(false);
+  const [subproductSearch, setSubproductSearch] = useState('');
+  const [showSubproductModal, setShowSubproductModal] = useState(false);
+  const [showManageGroupsModal, setShowManageGroupsModal] = useState(false);
+  const [editingSubproductId, setEditingSubproductId] = useState(null);
+  const [subproductName, setSubproductName] = useState('');
+  const [subproductKeyName, setSubproductKeyName] = useState('');
+  const [subproductProductionName, setSubproductProductionName] = useState('');
+  const [subproductActiveField, setSubproductActiveField] = useState('name');
+  const [subproductPrice, setSubproductPrice] = useState('');
+  const [subproductVatTakeOut, setSubproductVatTakeOut] = useState('');
+  const [subproductVatEatIn, setSubproductVatEatIn] = useState('');
+  const [subproductModalGroupId, setSubproductModalGroupId] = useState(null);
+  const [subproductKioskPicture, setSubproductKioskPicture] = useState('');
+  const [subproductAttachToCategoryIds, setSubproductAttachToCategoryIds] = useState([]);
+  const subproductAttachToListRef = useRef(null);
+  const [subproductAddCategoryId, setSubproductAddCategoryId] = useState('');
+  const [savingSubproduct, setSavingSubproduct] = useState(false);
+  const [deleteConfirmSubproductId, setDeleteConfirmSubproductId] = useState(null);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [showAddGroupInline, setShowAddGroupInline] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [editingGroupName, setEditingGroupName] = useState('');
+  const [deleteConfirmGroupId, setDeleteConfirmGroupId] = useState(null);
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [selectedManageGroupId, setSelectedManageGroupId] = useState(null);
+  const manageGroupsListRef = useRef(null);
+  const manageGroupsDragRef = useRef({ active: false, startY: 0, startScrollTop: 0, pointerId: null });
+  const positioningCategoryTabsRef = useRef(null);
+  const [canManageGroupsPageUp, setCanManageGroupsPageUp] = useState(false);
+  const [canManageGroupsPageDown, setCanManageGroupsPageDown] = useState(false);
+  const LOCALE_BY_LANG = { en: 'en-US', nl: 'nl-NL', fr: 'fr-FR', tr: 'tr-TR' };
+
+  const showToast = useCallback((type, text) => {
+    setToast({ id: Date.now(), type, text });
+  }, []);
+
+  const fetchPaymentTypes = useCallback(async () => {
+    setPaymentTypesLoading(true);
+    try {
+      const res = await fetch(`${API}/payment-methods`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(data?.data)) setPaymentTypes(data.data);
+      else throw new Error(data?.error || 'Failed to load payment methods');
+    } catch (e) {
+      showToast('error', e?.message || 'Failed to load payment methods');
+    } finally {
+      setPaymentTypesLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchPaymentTypes();
+  }, [fetchPaymentTypes]);
+
+  const updateManageGroupsPaginationState = useCallback(() => {
+    const el = manageGroupsListRef.current;
+    if (!el) {
+      setCanManageGroupsPageUp(false);
+      setCanManageGroupsPageDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanManageGroupsPageUp(el.scrollTop > 0);
+    setCanManageGroupsPageDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const pageManageGroups = useCallback((direction) => {
+    const el = manageGroupsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateTableLocationsScrollState = useCallback(() => {
+    const el = tableLocationsListRef.current;
+    if (!el) {
+      setCanTableLocationsScrollUp(false);
+      setCanTableLocationsScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanTableLocationsScrollUp(el.scrollTop > 0);
+    setCanTableLocationsScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollTableLocationsByPage = useCallback((direction) => {
+    const el = tableLocationsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateDiscountsScrollState = useCallback(() => {
+    const el = discountsListRef.current;
+    if (!el) {
+      setCanDiscountsScrollUp(false);
+      setCanDiscountsScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanDiscountsScrollUp(el.scrollTop > 0);
+    setCanDiscountsScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollDiscountsByPage = useCallback((direction) => {
+    const el = discountsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateKitchenScrollState = useCallback(() => {
+    const el = kitchenListRef.current;
+    if (!el) {
+      setCanKitchenScrollUp(false);
+      setCanKitchenScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanKitchenScrollUp(el.scrollTop > 0);
+    setCanKitchenScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollKitchenByPage = useCallback((direction) => {
+    const el = kitchenListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateCategoriesScrollState = useCallback(() => {
+    const el = categoriesListRef.current;
+    if (!el) {
+      setCanCategoriesScrollUp(false);
+      setCanCategoriesScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanCategoriesScrollUp(el.scrollTop > 0);
+    setCanCategoriesScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollCategoriesByPage = useCallback((direction) => {
+    const el = categoriesListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateProductsScrollState = useCallback(() => {
+    const el = productsListRef.current;
+    if (!el) {
+      setCanProductsScrollUp(false);
+      setCanProductsScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanProductsScrollUp(el.scrollTop > 0);
+    setCanProductsScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollProductsByPage = useCallback((direction) => {
+    const el = productsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateSubproductsScrollState = useCallback(() => {
+    const el = subproductsListRef.current;
+    if (!el) {
+      setCanSubproductsScrollUp(false);
+      setCanSubproductsScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanSubproductsScrollUp(el.scrollTop > 0);
+    setCanSubproductsScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollSubproductsByPage = useCallback((direction) => {
+    const el = subproductsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const scrollSubproductAttachToByPage = useCallback((direction) => {
+    const el = subproductAttachToListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(80, Math.floor(el.clientHeight * 0.9));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateProductionMessagesScrollState = useCallback(() => {
+    const el = productionMessagesListRef.current;
+    if (!el) {
+      setCanProductionMessagesScrollUp(false);
+      setCanProductionMessagesScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanProductionMessagesScrollUp(el.scrollTop > 0);
+    setCanProductionMessagesScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const updateDiscountTargetScrollState = useCallback(() => {
+    const el = discountTargetListRef.current;
+    if (!el) {
+      setCanDiscountTargetScrollUp(false);
+      setCanDiscountTargetScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanDiscountTargetScrollUp(el.scrollTop > 0);
+    setCanDiscountTargetScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollDiscountTargetByPage = useCallback((direction) => {
+    const el = discountTargetListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(80, Math.floor(el.clientHeight * 0.9));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updatePriceGroupsScrollState = useCallback(() => {
+    const el = priceGroupsListRef.current;
+    if (!el) {
+      setCanPriceGroupsScrollUp(false);
+      setCanPriceGroupsScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanPriceGroupsScrollUp(el.scrollTop > 0);
+    setCanPriceGroupsScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollPriceGroupsByPage = useCallback((direction) => {
+    const el = priceGroupsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updatePaymentTypesScrollState = useCallback(() => {
+    const el = paymentTypesListRef.current;
+    if (!el) {
+      setCanPaymentTypesScrollUp(false);
+      setCanPaymentTypesScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanPaymentTypesScrollUp(el.scrollTop > 0);
+    setCanPaymentTypesScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollPaymentTypesByPage = useCallback((direction) => {
+    const el = paymentTypesListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateUsersScrollState = useCallback(() => {
+    const el = usersListRef.current;
+    if (!el) {
+      setCanUsersScrollUp(false);
+      setCanUsersScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanUsersScrollUp(el.scrollTop > 0);
+    setCanUsersScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollUsersByPage = useCallback((direction) => {
+    const el = usersListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const updateLabelsScrollState = useCallback(() => {
+    const el = labelsListRef.current;
+    if (!el) {
+      setCanLabelsScrollUp(false);
+      setCanLabelsScrollDown(false);
+      return;
+    }
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    setCanLabelsScrollUp(el.scrollTop > 0);
+    setCanLabelsScrollDown(el.scrollTop < maxScrollTop - 1);
+  }, []);
+
+  const scrollLabelsByPage = useCallback((direction) => {
+    const el = labelsListRef.current;
+    if (!el) return;
+    const pageHeight = Math.max(120, Math.floor(el.clientHeight * 0.92));
+    const delta = direction === 'down' ? pageHeight : -pageHeight;
+    el.scrollBy({ top: delta, behavior: 'smooth' });
+  }, []);
+
+  const formatDateForCurrentLanguage = useCallback((isoDate) => {
+    if (!isoDate) return '';
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return isoDate;
+    return d.toLocaleDateString(LOCALE_BY_LANG[lang] || 'en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  }, [lang]);
+
+  useEffect(() => {
+    if (!showManageGroupsModal) return;
+    updateManageGroupsPaginationState();
+  }, [showManageGroupsModal, subproductGroups, updateManageGroupsPaginationState]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Discounts') return;
+    updateDiscountsScrollState();
+  }, [topNavId, subNavId, discounts, updateDiscountsScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Kitchen') return;
+    updateKitchenScrollState();
+  }, [topNavId, subNavId, kitchens, updateKitchenScrollState]);
+
+  useEffect(() => {
+    if (!showDiscountModal) return;
+    updateDiscountTargetScrollState();
+  }, [showDiscountModal, discountTargetIds, updateDiscountTargetScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Categories') return;
+    updateCategoriesScrollState();
+  }, [topNavId, subNavId, categories, updateCategoriesScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Products') return;
+    updateProductsScrollState();
+  }, [topNavId, subNavId, selectedCategoryId, products, productSearch, updateProductsScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Subproducts') return;
+    updateSubproductsScrollState();
+  }, [topNavId, subNavId, selectedSubproductGroupId, subproducts, updateSubproductsScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Price Groups') return;
+    updatePriceGroupsScrollState();
+  }, [topNavId, subNavId, priceGroups, updatePriceGroupsScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'cash-register' || subNavId !== 'Payment types') return;
+    updatePaymentTypesScrollState();
+  }, [topNavId, subNavId, paymentTypes, updatePaymentTypesScrollState]);
+
+  useEffect(() => {
+    if (controlSidebarId !== 'users') return;
+    updateUsersScrollState();
+  }, [controlSidebarId, users, updateUsersScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'tables') return;
+    updateTableLocationsScrollState();
+  }, [topNavId, tableLocations, updateTableLocationsScrollState]);
+
+  useEffect(() => {
+    if (!showProductionMessagesModal) return;
+    updateProductionMessagesScrollState();
+  }, [showProductionMessagesModal, productionMessages, updateProductionMessagesScrollState]);
+
+  useEffect(() => {
+    if (topNavId !== 'cash-register' || subNavId !== 'Printer' || printerTab !== 'Labels') return;
+    updateLabelsScrollState();
+  }, [topNavId, subNavId, printerTab, labelsList, updateLabelsScrollState]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const fetchPriceGroups = useCallback(async () => {
+    setPriceGroupsLoading(true);
+    try {
+      const res = await fetch(`${API}/price-groups`);
+      const data = await res.json();
+      setPriceGroups(Array.isArray(data) ? data : []);
+    } catch {
+      setPriceGroups([]);
+    } finally {
+      setPriceGroupsLoading(false);
+    }
+  }, []);
+
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    try {
+      const res = await fetch(`${API}/categories`);
+      const data = await res.json();
+      setCategories(Array.isArray(data) ? data : []);
+    } catch {
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (subNavId === 'Price Groups') fetchPriceGroups();
+  }, [subNavId, fetchPriceGroups]);
+
+  useEffect(() => {
+    if (subNavId === 'Categories') fetchCategories();
+  }, [subNavId, fetchCategories]);
+
+  const [discountsPage, setDiscountsPage] = useState(0);
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Discounts') setDiscountsPage(0);
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (subNavId === 'Products') fetchCategories();
+  }, [subNavId, fetchCategories]);
+
+  useEffect(() => {
+    if (showProductModal) fetchPriceGroups();
+  }, [showProductModal, fetchPriceGroups]);
+
+  useEffect(() => {
+    if (!showProductModal || !priceGroups.length) return;
+    setExtraPricesRows((prev) => {
+      const byId = new Map(prev.filter((r) => r.priceGroupId).map((r) => [r.priceGroupId, r]));
+      return priceGroups.map((pg) => {
+        const ex = byId.get(pg.id);
+        return {
+          priceGroupId: pg.id,
+          priceGroupLabel: pg.name,
+          otherName: ex?.otherName ?? '',
+          otherPrinter: ex?.otherPrinter ?? '',
+          otherPrice: ex?.otherPrice ?? ''
+        };
+      });
+    });
+  }, [showProductModal, priceGroups]);
+
+  const fetchProducts = useCallback(async (categoryId) => {
+    if (!categoryId) {
+      setProducts([]);
+      return;
+    }
+    setProductsLoading(true);
+    try {
+      const res = await fetch(`${API}/categories/${categoryId}/products`);
+      const data = await res.json();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch {
+      setProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (subNavId === 'Products' && selectedCategoryId) fetchProducts(selectedCategoryId);
+  }, [subNavId, selectedCategoryId, fetchProducts]);
+
+  useEffect(() => {
+    if (subNavId !== 'Products') return;
+    if (!Array.isArray(products) || products.length === 0) return;
+
+    let cancelled = false;
+    const toCheck = products
+      .map((p) => p?.id)
+      .filter((id) => id != null && productHasSubproductsById[id] == null);
+    if (toCheck.length === 0) return;
+
+    (async () => {
+      for (const id of toCheck) {
+        if (cancelled) return;
+        try {
+          const res = await fetch(`${API}/products/${id}/subproduct-links`);
+          const data = await res.json().catch(() => ({}));
+          const links = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+          const hasAny = links.length > 0;
+          if (!cancelled) {
+            setProductHasSubproductsById((prev) => (prev[id] === hasAny ? prev : { ...prev, [id]: hasAny }));
+          }
+        } catch {
+          // ignore
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subNavId, products, productHasSubproductsById]);
+
+  useEffect(() => {
+    if (subNavId === 'Products' && categories.length > 0 && !selectedCategoryId) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [subNavId, categories, selectedCategoryId]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Products') return;
+    if (!selectedCategoryId || !productsCategoryTabsRef.current) return;
+    const selectedTab = productsCategoryTabsRef.current.querySelector(`[data-category-id="${String(selectedCategoryId)}"]`);
+    if (selectedTab && typeof selectedTab.scrollIntoView === 'function') {
+      selectedTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [topNavId, subNavId, selectedCategoryId, categories]);
+
+  useEffect(() => {
+    if (!showProductPositioningModal) return;
+    if (!positioningCategoryId && categories.length > 0) {
+      setPositioningCategoryId(selectedCategoryId || categories[0].id);
+    }
+  }, [showProductPositioningModal, positioningCategoryId, categories, selectedCategoryId]);
+
+  useEffect(() => {
+    if (!showProductModal || productTab !== 'extra_prices') return;
+    const id = requestAnimationFrame(() => {
+      syncExtraPricesScrollEdges();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showProductModal, productTab, extraPricesRows.length, syncExtraPricesScrollEdges]);
+
+  useEffect(() => {
+    let alive = true;
+    const loadSavedPositioningLayout = async () => {
+      try {
+        const res = await fetch(`${API}/settings/product-positioning-layout`);
+        const data = await res.json().catch(() => null);
+        const value = data?.value;
+        if (alive && value && typeof value === 'object') {
+          setPositioningLayoutByCategory(value);
+          return;
+        }
+      } catch {
+        // fallback to local draft when api is unavailable
+      }
+      try {
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_layout') : null;
+        if (alive && raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') setPositioningLayoutByCategory(parsed);
+        }
+      } catch {
+        // ignore broken local positioning data
+      }
+    };
+    loadSavedPositioningLayout();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const loadSavedPositioningColors = async () => {
+      try {
+        const res = await fetch(`${API}/settings/product-positioning-colors`);
+        const data = await res.json().catch(() => null);
+        const value = data?.value;
+        if (alive && value && typeof value === 'object') {
+          setPositioningColorByCategory(value);
+          return;
+        }
+      } catch {
+        // fallback to local draft when api is unavailable
+      }
+      try {
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_colors') : null;
+        if (alive && raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') setPositioningColorByCategory(parsed);
+        }
+      } catch {
+        // ignore broken local color data
+      }
+    };
+    loadSavedPositioningColors();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pos_product_positioning_layout', JSON.stringify(positioningLayoutByCategory));
+      }
+    } catch {
+      // ignore localStorage write failures
+    }
+  }, [positioningLayoutByCategory]);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pos_product_positioning_colors', JSON.stringify(positioningColorByCategory));
+      }
+    } catch {
+      // ignore localStorage write failures
+    }
+  }, [positioningColorByCategory]);
+
+  const fetchPositioningSubproducts = useCallback(async (categoryId) => {
+    if (!categoryId) {
+      setPositioningSubproducts([]);
+      return;
+    }
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_subproduct_extra') : null;
+      const extraMap = raw ? JSON.parse(raw) : {};
+      const attachedIds = Object.entries(extraMap || {})
+        .filter(([, value]) => Array.isArray(value?.attachToCategoryIds) && value.attachToCategoryIds.includes(categoryId))
+        .map(([id]) => id);
+      if (attachedIds.length === 0) {
+        setPositioningSubproducts([]);
+        return;
+      }
+      const groupsRes = await fetch(`${API}/subproduct-groups`);
+      const groups = await groupsRes.json().catch(() => []);
+      const safeGroups = Array.isArray(groups) ? groups : [];
+      const listNested = await Promise.all(
+        safeGroups.map(async (g) => {
+          const res = await fetch(`${API}/subproduct-groups/${g.id}/subproducts`);
+          const data = await res.json().catch(() => []);
+          return Array.isArray(data) ? data : [];
+        })
+      );
+      const allSubproducts = listNested.flat();
+      const filtered = allSubproducts
+        .filter((sp) => attachedIds.includes(sp.id))
+        .map((sp) => {
+          const ex = extraMap?.[sp.id] || {};
+          const parsedPrice = parseFloat(ex?.price);
+          return {
+            ...sp,
+            type: 'subproduct',
+            _positioningId: `s:${sp.id}`,
+            _positioningPrice: Number.isFinite(parsedPrice) ? parsedPrice : Number(sp.price ?? 0),
+          };
+        });
+      setPositioningSubproducts(filtered);
+    } catch {
+      setPositioningSubproducts([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showProductPositioningModal) return;
+    const categoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
+    if (!categoryId) return;
+    fetchProducts(categoryId);
+    fetchPositioningSubproducts(categoryId);
+  }, [showProductPositioningModal, positioningCategoryId, selectedCategoryId, categories, fetchProducts, fetchPositioningSubproducts]);
+
+  useEffect(() => {
+    if (!showProductPositioningModal) return;
+    const categoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
+    if (!categoryId) return;
+    setPositioningLayoutByCategory((prev) => {
+      if (Array.isArray(prev?.[categoryId])) return prev;
+      // Persist explicit empty layout so POS does not auto-fallback to full product list.
+      return { ...prev, [categoryId]: Array.from({ length: 25 }, () => null) };
+    });
+  }, [showProductPositioningModal, positioningCategoryId, selectedCategoryId, categories]);
+
+  useEffect(() => {
+    if (!showProductPositioningModal) return;
+    const categoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
+    if (!categoryId || !positioningCategoryTabsRef.current) return;
+    const selectedTab = positioningCategoryTabsRef.current.querySelector(`[data-category-id="${String(categoryId)}"]`);
+    if (selectedTab && typeof selectedTab.scrollIntoView === 'function') {
+      selectedTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [showProductPositioningModal, positioningCategoryId, selectedCategoryId, categories]);
+
+  const openProductPositioningModal = () => {
+    setPositioningCategoryId(selectedCategoryId || categories[0]?.id || null);
+    setPositioningSelectedProductId(null);
+    setPositioningSelectedCellIndex(null);
+    setPositioningSelectedPoolItemId(null);
+    setShowProductPositioningModal(true);
+  };
+
+  const closeProductPositioningModal = () => {
+    setShowProductPositioningModal(false);
+    setPositioningSelectedProductId(null);
+    setPositioningSelectedCellIndex(null);
+    setPositioningSelectedPoolItemId(null);
+    setPositioningLayoutSaveMessage('');
+  };
+
+  const saveProductPositioningLayout = useCallback(async () => {
+    setSavingPositioningLayout(true);
+    setPositioningLayoutSaveMessage('');
+    try {
+      const [layoutRes, colorRes] = await Promise.all([
+        fetch(`${API}/settings/product-positioning-layout`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: positioningLayoutByCategory || {} })
+        }),
+        fetch(`${API}/settings/product-positioning-colors`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: positioningColorByCategory || {} })
+        })
+      ]);
+      if (!layoutRes.ok || !colorRes.ok) {
+        const layoutErr = layoutRes.ok ? null : await layoutRes.json().catch(() => null);
+        const colorErr = colorRes.ok ? null : await colorRes.json().catch(() => null);
+        throw new Error(layoutErr?.error || colorErr?.error || 'Failed to save positioning layout');
+      }
+      showToast('success', 'Layout and colors saved.');
+      closeProductPositioningModal();
+    } catch (err) {
+      showToast('error', err?.message || 'Failed to save layout');
+    } finally {
+      setSavingPositioningLayout(false);
+    }
+  }, [positioningLayoutByCategory, positioningColorByCategory, showToast, closeProductPositioningModal]);
+
+  const fetchSubproductGroups = useCallback(async () => {
+    setSubproductGroupsLoading(true);
+    try {
+      const res = await fetch(`${API}/subproduct-groups`);
+      const data = await res.json();
+      setSubproductGroups(Array.isArray(data) ? data : []);
+    } catch {
+      setSubproductGroups([]);
+    } finally {
+      setSubproductGroupsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (subNavId === 'Subproducts') {
+      fetchSubproductGroups();
+      fetchCategories();
+    }
+  }, [subNavId, fetchSubproductGroups, fetchCategories]);
+
+  const fetchTableLocations = useCallback(async () => {
+    setTableLocationsLoading(true);
+    try {
+      const res = await fetch(`${API}/rooms`);
+      const data = await res.json();
+      setTableLocations(Array.isArray(data) ? data : []);
+    } catch {
+      setTableLocations([]);
+    } finally {
+      setTableLocationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (topNavId === 'tables') fetchTableLocations();
+  }, [topNavId, fetchTableLocations]);
+
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const res = await fetch(`${API}/users`);
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (controlSidebarId === 'users') fetchUsers();
+  }, [controlSidebarId, fetchUsers]);
+
+  const fetchSubproducts = useCallback(async (groupId) => {
+    if (!groupId) {
+      setSubproducts([]);
+      return;
+    }
+    setSubproductsLoading(true);
+    try {
+      const res = await fetch(`${API}/subproduct-groups/${groupId}/subproducts`);
+      const data = await res.json();
+      setSubproducts(Array.isArray(data) ? data : []);
+    } catch {
+      setSubproducts([]);
+    } finally {
+      setSubproductsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (subNavId === 'Subproducts' && selectedSubproductGroupId) fetchSubproducts(selectedSubproductGroupId);
+  }, [subNavId, selectedSubproductGroupId, fetchSubproducts]);
+
+  useEffect(() => {
+    if (subNavId === 'Subproducts' && subproductGroups.length > 0 && !selectedSubproductGroupId) {
+      setSelectedSubproductGroupId(subproductGroups[0].id);
+    }
+  }, [subNavId, subproductGroups, selectedSubproductGroupId]);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Subproducts') return;
+    if (!selectedSubproductGroupId || !subproductsGroupTabsRef.current) return;
+    const selectedTab = subproductsGroupTabsRef.current.querySelector(`[data-group-id="${String(selectedSubproductGroupId)}"]`);
+    if (selectedTab && typeof selectedTab.scrollIntoView === 'function') {
+      selectedTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [topNavId, subNavId, selectedSubproductGroupId, subproductGroups]);
+
+  const openProductSubproductsModal = useCallback(async (product) => {
+    setProductSubproductsProduct(product);
+    setShowProductSubproductsModal(true);
+    let groups = subproductGroups;
+    if (!groups.length) {
+      try {
+        const res = await fetch(`${API}/subproduct-groups`);
+        const data = await res.json().catch(() => []);
+        groups = Array.isArray(data) ? data : [];
+        setSubproductGroups(groups);
+      } catch {
+        groups = [];
+      }
+    }
+    setProductSubproductsGroupId('');
+    setProductSubproductsLeftSelectedIds(new Set());
+    setProductSubproductsRightSelectedIds(new Set());
+    setProductSubproductsOptions([]);
+    setProductSubproductsLinked([]);
+    setLoadingProductSubproductsLinked(true);
+    try {
+      const res = await fetch(`${API}/products/${product.id}/subproduct-links`);
+      const data = await res.json().catch(() => []);
+      const links = Array.isArray(data) ? data : [];
+      setProductSubproductsLinked(links.map((l) => ({
+        subproductId: l.subproductId,
+        subproductName: l.subproductName,
+        groupId: l.groupId || '',
+        groupName: l.groupName || ''
+      })));
+      // Only preselect group when this product already has linked subproducts.
+      const firstLinkedGroupId = links.find((l) => l?.groupId)?.groupId || '';
+      if (firstLinkedGroupId && groups.some((g) => g.id === firstLinkedGroupId)) {
+        setProductSubproductsGroupId(firstLinkedGroupId);
+      }
+    } catch {
+      setProductSubproductsLinked([]);
+    } finally {
+      setLoadingProductSubproductsLinked(false);
+    }
+  }, [subproductGroups]);
+
+  const closeProductSubproductsModal = useCallback(() => {
+    setShowProductSubproductsModal(false);
+    setProductSubproductsProduct(null);
+    setProductSubproductsGroupId('');
+    setProductSubproductsLeftSelectedIds(new Set());
+    setProductSubproductsRightSelectedIds(new Set());
+    setProductSubproductsOptions([]);
+    setProductSubproductsLinked([]);
+    setLoadingProductSubproductsLinked(false);
+    setSavingProductSubproducts(false);
+  }, []);
+
+  useEffect(() => {
+    if (!showProductSubproductsModal || !productSubproductsGroupId) {
+      setProductSubproductsOptions([]);
+      setProductSubproductsLeftSelectedIds(new Set());
+      return;
+    }
+    let alive = true;
+    const loadGroupSubproducts = async () => {
+      try {
+        const res = await fetch(`${API}/subproduct-groups/${productSubproductsGroupId}/subproducts`);
+        const data = await res.json().catch(() => []);
+        if (!alive) return;
+        const list = Array.isArray(data) ? data : [];
+        setProductSubproductsOptions(list);
+        setProductSubproductsLeftSelectedIds(new Set());
+      } catch {
+        if (!alive) return;
+        setProductSubproductsOptions([]);
+        setProductSubproductsLeftSelectedIds(new Set());
+      }
+    };
+    loadGroupSubproducts();
+    return () => {
+      alive = false;
+    };
+  }, [showProductSubproductsModal, productSubproductsGroupId]);
+
+  const productSubproductsAvailable = useMemo(() => {
+    const linkedIds = new Set(productSubproductsLinked.map((l) => l.subproductId));
+    return productSubproductsOptions.filter((sp) => !linkedIds.has(sp.id));
+  }, [productSubproductsOptions, productSubproductsLinked]);
+
+  const handleAddProductSubproductLinks = useCallback(() => {
+    if (!productSubproductsLeftSelectedIds.size) return;
+    const group = subproductGroups.find((g) => g.id === productSubproductsGroupId);
+    const toAdd = productSubproductsAvailable.filter((sp) => productSubproductsLeftSelectedIds.has(sp.id));
+    if (!toAdd.length) return;
+    setProductSubproductsLinked((prev) => {
+      const existingIds = new Set(prev.map((l) => l.subproductId));
+      const newLinks = toAdd
+        .filter((sp) => !existingIds.has(sp.id))
+        .map((sp) => ({
+          subproductId: sp.id,
+          subproductName: sp.name,
+          groupId: group?.id || productSubproductsGroupId || '',
+          groupName: group?.name || ''
+        }));
+      return [...prev, ...newLinks];
+    });
+    setProductSubproductsLeftSelectedIds(new Set());
+  }, [productSubproductsLeftSelectedIds, productSubproductsAvailable, subproductGroups, productSubproductsGroupId]);
+
+  const handleRemoveProductSubproductLinks = useCallback(() => {
+    if (!productSubproductsRightSelectedIds.size) return;
+    setProductSubproductsLinked((prev) =>
+      prev.filter((l) => !productSubproductsRightSelectedIds.has(l.subproductId))
+    );
+    setProductSubproductsRightSelectedIds(new Set());
+  }, [productSubproductsRightSelectedIds]);
+
+  const removeProductSubproductLink = useCallback((subproductId) => {
+    setProductSubproductsLinked((prev) => prev.filter((x) => x.subproductId !== subproductId));
+  }, []);
+
+  const handleLogoutConfirm = () => {
+    setShowLogoutModal(false);
+    onLogout?.();
+  };
+
+  const tr = useCallback((key, fallback) => {
+    const translated = t(key);
+    return translated === key ? fallback : translated;
+  }, [t]);
+
+  const handleSaveProductSubproducts = useCallback(async () => {
+    if (!productSubproductsProduct?.id) return;
+    setSavingProductSubproducts(true);
+    try {
+      const linksPayload = productSubproductsLinked.map((l) => ({
+        groupId: l.groupId || '',
+        subproductId: l.subproductId
+      }));
+      const res = await fetch(`${API}/products/${productSubproductsProduct.id}/subproduct-links`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ links: linksPayload })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || tr('control.productSubproducts.saveFailed', 'Failed to save product subproducts'));
+      }
+      showToast('success', tr('control.productSubproducts.saved', 'Product subproducts saved.'));
+      closeProductSubproductsModal();
+    } catch (err) {
+      showToast('error', err?.message || tr('control.productSubproducts.saveFailed', 'Failed to save product subproducts.'));
+    } finally {
+      setSavingProductSubproducts(false);
+    }
+  }, [closeProductSubproductsModal, productSubproductsLinked, productSubproductsProduct, showToast, tr]);
+
+  const mapTranslatedOptions = useCallback((opts) =>
+    opts.map((o) => ({ value: o.value, label: o.labelKey ? tr(o.labelKey, o.fallback) : o.label }))
+  , [tr]);
+  const getFunctionButtonLabel = useCallback((id) => {
+    const item = FUNCTION_BUTTON_ITEM_BY_ID[id];
+    if (!item) return '';
+    return tr(item.labelKey, item.fallbackLabel);
+  }, [tr]);
+  const getOptionButtonLabel = useCallback((id) => {
+    const item = OPTION_BUTTON_ITEM_BY_ID[id];
+    if (!item) return '';
+    return tr(item.labelKey, item.fallbackLabel);
+  }, [tr]);
+
+  useEffect(() => {
+    if (LANGUAGE_OPTIONS.some((o) => o.value === lang)) setAppLanguage(lang);
+  }, [lang]);
+
+  const handleSaveAppLanguage = () => {
+    setSavingAppLanguage(true);
+    try {
+      setLang(appLanguage);
+      showToast('success', tr('control.languageUpdated', 'Language updated.'));
+    } finally {
+      setSavingAppLanguage(false);
+    }
+  };
+
+  const openPriceGroupModal = () => {
+    setEditingPriceGroupId(null);
+    setPriceGroupName('');
+    setPriceGroupTax('standard');
+    setShowPriceGroupModal(true);
+  };
+
+  const openEditPriceGroupModal = (pg) => {
+    setEditingPriceGroupId(pg.id);
+    setPriceGroupName(pg.name || '');
+    setPriceGroupTax(pg.tax && VAT_OPTIONS.some((o) => o.value === pg.tax) ? pg.tax : 'standard');
+    setShowPriceGroupModal(true);
+  };
+
+  const closePriceGroupModal = () => {
+    setShowPriceGroupModal(false);
+    setEditingPriceGroupId(null);
+  };
+
+  const handleSavePriceGroup = async () => {
+    setSavingPriceGroup(true);
+    const payload = { name: priceGroupName.trim() || 'New price group', tax: priceGroupTax };
+    try {
+      if (editingPriceGroupId) {
+        const res = await fetch(`${API}/price-groups/${editingPriceGroupId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const updated = await res.json();
+        if (res.ok && updated) {
+          setPriceGroups((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          closePriceGroupModal();
+        } else fetchPriceGroups();
+      } else {
+        const res = await fetch(`${API}/price-groups`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const created = await res.json();
+        if (res.ok && created) {
+          setPriceGroups((prev) => [...prev, created]);
+          closePriceGroupModal();
+        } else fetchPriceGroups();
+      }
+    } catch {
+      fetchPriceGroups();
+    } finally {
+      setSavingPriceGroup(false);
+    }
+  };
+
+  const handleDeletePriceGroup = async (id) => {
+    try {
+      const res = await fetch(`${API}/price-groups/${id}`, { method: 'DELETE' });
+      if (res.ok) setPriceGroups((prev) => prev.filter((p) => p.id !== id));
+      else fetchPriceGroups();
+    } catch {
+      fetchPriceGroups();
+    } finally {
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const openCategoryModal = () => {
+    setEditingCategoryId(null);
+    setCategoryName('');
+    setCategoryNextCourse('');
+    setCategoryInWebshop(true);
+    setCategoryDisplayOnCashRegister(true);
+    setCategoryActiveField('name');
+    setShowCategoryModal(true);
+  };
+
+  const openEditCategoryModal = (cat) => {
+    setEditingCategoryId(cat.id);
+    setCategoryName(cat.name || '');
+    setCategoryNextCourse(cat.nextCourse || '');
+    setCategoryInWebshop(cat.inWebshop !== false);
+    setCategoryDisplayOnCashRegister(cat.displayOnCashRegister !== false);
+    setCategoryActiveField('name');
+    setShowCategoryModal(true);
+  };
+
+  const closeCategoryModal = () => {
+    setShowCategoryModal(false);
+    setEditingCategoryId(null);
+  };
+
+  const handleSaveCategory = async () => {
+    setSavingCategory(true);
+    const payload = {
+      name: categoryName.trim() || 'New category',
+      inWebshop: categoryInWebshop,
+      displayOnCashRegister: categoryDisplayOnCashRegister,
+      nextCourse: categoryNextCourse.trim() || null
+    };
+    try {
+      if (editingCategoryId) {
+        const res = await fetch(`${API}/categories/${editingCategoryId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const updated = await res.json();
+        if (res.ok && updated) {
+          setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          closeCategoryModal();
+        } else fetchCategories();
+      } else {
+        const res = await fetch(`${API}/categories`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const created = await res.json();
+        if (res.ok && created) {
+          setCategories((prev) => [...prev, created]);
+          closeCategoryModal();
+        } else fetchCategories();
+      }
+    } catch {
+      fetchCategories();
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    try {
+      const res = await fetch(`${API}/categories/${id}`, { method: 'DELETE' });
+      if (res.ok) setCategories((prev) => prev.filter((c) => c.id !== id));
+      else fetchCategories();
+    } catch {
+      fetchCategories();
+    } finally {
+      setDeleteConfirmCategoryId(null);
+    }
+  };
+
+  const handleMoveCategory = async (id, direction) => {
+    const idx = categories.findIndex((c) => c.id === id);
+    if (idx < 0) return;
+    const nextIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= categories.length) return;
+    const curr = categories[idx];
+    const other = categories[nextIdx];
+    const currOrder = curr.sortOrder;
+    const otherOrder = other.sortOrder;
+    try {
+      await fetch(`${API}/categories/${curr.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: otherOrder })
+      });
+      await fetch(`${API}/categories/${other.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: currOrder })
+      });
+      setCategories((prev) => {
+        const list = [...prev];
+        list[idx] = { ...list[idx], sortOrder: otherOrder };
+        list[nextIdx] = { ...list[nextIdx], sortOrder: currOrder };
+        return list.sort((a, b) => a.sortOrder - b.sortOrder);
+      });
+    } catch {
+      fetchCategories();
+    }
+  };
+
+  const openProductModal = () => {
+    setEditingProductId(null);
+    setProductTab('general');
+    setProductName('');
+    setProductKeyName('');
+    setProductProductionName('');
+    setProductPrice('');
+    setProductVatTakeOut('');
+    setProductVatEatIn('');
+    setProductCategoryIds([selectedCategoryId || '']);
+    setProductAddition('Subproducts');
+    setProductBarcode('');
+    setProductPrinter1('');
+    setProductPrinter2('');
+    setProductPrinter3('');
+    setProductActiveField('name');
+    setProductFieldErrors({ name: false, keyName: false, productionName: false, vatTakeOut: false, vatEatIn: false });
+    setProductTabsUnlocked(true);
+    setProductDisplayNumber(null);
+    setAdvancedKassaPhotoPreview(null);
+    setShowProductModal(true);
+  };
+
+  const openEditProductModal = (product) => {
+    setEditingProductId(product.id);
+    setProductTab('general');
+    setProductName(product.name || '');
+    setProductKeyName(product.keyName ?? '');
+    setProductProductionName(product.productionName ?? '');
+    setProductPrice(String(product.price ?? ''));
+    setProductVatTakeOut(product.vatTakeOut ?? '');
+    setProductVatEatIn(product.vatEatIn ?? '');
+    let categoryIds = [product.categoryId || selectedCategoryId || ''];
+    if (product.categoryIdsJson) {
+      try {
+        const parsed = JSON.parse(product.categoryIdsJson);
+        if (Array.isArray(parsed) && parsed.length) categoryIds = parsed;
+      } catch (_) { }
+    }
+    setProductCategoryIds(categoryIds);
+    setProductAddition(product.addition ?? 'Subproducts');
+    setProductBarcode(product.barcode ?? '');
+    setProductPrinter1(product.printer1 || '');
+    setProductPrinter2(product.printer2 || '');
+    setProductPrinter3(product.printer3 || '');
+    setProductActiveField('name');
+    setProductFieldErrors({ name: false, keyName: false, productionName: false, vatTakeOut: false, vatEatIn: false });
+    setProductTabsUnlocked(true);
+    setProductDisplayNumber(product.number != null ? product.number : null);
+
+    setAdvancedOpenPrice(!!product.openPrice);
+    setAdvancedWeegschaal(!!product.weegschaal);
+    setAdvancedSubproductRequires(!!product.subproductRequires);
+    setAdvancedLeeggoedPrijs(product.leeggoedPrijs ?? '0.00');
+    setAdvancedPagerVerplicht(!!product.pagerVerplicht);
+    setAdvancedBoldPrint(!!product.boldPrint);
+    setAdvancedGroupingReceipt(product.groupingReceipt !== false);
+    setAdvancedLabelExtraInfo(product.labelExtraInfo ?? '');
+    setAdvancedVoorverpakVervaltype(product.voorverpakVervaltype ?? 'Shelf life');
+    setAdvancedHoudbareDagen(product.houdbareDagen ?? '0');
+    setAdvancedBewarenGebruik(product.bewarenGebruik ?? '');
+    setAdvancedKassaPhotoPreview(product.kassaPhotoPath ?? null);
+
+    let rows = [];
+    if (product.extraPricesJson) {
+      try {
+        const parsed = JSON.parse(product.extraPricesJson);
+        if (Array.isArray(parsed)) rows = parsed;
+      } catch (_) { }
+    }
+    setExtraPricesRows(rows);
+    setExtraPricesSelectedIndex(0);
+
+    setPurchaseVat(product.purchaseVat ?? '');
+    setPurchasePriceExcl(product.purchasePriceExcl ?? '0.00');
+    setPurchasePriceIncl(product.purchasePriceIncl ?? '0.00');
+    setProfitPct(product.profitPct ?? '0.00');
+    setPurchaseUnit(product.unit ?? 'Piece');
+    setUnitContent(product.unitContent ?? '0');
+    setStock(product.stock ?? '0');
+    setPurchaseSupplier(product.supplierCode ?? '');
+    setSupplierCode(product.supplierCode ?? '');
+    setStockNotification(product.stockNotification !== false);
+    setExpirationDate(product.expirationDate ?? '');
+    setDeclarationExpiryDays(product.declarationExpiryDays ?? '0');
+    setNotificationSoldOutPieces(product.notificationSoldOutPieces ?? '');
+
+    setProductInWebshop(!!product.inWebshop);
+    setWebshopOnlineOrderable(product.onlineOrderable !== false);
+    setWebsiteRemark(product.websiteRemark ?? '');
+    setWebsiteOrder(product.websiteOrder ?? '0');
+    setShortWebText(product.shortWebText ?? '');
+    setWebsitePhotoFileName(product.websitePhotoPath ?? '');
+
+    setKioskInfo(product.kioskInfo ?? '');
+    setKioskTakeAway(product.kioskTakeAway !== false);
+    setKioskEatIn(product.kioskEatIn ?? '');
+    setKioskSubtitle(product.kioskSubtitle ?? '');
+    setKioskMinSubs(product.kioskMinSubs ?? 'unlimited');
+    setKioskMaxSubs(product.kioskMaxSubs ?? 'unlimited');
+    setKioskPictureFileName(product.kioskPicturePath ?? '');
+
+    setShowProductModal(true);
+  };
+
+  const closeProductModal = () => {
+    setAdvancedKassaPhotoPreview(null);
+    setExtraPricesRows([]);
+    setExtraPricesSelectedIndex(0);
+    setProductCategoryIds(['']);
+    setShowProductModal(false);
+    setEditingProductId(null);
+  };
+
+  const validateProductRequired = () => {
+    const name = !productName.trim();
+    const keyName = !productKeyName.trim();
+    const productionName = !productProductionName.trim();
+    const vatTakeOut = !productVatTakeOut;
+    const vatEatIn = !productVatEatIn;
+    setProductFieldErrors({ name, keyName, productionName, vatTakeOut, vatEatIn });
+    return !name && !keyName && !productionName && !vatTakeOut && !vatEatIn;
+  };
+
+  const buildProductPayload = () => {
+    const categoryId = (productCategoryIds[0] || '') || selectedCategoryId;
+    const payload = {
+      name: productName.trim() || 'New product',
+      price: parseFloat(productPrice) || 0,
+      categoryId: categoryId || undefined,
+      keyName: productKeyName.trim() || null,
+      productionName: productProductionName.trim() || null,
+      vatTakeOut: productVatTakeOut || null,
+      vatEatIn: productVatEatIn || null,
+      barcode: productBarcode.trim() || null,
+      printer1: productPrinter1 || null,
+      printer2: productPrinter2 || null,
+      printer3: productPrinter3 || null,
+      addition: productAddition || null,
+      categoryIdsJson: JSON.stringify(productCategoryIds.filter(Boolean)),
+      openPrice: advancedOpenPrice,
+      weegschaal: advancedWeegschaal,
+      subproductRequires: advancedSubproductRequires,
+      leeggoedPrijs: advancedLeeggoedPrijs || null,
+      pagerVerplicht: advancedPagerVerplicht,
+      boldPrint: advancedBoldPrint,
+      groupingReceipt: advancedGroupingReceipt,
+      labelExtraInfo: advancedLabelExtraInfo.trim() || null,
+      kassaPhotoPath: advancedKassaPhotoPreview || null,
+      voorverpakVervaltype: advancedVoorverpakVervaltype || null,
+      houdbareDagen: advancedHoudbareDagen || null,
+      bewarenGebruik: advancedBewarenGebruik.trim() || null,
+      extraPricesJson: JSON.stringify(extraPricesRows.map((r) => ({ priceGroupId: r.priceGroupId, priceGroupLabel: r.priceGroupLabel, otherName: r.otherName || '', otherPrinter: r.otherPrinter || '', otherPrice: r.otherPrice || '' }))),
+      purchaseVat: purchaseVat || null,
+      purchasePriceExcl: purchasePriceExcl || null,
+      purchasePriceIncl: purchasePriceIncl || null,
+      profitPct: profitPct || null,
+      unit: purchaseUnit || null,
+      unitContent: unitContent || null,
+      stock: stock || null,
+      supplierCode: supplierCode.trim() || null,
+      stockNotification: stockNotification,
+      expirationDate: expirationDate || null,
+      declarationExpiryDays: declarationExpiryDays || null,
+      notificationSoldOutPieces: notificationSoldOutPieces || null,
+      inWebshop: productInWebshop,
+      onlineOrderable: webshopOnlineOrderable,
+      websiteRemark: websiteRemark.trim() || null,
+      websiteOrder: websiteOrder || null,
+      shortWebText: shortWebText.trim() || null,
+      websitePhotoPath: websitePhotoFileName || null,
+      kioskInfo: kioskInfo.trim() || null,
+      kioskTakeAway: kioskTakeAway,
+      kioskEatIn: kioskEatIn.trim() || null,
+      kioskSubtitle: kioskSubtitle.trim() || null,
+      kioskMinSubs: kioskMinSubs || null,
+      kioskMaxSubs: kioskMaxSubs || null,
+      kioskPicturePath: kioskPictureFileName || null
+    };
+    return payload;
+  };
+
+  const handleSaveProduct = async () => {
+    if (!validateProductRequired()) return;
+    const categoryId = (productCategoryIds[0] || '') || selectedCategoryId;
+    if (!categoryId) return;
+    setSavingProduct(true);
+    const payload = buildProductPayload();
+    try {
+      if (editingProductId) {
+        const res = await fetch(`${API}/products/${editingProductId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const updated = await res.json();
+        if (res.ok && updated) {
+          setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          closeProductModal();
+        } else fetchProducts(selectedCategoryId);
+      } else {
+        const res = await fetch(`${API}/products`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, categoryId })
+        });
+        const created = await res.json();
+        if (res.ok && created) {
+          setProducts((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+          closeProductModal();
+        } else fetchProducts(selectedCategoryId);
+      }
+    } catch {
+      fetchProducts(selectedCategoryId);
+    } finally {
+      setSavingProduct(false);
+    }
+  };
+
+  const productKeyboardValue = productActiveField === 'name' ? productName : productActiveField === 'keyName' ? productKeyName : productActiveField === 'productionName' ? productProductionName : productActiveField === 'price' ? productPrice : productActiveField === 'barcode' ? productBarcode : productActiveField === 'leeggoedPrijs' ? advancedLeeggoedPrijs : productActiveField === 'labelExtraInfo' ? advancedLabelExtraInfo : productActiveField === 'houdbareDagen' ? advancedHoudbareDagen : productActiveField === 'bewarenGebruik' ? advancedBewarenGebruik : productActiveField === 'extraOtherName' ? (extraPricesRows[extraPricesSelectedIndex]?.otherName ?? '') : productActiveField === 'extraOtherPrice' ? (extraPricesRows[extraPricesSelectedIndex]?.otherPrice ?? '') : productActiveField === 'purchasePriceExcl' ? purchasePriceExcl : productActiveField === 'purchasePriceIncl' ? purchasePriceIncl : productActiveField === 'profitPct' ? profitPct : productActiveField === 'unitContent' ? unitContent : productActiveField === 'stock' ? stock : productActiveField === 'supplierCode' ? supplierCode : productActiveField === 'expirationDate' ? expirationDate : productActiveField === 'declarationExpiryDays' ? declarationExpiryDays : productActiveField === 'notificationSoldOutPieces' ? notificationSoldOutPieces : productActiveField === 'websiteRemark' ? websiteRemark : productActiveField === 'websiteOrder' ? websiteOrder : productActiveField === 'shortWebText' ? shortWebText : productActiveField === 'kioskInfo' ? kioskInfo : productActiveField === 'kioskEatIn' ? kioskEatIn : productActiveField === 'kioskSubtitle' ? kioskSubtitle : '';
+  const productKeyboardOnChange = productActiveField === 'name'
+    ? (v) => {
+      // Typing in Name should mirror to Test name and Production name.
+      setProductName(v);
+      setProductKeyName(v);
+      setProductProductionName(v);
+      setProductFieldErrors((e) => ({ ...e, name: false, keyName: false, productionName: false }));
+    }
+    : productActiveField === 'keyName'
+      ? (v) => { setProductKeyName(v); setProductFieldErrors((e) => ({ ...e, keyName: false })); }
+      : productActiveField === 'productionName'
+        ? (v) => { setProductProductionName(v); setProductFieldErrors((e) => ({ ...e, productionName: false })); }
+        : productActiveField === 'price'
+          ? setProductPrice
+          : productActiveField === 'barcode'
+            ? setProductBarcode
+            : productActiveField === 'leeggoedPrijs'
+              ? setAdvancedLeeggoedPrijs
+              : productActiveField === 'labelExtraInfo'
+                ? setAdvancedLabelExtraInfo
+                : productActiveField === 'houdbareDagen'
+                  ? setAdvancedHoudbareDagen
+                  : productActiveField === 'bewarenGebruik'
+                    ? setAdvancedBewarenGebruik
+                    : productActiveField === 'extraOtherName'
+                      ? (v) => setExtraPricesRows((prev) => { const next = prev.map((r, i) => i === extraPricesSelectedIndex ? { ...r, otherName: v } : r); return next; })
+                      : productActiveField === 'extraOtherPrice'
+                        ? (v) => setExtraPricesRows((prev) => { const next = prev.map((r, i) => i === extraPricesSelectedIndex ? { ...r, otherPrice: v } : r); return next; })
+                        : productActiveField === 'purchasePriceExcl'
+                          ? setPurchasePriceExcl
+                          : productActiveField === 'purchasePriceIncl'
+                            ? setPurchasePriceIncl
+                            : productActiveField === 'profitPct'
+                              ? setProfitPct
+                              : productActiveField === 'unitContent'
+                                ? setUnitContent
+                                : productActiveField === 'stock'
+                                  ? setStock
+                                  : productActiveField === 'supplierCode'
+                                    ? setSupplierCode
+                                    : productActiveField === 'expirationDate'
+                                      ? setExpirationDate
+                                      : productActiveField === 'declarationExpiryDays'
+                                        ? setDeclarationExpiryDays
+                                        : productActiveField === 'notificationSoldOutPieces'
+                                          ? setNotificationSoldOutPieces
+                                          : productActiveField === 'websiteRemark'
+                                            ? setWebsiteRemark
+                                            : productActiveField === 'websiteOrder'
+                                              ? setWebsiteOrder
+                                              : productActiveField === 'shortWebText'
+                                                ? setShortWebText
+                                                : productActiveField === 'kioskInfo'
+                                                  ? setKioskInfo
+                                                  : productActiveField === 'kioskEatIn'
+                                                    ? setKioskEatIn
+                                                    : productActiveField === 'kioskSubtitle'
+                                                      ? setKioskSubtitle
+                                                      : () => { };
+
+  const handleGenerateBarcode = () => {
+    const digits = Array.from({ length: 13 }, () => Math.floor(Math.random() * 10)).join('');
+    setProductBarcode(digits);
+    setBarcodeButtonSpinning(true);
+    setTimeout(() => setBarcodeButtonSpinning(false), 600);
+  };
+
+  const handleDeleteProduct = async (id) => {
+    try {
+      const res = await fetch(`${API}/products/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        if (selectedProductId === id) setSelectedProductId(null);
+      } else fetchProducts(selectedCategoryId);
+    } catch {
+      fetchProducts(selectedCategoryId);
+    } finally {
+      setDeleteConfirmProductId(null);
+    }
+  };
+
+  const handleMoveProduct = async (direction) => {
+    if (!selectedProductId) return;
+    const idx = products.findIndex((p) => p.id === selectedProductId);
+    if (idx < 0) return;
+    const nextIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= products.length) return;
+    const curr = products[idx];
+    const other = products[nextIdx];
+    const currOrder = curr.sortOrder ?? idx;
+    const otherOrder = other.sortOrder ?? nextIdx;
+    try {
+      await fetch(`${API}/products/${curr.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: otherOrder })
+      });
+      await fetch(`${API}/products/${other.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: currOrder })
+      });
+      setProducts((prev) => {
+        const list = [...prev];
+        list[idx] = { ...list[idx], sortOrder: otherOrder };
+        list[nextIdx] = { ...list[nextIdx], sortOrder: currOrder };
+        return list.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      });
+    } catch {
+      fetchProducts(selectedCategoryId);
+    }
+  };
+
+  const filteredProducts = productSearch.trim()
+    ? products.filter((p) => (p.name || '').toLowerCase().includes(productSearch.trim().toLowerCase()))
+    : products;
+
+  const filteredSubproducts = subproductSearch.trim()
+    ? subproducts.filter((s) => (s.name || '').toLowerCase().includes(subproductSearch.trim().toLowerCase()))
+    : subproducts;
+
+  const handleSubproductNameChange = useCallback((value) => {
+    setSubproductName(value);
+    setSubproductKeyName(value);
+    setSubproductProductionName(value);
+  }, []);
+
+  const subproductKeyboardValue = subproductActiveField === 'name'
+    ? subproductName
+    : subproductActiveField === 'keyName'
+      ? subproductKeyName
+      : subproductActiveField === 'productionName'
+        ? subproductProductionName
+        : subproductActiveField === 'price'
+          ? subproductPrice
+          : '';
+
+  const subproductKeyboardOnChange = subproductActiveField === 'name'
+    ? handleSubproductNameChange
+    : subproductActiveField === 'keyName'
+      ? setSubproductKeyName
+      : subproductActiveField === 'productionName'
+        ? setSubproductProductionName
+        : subproductActiveField === 'price'
+          ? setSubproductPrice
+          : () => { };
+
+  const openSubproductModal = () => {
+    setEditingSubproductId(null);
+    setSubproductName('');
+    setSubproductKeyName('');
+    setSubproductProductionName('');
+    setSubproductActiveField('name');
+    setSubproductPrice('');
+    setSubproductVatTakeOut('');
+    setSubproductVatEatIn('');
+    setSubproductModalGroupId(selectedSubproductGroupId || (subproductGroups[0]?.id ?? null));
+    setSubproductKioskPicture('');
+    setSubproductAttachToCategoryIds([]);
+    setSubproductAddCategoryId('');
+    setShowSubproductModal(true);
+  };
+
+  const openEditSubproductModal = (sp) => {
+    setEditingSubproductId(sp.id);
+    setSubproductName(sp.name || '');
+    setSubproductActiveField('name');
+    setSubproductModalGroupId(selectedSubproductGroupId);
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_subproduct_extra');
+      const extra = raw ? JSON.parse(raw) : {};
+      const e = extra[sp.id] || {};
+      setSubproductKeyName(e.keyName || '');
+      setSubproductProductionName(e.productionName || '');
+      setSubproductPrice(e.price != null ? String(e.price) : '');
+      setSubproductVatTakeOut(e.vatTakeOut ?? '');
+      setSubproductVatEatIn(e.vatEatIn ?? '');
+      setSubproductKioskPicture(e.kioskPicture || '');
+      setSubproductAttachToCategoryIds(Array.isArray(e.attachToCategoryIds) ? e.attachToCategoryIds : []);
+    } catch {
+      setSubproductKeyName('');
+      setSubproductProductionName('');
+      setSubproductPrice('');
+      setSubproductVatTakeOut('');
+      setSubproductVatEatIn('');
+      setSubproductKioskPicture('');
+      setSubproductAttachToCategoryIds([]);
+    }
+    setShowSubproductModal(true);
+  };
+
+  const closeSubproductModal = () => {
+    setShowSubproductModal(false);
+    setEditingSubproductId(null);
+    setSubproductName('');
+    setSubproductKeyName('');
+    setSubproductProductionName('');
+    setSubproductActiveField('name');
+    setSubproductPrice('');
+    setSubproductAttachToCategoryIds([]);
+    setSubproductAddCategoryId('');
+  };
+
+  const persistSubproductExtra = (id, data) => {
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_subproduct_extra');
+      const extra = raw ? JSON.parse(raw) : {};
+      extra[id] = data;
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_subproduct_extra', JSON.stringify(extra));
+    } catch (_) { }
+  };
+
+  const handleSaveSubproduct = async () => {
+    const groupId = subproductModalGroupId || selectedSubproductGroupId;
+    if (!groupId && !editingSubproductId) return;
+    setSavingSubproduct(true);
+    const name = subproductName.trim() || 'New subproduct';
+    const extraData = {
+      keyName: subproductKeyName.trim(),
+      productionName: subproductProductionName.trim(),
+      price: subproductPrice.trim(),
+      vatTakeOut: subproductVatTakeOut,
+      vatEatIn: subproductVatEatIn,
+      kioskPicture: subproductKioskPicture.trim(),
+      attachToCategoryIds: subproductAttachToCategoryIds
+    };
+    try {
+      if (editingSubproductId) {
+        const res = await fetch(`${API}/subproducts/${editingSubproductId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const updated = await res.json();
+        if (res.ok && updated) {
+          setSubproducts((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+          persistSubproductExtra(editingSubproductId, extraData);
+          closeSubproductModal();
+        } else fetchSubproducts(selectedSubproductGroupId);
+      } else {
+        const res = await fetch(`${API}/subproducts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, groupId })
+        });
+        const created = await res.json();
+        if (res.ok && created) {
+          setSubproducts((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+          persistSubproductExtra(created.id, extraData);
+          closeSubproductModal();
+        } else fetchSubproducts(selectedSubproductGroupId);
+      }
+    } catch {
+      fetchSubproducts(selectedSubproductGroupId);
+    } finally {
+      setSavingSubproduct(false);
+    }
+  };
+
+  const handleDeleteSubproduct = async (id) => {
+    try {
+      const res = await fetch(`${API}/subproducts/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSubproducts((prev) => prev.filter((s) => s.id !== id));
+        if (selectedSubproductId === id) setSelectedSubproductId(null);
+      } else fetchSubproducts(selectedSubproductGroupId);
+    } catch {
+      fetchSubproducts(selectedSubproductGroupId);
+    } finally {
+      setDeleteConfirmSubproductId(null);
+    }
+  };
+
+  const handleMoveSubproduct = async (direction) => {
+    if (!selectedSubproductId) return;
+    const idx = subproducts.findIndex((s) => s.id === selectedSubproductId);
+    if (idx < 0) return;
+    const nextIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= subproducts.length) return;
+    const curr = subproducts[idx];
+    const other = subproducts[nextIdx];
+    const currOrder = curr.sortOrder ?? idx;
+    const otherOrder = other.sortOrder ?? nextIdx;
+    try {
+      await fetch(`${API}/subproducts/${curr.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: otherOrder })
+      });
+      await fetch(`${API}/subproducts/${other.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortOrder: currOrder })
+      });
+      setSubproducts((prev) => {
+        const list = [...prev];
+        list[idx] = { ...list[idx], sortOrder: otherOrder };
+        list[nextIdx] = { ...list[nextIdx], sortOrder: currOrder };
+        return list.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      });
+    } catch {
+      fetchSubproducts(selectedSubproductGroupId);
+    }
+  };
+
+  const handleAddGroup = async () => {
+    const name = newGroupName.trim() || 'New group';
+    setSavingGroup(true);
+    try {
+      const res = await fetch(`${API}/subproduct-groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const created = await res.json();
+      if (res.ok && created) {
+        setSubproductGroups((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+        setNewGroupName('');
+        setShowAddGroupInline(false);
+      } else fetchSubproductGroups();
+    } catch {
+      fetchSubproductGroups();
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const handleSaveEditGroup = async () => {
+    if (!editingGroupId) return;
+    const name = editingGroupName.trim() || 'New group';
+    setSavingGroup(true);
+    try {
+      const res = await fetch(`${API}/subproduct-groups/${editingGroupId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const updated = await res.json();
+      if (res.ok && updated) {
+        setSubproductGroups((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+        setEditingGroupId(null);
+        setEditingGroupName('');
+      } else fetchSubproductGroups();
+    } catch {
+      fetchSubproductGroups();
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const handleMoveGroup = async (groupId, direction) => {
+    const sorted = [...subproductGroups].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const idx = sorted.findIndex((g) => g.id === groupId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const curr = sorted[idx];
+    const other = sorted[swapIdx];
+    const currOrder = curr.sortOrder ?? idx;
+    const otherOrder = other.sortOrder ?? swapIdx;
+    setSavingGroup(true);
+    try {
+      await fetch(`${API}/subproduct-groups/${curr.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: otherOrder }) });
+      await fetch(`${API}/subproduct-groups/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: currOrder }) });
+      setSubproductGroups((prev) => prev.map((g) => (g.id === curr.id ? { ...g, sortOrder: otherOrder } : g.id === other.id ? { ...g, sortOrder: currOrder } : g)).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+    } catch {
+      fetchSubproductGroups();
+    } finally {
+      setSavingGroup(false);
+    }
+  };
+
+  const openTableLocationModal = () => {
+    setEditingTableLocationId(null);
+    setTableLocationName('');
+    setTableLocationSelectionStart(0);
+    setTableLocationSelectionEnd(0);
+    setTableLocationBackground('');
+    setTableLocationTextColor('light');
+    setShowTableLocationModal(true);
+  };
+
+  const openEditTableLocationModal = (loc) => {
+    const nextName = loc.name || '';
+    setEditingTableLocationId(loc.id);
+    setTableLocationName(nextName);
+    setTableLocationSelectionStart(nextName.length);
+    setTableLocationSelectionEnd(nextName.length);
+    setTableLocationBackground(typeof loc?.background === 'string' ? loc.background : '');
+    setTableLocationTextColor(loc?.textColor === 'dark' ? 'dark' : 'light');
+    setShowTableLocationModal(true);
+  };
+
+  const closeTableLocationModal = () => {
+    setShowTableLocationModal(false);
+    setEditingTableLocationId(null);
+    setTableLocationName('');
+    setTableLocationSelectionStart(0);
+    setTableLocationSelectionEnd(0);
+    setTableLocationBackground('');
+    setTableLocationTextColor('light');
+  };
+
+  useEffect(() => {
+    if (!showTableLocationModal) return;
+    const input = tableLocationNameInputRef.current;
+    if (!input) return;
+    if (document.activeElement !== input) input.focus();
+    const pos = Math.min(String(tableLocationName || '').length, Math.max(0, tableLocationSelectionStart));
+    try {
+      input.setSelectionRange(pos, Math.min(String(tableLocationName || '').length, Math.max(0, tableLocationSelectionEnd)));
+    } catch { }
+  }, [showTableLocationModal, tableLocationName, tableLocationSelectionStart, tableLocationSelectionEnd]);
+
+  const handleSaveTableLocation = async () => {
+    const name = tableLocationName.trim() || 'New location';
+    setSavingTableLocation(true);
+    try {
+      if (editingTableLocationId) {
+        const res = await fetch(`${API}/rooms/${editingTableLocationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, background: tableLocationBackground, textColor: tableLocationTextColor })
+        });
+        const updated = await res.json();
+        if (res.ok && updated) {
+          setTableLocations((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+          closeTableLocationModal();
+        } else fetchTableLocations();
+      } else {
+        const res = await fetch(`${API}/rooms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, background: tableLocationBackground, textColor: tableLocationTextColor })
+        });
+        const created = await res.json();
+        if (res.ok && created) {
+          setTableLocations((prev) => [...prev, created].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+          closeTableLocationModal();
+        } else fetchTableLocations();
+      }
+    } catch {
+      fetchTableLocations();
+    } finally {
+      setSavingTableLocation(false);
+    }
+  };
+
+  const handleDeleteTableLocation = async (id) => {
+    try {
+      const res = await fetch(`${API}/rooms/${id}`, { method: 'DELETE' });
+      if (res.ok) setTableLocations((prev) => prev.filter((t) => t.id !== id));
+      else fetchTableLocations();
+    } catch {
+      fetchTableLocations();
+    }
+    setDeleteConfirmTableLocationId(null);
+  };
+
+  const openSetTablesModal = async (loc) => {
+    const locationId = String(loc?.id || '');
+    const locationName = String(loc?.name || 'Restaurant');
+    const emptyDraft = () => ({ ...normalizeLayoutEditorDraft(null, locationName), tables: [] });
+    let draft = emptyDraft();
+    if (loc?.layoutJson != null && loc.layoutJson !== '') {
+      try {
+        const parsed = JSON.parse(loc.layoutJson);
+        if (parsed && typeof parsed === 'object') draft = normalizeLayoutEditorDraft(parsed, locationName);
+      } catch {
+        // keep empty draft
+      }
+    }
+    setSetTablesLocationId(locationId);
+    setSetTablesLocationName(locationName);
+    setSetTablesDraft(draft);
+    setSetTablesSelectedTableId(draft.tables[0]?.id || null);
+    setShowSetTablesModal(true);
+  };
+
+  const closeSetTablesModal = () => {
+    setShowSetTablesModal(false);
+    setShowSetTableTypeModal(false);
+    setShowSetBoardColorModal(false);
+    setSetTablesLocationId(null);
+    setSetTablesLocationName('');
+    setSetTablesSelectedTableId(null);
+    setSetTablesSelectedBoardIndex(null);
+    setSetTablesSelectedFlowerPotIndex(null);
+  };
+
+  const selectedSetTable = setTablesDraft.tables.find((table) => table.id === setTablesSelectedTableId) || null;
+  const boards = selectedSetTable?.boards ?? [];
+  const flowerPots = selectedSetTable?.flowerPots ?? [];
+  const selectedSetBoardIndex = setTablesSelectedBoardIndex != null && setTablesSelectedBoardIndex >= 0 && setTablesSelectedBoardIndex < boards.length ? setTablesSelectedBoardIndex : null;
+  const selectedSetBoard = selectedSetBoardIndex != null ? boards[selectedSetBoardIndex] : null;
+  const selectedSetFlowerPotIndex = setTablesSelectedFlowerPotIndex != null && setTablesSelectedFlowerPotIndex >= 0 && setTablesSelectedFlowerPotIndex < flowerPots.length ? setTablesSelectedFlowerPotIndex : null;
+  const selectedSetFlowerPot = selectedSetFlowerPotIndex != null ? flowerPots[selectedSetFlowerPotIndex] : null;
+
+  const updateSelectedSetTable = (patch) => {
+    if (!setTablesSelectedTableId) return;
+    setSetTablesDraft((prev) => ({
+      ...prev,
+      tables: prev.tables.map((table) => {
+        if (table.id !== setTablesSelectedTableId) return table;
+        return { ...table, ...patch };
+      })
+    }));
+  };
+
+  const updateSelectedSetBoard = (patch) => {
+    if (!setTablesSelectedTableId || selectedSetBoardIndex == null) return;
+    setSetTablesDraft((prev) => ({
+      ...prev,
+      tables: prev.tables.map((table) => {
+        if (table.id !== setTablesSelectedTableId || !Array.isArray(table.boards) || selectedSetBoardIndex >= table.boards.length) return table;
+        const nextBoards = [...table.boards];
+        nextBoards[selectedSetBoardIndex] = { ...nextBoards[selectedSetBoardIndex], ...patch };
+        return { ...table, boards: nextBoards };
+      })
+    }));
+  };
+
+  const updateSelectedSetFlowerPot = (patch) => {
+    if (!setTablesSelectedTableId || selectedSetFlowerPotIndex == null) return;
+    setSetTablesDraft((prev) => ({
+      ...prev,
+      tables: prev.tables.map((table) => {
+        if (table.id !== setTablesSelectedTableId || !Array.isArray(table.flowerPots) || selectedSetFlowerPotIndex >= table.flowerPots.length) return table;
+        const nextFlowerPots = [...table.flowerPots];
+        nextFlowerPots[selectedSetFlowerPotIndex] = { ...nextFlowerPots[selectedSetFlowerPotIndex], ...patch };
+        return { ...table, flowerPots: nextFlowerPots };
+      })
+    }));
+  };
+
+  const addSetTable = () => {
+    setShowSetTableTypeModal(true);
+  };
+
+  const addSetTableWithTemplate = (templateType) => {
+    setSetTablesDraft((prev) => {
+      const nextTable = createDefaultLayoutTable(prev.tables.length + 1, templateType);
+      const next = { ...prev, tables: [...prev.tables, nextTable] };
+      setSetTablesSelectedTableId(nextTable.id);
+      return next;
+    });
+    setShowSetTableTypeModal(false);
+  };
+
+  const handleAddBoard = () => {
+    if (!setTablesSelectedTableId) return;
+    setShowSetBoardColorModal(true);
+  };
+
+  const handleRemoveBoard = () => {
+    if (!setTablesSelectedTableId) return;
+    setSetTablesDraft((prev) => {
+      const table = prev.tables.find((t) => t.id === setTablesSelectedTableId);
+      if (!table || !Array.isArray(table.boards) || table.boards.length === 0) return prev;
+      const idx = selectedSetBoardIndex != null && selectedSetBoardIndex < table.boards.length ? selectedSetBoardIndex : table.boards.length - 1;
+      const nextBoards = table.boards.filter((_, i) => i !== idx);
+      return {
+        ...prev,
+        tables: prev.tables.map((t) => (t.id !== setTablesSelectedTableId ? t : { ...t, boards: nextBoards }))
+      };
+    });
+    setSetTablesSelectedBoardIndex(null);
+  };
+
+  const handleSelectBoardColor = (color) => {
+    if (!setTablesSelectedTableId) return;
+    setSetTablesDraft((prev) => ({
+      ...prev,
+      tables: prev.tables.map((table) => {
+        if (table.id !== setTablesSelectedTableId) return table;
+        const newBoard = { ...createDefaultBoard(table, color), color, x: 0, y: 0 };
+        const nextBoards = [...(Array.isArray(table.boards) ? table.boards : []), newBoard];
+        return { ...table, boards: nextBoards };
+      })
+    }));
+    setShowSetBoardColorModal(false);
+  };
+
+  const handleAddFlowerPot = () => {
+    if (!setTablesSelectedTableId) return;
+    setSetTablesDraft((prev) => ({
+      ...prev,
+      tables: prev.tables.map((table) => {
+        if (table.id !== setTablesSelectedTableId) return table;
+        const newFlowerPot = createDefaultFlowerPot();
+        const nextFlowerPots = [...(Array.isArray(table.flowerPots) ? table.flowerPots : []), newFlowerPot];
+        return { ...table, flowerPots: nextFlowerPots };
+      })
+    }));
+  };
+
+  const handleRemoveFlowerPot = () => {
+    if (!setTablesSelectedTableId) return;
+    setSetTablesDraft((prev) => {
+      const table = prev.tables.find((t) => t.id === setTablesSelectedTableId);
+      if (!table || !Array.isArray(table.flowerPots) || table.flowerPots.length === 0) return prev;
+      const idx = selectedSetFlowerPotIndex != null && selectedSetFlowerPotIndex < table.flowerPots.length ? selectedSetFlowerPotIndex : table.flowerPots.length - 1;
+      const nextFlowerPots = table.flowerPots.filter((_, i) => i !== idx);
+      return {
+        ...prev,
+        tables: prev.tables.map((t) => (t.id !== setTablesSelectedTableId ? t : { ...t, flowerPots: nextFlowerPots }))
+      };
+    });
+    setSetTablesSelectedFlowerPotIndex(null);
+  };
+
+  const startSetTableDrag = (event, table) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSetTablesSelectedTableId(table.id);
+    setTablesDragRef.current = {
+      type: 'table',
+      id: table.id,
+      startMouseX: event.clientX,
+      startMouseY: event.clientY,
+      startX: Number(table.x) || 0,
+      startY: Number(table.y) || 0
+    };
+    setSetTablesDraggingId(table.id);
+    setSetTablesDraggingType('table');
+  };
+
+  const startSetBoardDrag = (event, table, boardIndex) => {
+    const boards = table?.boards;
+    if (!Array.isArray(boards) || boardIndex < 0 || boardIndex >= boards.length) return;
+    const board = boards[boardIndex];
+    event.preventDefault();
+    event.stopPropagation();
+    setSetTablesSelectedTableId(table.id);
+    setSetTablesSelectedBoardIndex(boardIndex);
+    setTablesDragRef.current = {
+      type: 'board',
+      id: table.id,
+      boardIndex,
+      startMouseX: event.clientX,
+      startMouseY: event.clientY,
+      startX: Number(board.x) || 0,
+      startY: Number(board.y) || 0
+    };
+    setSetTablesDraggingId(table.id);
+    setSetTablesDraggingType('board');
+  };
+
+  const startSetFlowerPotDrag = (event, table, flowerPotIndex) => {
+    const pots = table?.flowerPots;
+    if (!Array.isArray(pots) || flowerPotIndex < 0 || flowerPotIndex >= pots.length) return;
+    const fp = pots[flowerPotIndex];
+    event.preventDefault();
+    event.stopPropagation();
+    setSetTablesSelectedTableId(table.id);
+    setSetTablesSelectedFlowerPotIndex(flowerPotIndex);
+    setTablesDragRef.current = {
+      type: 'flowerPot',
+      id: table.id,
+      flowerPotIndex,
+      startMouseX: event.clientX,
+      startMouseY: event.clientY,
+      startX: Number(fp.x) || 0,
+      startY: Number(fp.y) || 0
+    };
+    setSetTablesDraggingId(table.id);
+    setSetTablesDraggingType('flowerPot');
+  };
+
+  useEffect(() => {
+    if (!setTablesDraggingId) return undefined;
+
+    const onMouseMove = (event) => {
+      const drag = setTablesDragRef.current;
+      if (!drag) return;
+      const scale = setTablesCanvasZoom / 100;
+      const dx = (event.clientX - drag.startMouseX) / scale;
+      const dy = (event.clientY - drag.startMouseY) / scale;
+
+      setSetTablesDraft((prev) => {
+        const canvasWidth = prev.floorWidth ?? 979;
+        const canvasHeight = prev.floorHeight ?? 595.5;
+        return {
+        ...prev,
+        tables: prev.tables.map((table) => {
+          if (table.id !== drag.id) return table;
+          if (drag.type === 'flowerPot' && Array.isArray(table.flowerPots) && drag.flowerPotIndex != null && table.flowerPots[drag.flowerPotIndex]) {
+            const fp = table.flowerPots[drag.flowerPotIndex];
+            const fpWidth = Math.max(10, Number(fp.width) || 0);
+            const fpHeight = Math.max(10, Number(fp.height) || 0);
+            const maxX = Math.max(0, canvasWidth - fpWidth);
+            const maxY = Math.max(0, canvasHeight - fpHeight);
+            const x = Math.min(maxX, Math.max(0, drag.startX + dx));
+            const y = Math.min(maxY, Math.max(0, drag.startY + dy));
+            const nextFlowerPots = [...table.flowerPots];
+            nextFlowerPots[drag.flowerPotIndex] = { ...fp, x, y };
+            return { ...table, flowerPots: nextFlowerPots };
+          }
+          if (drag.type === 'board' && Array.isArray(table.boards) && drag.boardIndex != null && table.boards[drag.boardIndex]) {
+            const board = table.boards[drag.boardIndex];
+            const boardWidth = Math.max(10, Number(board.width) || 0);
+            const boardHeight = Math.max(10, Number(board.height) || 0);
+            const maxX = Math.max(0, canvasWidth - boardWidth);
+            const maxY = Math.max(0, canvasHeight - boardHeight);
+            const x = Math.min(maxX, Math.max(0, drag.startX + dx));
+            const y = Math.min(maxY, Math.max(0, drag.startY + dy));
+            const nextBoards = [...table.boards];
+            nextBoards[drag.boardIndex] = { ...board, x, y };
+            return { ...table, boards: nextBoards };
+          }
+          const tableWidth = table.round ? Math.max(70, Number(table.width) || 0) : Math.max(60, Number(table.width) || 0);
+          const tableHeight = table.round ? tableWidth : Math.max(40, Number(table.height) || 0);
+          const maxX = Math.max(0, canvasWidth - tableWidth);
+          const maxY = Math.max(0, canvasHeight - tableHeight);
+          const x = Math.min(maxX, Math.max(0, drag.startX + dx));
+          const y = Math.min(maxY, Math.max(0, drag.startY + dy));
+          return { ...table, x, y };
+        })
+        };
+      });
+    };
+
+    const onMouseUp = () => {
+      setTablesDragRef.current = null;
+      setSetTablesDraggingId(null);
+      setSetTablesDraggingType(null);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [setTablesDraggingId, setTablesCanvasZoom]);
+
+  const removeSetTable = () => {
+    if (!setTablesSelectedTableId) return;
+    setSetTablesDraft((prev) => {
+      const nextTables = prev.tables.filter((table) => table.id !== setTablesSelectedTableId);
+      setSetTablesSelectedTableId(nextTables[0]?.id || null);
+      return { ...prev, tables: nextTables };
+    });
+  };
+
+  const saveSetTablesLayout = async () => {
+    if (!setTablesLocationId) return;
+    try {
+      const patchRes = await fetch(`${API}/rooms/${setTablesLocationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layoutJson: JSON.stringify(setTablesDraft) })
+      });
+      if (!patchRes.ok) throw new Error('Failed to save table layout');
+      const names = (setTablesDraft.tables || [])
+        .map((t) => String(t?.name ?? '').trim())
+        .filter(Boolean);
+      if (names.length > 0) {
+        const syncRes = await fetch(`${API}/tables/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomId: setTablesLocationId, names })
+        });
+        if (!syncRes.ok) throw new Error('Failed to sync tables');
+      }
+      setTableLocations((prev) =>
+        prev.map((r) =>
+          r.id === setTablesLocationId ? { ...r, layoutJson: JSON.stringify(setTablesDraft) } : r
+        )
+      );
+      if (typeof fetchTableLayouts === 'function') fetchTableLayouts();
+      if (typeof fetchTables === 'function') fetchTables();
+      showToast('success', tr('control.tables.layoutSaved', 'Table layout saved.'));
+      closeSetTablesModal();
+    } catch {
+      showToast('error', tr('control.tables.layoutSaveFailed', 'Failed to save table layout.'));
+    }
+  };
+
+  const handleDeleteGroup = async (id) => {
+    try {
+      const res = await fetch(`${API}/subproduct-groups/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSubproductGroups((prev) => prev.filter((g) => g.id !== id));
+        if (selectedSubproductGroupId === id) setSelectedSubproductGroupId(null);
+      } else fetchSubproductGroups();
+    } catch {
+      fetchSubproductGroups();
+    } finally {
+      setDeleteConfirmGroupId(null);
+    }
+  };
+
+  const applyDeviceSettingsToState = (saved) => {
+    if (!saved || typeof saved !== 'object') return;
+    if (saved.useSubproducts != null) setDeviceUseSubproducts(!!saved.useSubproducts);
+      if (saved.autoLogoutAfterTransaction != null) setDeviceAutoLogoutAfterTransaction(!!saved.autoLogoutAfterTransaction);
+      if (saved.autoReturnToTablePlan != null) setDeviceAutoReturnToTablePlan(!!saved.autoReturnToTablePlan);
+      if (saved.disableCashButtonInPayment != null) setDeviceDisableCashButtonInPayment(!!saved.disableCashButtonInPayment);
+      if (saved.openPriceWithoutPopup != null) setDeviceOpenPriceWithoutPopup(!!saved.openPriceWithoutPopup);
+      if (saved.openCashDrawerAfterOrder != null) setDeviceOpenCashDrawerAfterOrder(!!saved.openCashDrawerAfterOrder);
+      if (saved.autoReturnToCounterSale != null) setDeviceAutoReturnToCounterSale(!!saved.autoReturnToCounterSale);
+      if (saved.askSendToKitchen != null) setDeviceAskSendToKitchen(!!saved.askSendToKitchen);
+      if (saved.counterSaleVat != null) setDeviceCounterSaleVat(saved.counterSaleVat);
+      if (saved.tableSaleVat != null) setDeviceTableSaleVat(saved.tableSaleVat);
+      if (saved.timeoutLogout != null) setDeviceTimeoutLogout(Number(saved.timeoutLogout) || 0);
+      if (saved.fixedBorder != null) setDeviceFixedBorder(!!saved.fixedBorder);
+      if (saved.alwaysOnTop != null) setDeviceAlwaysOnTop(!!saved.alwaysOnTop);
+      if (saved.askInvoiceOrTicket != null) setDeviceAskInvoiceOrTicket(!!saved.askInvoiceOrTicket);
+      if (saved.printerGroupingProducts != null) setDevicePrinterGroupingProducts(!!saved.printerGroupingProducts);
+      if (saved.printerShowErrorScreen != null) setDevicePrinterShowErrorScreen(!!saved.printerShowErrorScreen);
+      if (saved.printerProductionMessageOnVat != null) setDevicePrinterProductionMessageOnVat(!!saved.printerProductionMessageOnVat);
+      if (saved.printerNextCourseOrder != null) setDevicePrinterNextCourseOrder(saved.printerNextCourseOrder);
+      if (saved.printerStandardMode != null) setDevicePrinterStandardMode(saved.printerStandardMode);
+      if (saved.printerQROrderPrinter != null) setDevicePrinterQROrderPrinter(saved.printerQROrderPrinter || '');
+      if (saved.printerReprintWithNextCourse != null) setDevicePrinterReprintWithNextCourse(!!saved.printerReprintWithNextCourse);
+      if (saved.printerPrintZeroTickets != null) setDevicePrinterPrintZeroTickets(!!saved.printerPrintZeroTickets);
+      if (saved.printerGiftVoucherAtMin != null) setDevicePrinterGiftVoucherAtMin(!!saved.printerGiftVoucherAtMin);
+      if (Array.isArray(saved.categoryDisplayIds)) setDeviceCategoryDisplayIds(saved.categoryDisplayIds);
+      if (saved.ordersConfirmOnHold != null) setDeviceOrdersConfirmOnHold(!!saved.ordersConfirmOnHold);
+      if (saved.ordersPrintBarcodeAfterCreate != null) setDeviceOrdersPrintBarcodeAfterCreate(!!saved.ordersPrintBarcodeAfterCreate);
+      if (saved.ordersCustomerCanBeModified != null) setDeviceOrdersCustomerCanBeModified(!!saved.ordersCustomerCanBeModified);
+      if (saved.ordersBookTableToWaiting != null) setDeviceOrdersBookTableToWaiting(!!saved.ordersBookTableToWaiting);
+      if (saved.ordersFastCustomerName != null) setDeviceOrdersFastCustomerName(!!saved.ordersFastCustomerName);
+      if (saved.scheduledPrinter != null) setDeviceScheduledPrinter(saved.scheduledPrinter || '');
+      if (saved.scheduledProductionFlow != null) setDeviceScheduledProductionFlow(saved.scheduledProductionFlow);
+      if (saved.scheduledLoading != null) setDeviceScheduledLoading(saved.scheduledLoading);
+      if (saved.scheduledMode != null) setDeviceScheduledMode(saved.scheduledMode);
+      if (saved.scheduledInvoiceLayout != null) setDeviceScheduledInvoiceLayout(saved.scheduledInvoiceLayout);
+      if (saved.scheduledCheckoutAt != null) setDeviceScheduledCheckoutAt(saved.scheduledCheckoutAt);
+      if (saved.scheduledPrintBarcodeLabel != null) setDeviceScheduledPrintBarcodeLabel(!!saved.scheduledPrintBarcodeLabel);
+      if (saved.scheduledDeliveryNoteToTurnover != null) setDeviceScheduledDeliveryNoteToTurnover(!!saved.scheduledDeliveryNoteToTurnover);
+      if (saved.scheduledPrintProductionReceipt != null) setDeviceScheduledPrintProductionReceipt(!!saved.scheduledPrintProductionReceipt);
+      if (saved.scheduledPrintCustomerProductionReceipt != null) setDeviceScheduledPrintCustomerProductionReceipt(!!saved.scheduledPrintCustomerProductionReceipt);
+      if (saved.scheduledWebOrderAutoPrint != null) setDeviceScheduledWebOrderAutoPrint(!!saved.scheduledWebOrderAutoPrint);
+      if (saved.optionButtonLayout != null) setOptionButtonSlots(normalizeOptionButtonSlots(saved.optionButtonLayout));
+    setSelectedFunctionButtonSlotIndex(null);
+    setSelectedOptionButtonSlotIndex(null);
+  };
+
+  useEffect(() => {
+    if (!showDeviceSettingsModal) return;
+    fetchCategories();
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_device_settings');
+      const saved = raw ? JSON.parse(raw) : {};
+      applyDeviceSettingsToState(saved);
+    } catch (_) {}
+    let cancelled = false;
+    (async () => {
+      try {
+        const [deviceRes, layoutRes] = await Promise.all([
+          fetch(`${API}/settings/device-settings`),
+          fetch(`${API}/settings/function-buttons-layout`)
+        ]);
+        if (cancelled) return;
+        if (deviceRes.ok) {
+          const deviceData = await deviceRes.json().catch(() => ({}));
+          const saved = deviceData?.value;
+          if (saved && typeof saved === 'object') {
+            applyDeviceSettingsToState(saved);
+            if (typeof localStorage !== 'undefined') localStorage.setItem('pos_device_settings', JSON.stringify(saved));
+          }
+        }
+        if (layoutRes.ok) {
+          const layoutData = await layoutRes.json().catch(() => ({}));
+          setFunctionButtonSlots(normalizeFunctionButtonSlots(layoutData?.value));
+        } else if (!cancelled) {
+          setFunctionButtonSlots(normalizeFunctionButtonSlots([]));
+        }
+      } catch {
+        if (!cancelled) setFunctionButtonSlots(normalizeFunctionButtonSlots([]));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showDeviceSettingsModal, fetchCategories]);
+
+  const handleSaveDeviceSettings = async () => {
+    setSavingDeviceSettings(true);
+    try {
+      const payload = {
+        useSubproducts: deviceUseSubproducts,
+        autoLogoutAfterTransaction: deviceAutoLogoutAfterTransaction,
+        autoReturnToTablePlan: deviceAutoReturnToTablePlan,
+        disableCashButtonInPayment: deviceDisableCashButtonInPayment,
+        openPriceWithoutPopup: deviceOpenPriceWithoutPopup,
+        openCashDrawerAfterOrder: deviceOpenCashDrawerAfterOrder,
+        autoReturnToCounterSale: deviceAutoReturnToCounterSale,
+        askSendToKitchen: deviceAskSendToKitchen,
+        counterSaleVat: deviceCounterSaleVat,
+        tableSaleVat: deviceTableSaleVat,
+        timeoutLogout: deviceTimeoutLogout,
+        fixedBorder: deviceFixedBorder,
+        alwaysOnTop: deviceAlwaysOnTop,
+        askInvoiceOrTicket: deviceAskInvoiceOrTicket,
+        printerGroupingProducts: devicePrinterGroupingProducts,
+        printerShowErrorScreen: devicePrinterShowErrorScreen,
+        printerProductionMessageOnVat: devicePrinterProductionMessageOnVat,
+        printerNextCourseOrder: devicePrinterNextCourseOrder,
+        printerStandardMode: devicePrinterStandardMode,
+        printerQROrderPrinter: devicePrinterQROrderPrinter,
+        printerReprintWithNextCourse: devicePrinterReprintWithNextCourse,
+        printerPrintZeroTickets: devicePrinterPrintZeroTickets,
+        printerGiftVoucherAtMin: devicePrinterGiftVoucherAtMin,
+        categoryDisplayIds: deviceCategoryDisplayIds,
+        ordersConfirmOnHold: deviceOrdersConfirmOnHold,
+        ordersPrintBarcodeAfterCreate: deviceOrdersPrintBarcodeAfterCreate,
+        ordersCustomerCanBeModified: deviceOrdersCustomerCanBeModified,
+        ordersBookTableToWaiting: deviceOrdersBookTableToWaiting,
+        ordersFastCustomerName: deviceOrdersFastCustomerName,
+        scheduledPrinter: deviceScheduledPrinter,
+        scheduledProductionFlow: deviceScheduledProductionFlow,
+        scheduledLoading: deviceScheduledLoading,
+        scheduledMode: deviceScheduledMode,
+        scheduledInvoiceLayout: deviceScheduledInvoiceLayout,
+        scheduledCheckoutAt: deviceScheduledCheckoutAt,
+        scheduledPrintBarcodeLabel: deviceScheduledPrintBarcodeLabel,
+        scheduledDeliveryNoteToTurnover: deviceScheduledDeliveryNoteToTurnover,
+        scheduledPrintProductionReceipt: deviceScheduledPrintProductionReceipt,
+        scheduledPrintCustomerProductionReceipt: deviceScheduledPrintCustomerProductionReceipt,
+        scheduledWebOrderAutoPrint: deviceScheduledWebOrderAutoPrint,
+        optionButtonLayout: optionButtonSlots
+      };
+      const deviceRes = await fetch(`${API}/settings/device-settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: payload })
+      });
+      if (!deviceRes.ok) {
+        const errData = await deviceRes.json().catch(() => ({}));
+        throw new Error(errData?.error || 'Failed to save device settings');
+      }
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_device_settings', JSON.stringify(payload));
+      const layoutRes = await fetch(`${API}/settings/function-buttons-layout`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: functionButtonSlots })
+      });
+      const layoutData = await layoutRes.json().catch(() => ({}));
+      if (!layoutRes.ok) {
+        throw new Error(layoutData?.error || 'Failed to save function buttons layout');
+      }
+      setFunctionButtonSlots(normalizeFunctionButtonSlots(layoutData?.value));
+      setSelectedFunctionButtonSlotIndex(null);
+      setShowDeviceSettingsModal(false);
+      if (typeof onFunctionButtonsSaved === 'function') onFunctionButtonsSaved();
+      showToast('success', 'Device settings saved.');
+    } catch (err) {
+      showToast('error', err?.message || 'Failed to save device settings.');
+    } finally {
+      setSavingDeviceSettings(false);
+    }
+  };
+
+  const handleFunctionButtonDragStart = (event, itemId) => {
+    if (!itemId) return;
+    event.dataTransfer.setData('text/plain', itemId);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleFunctionButtonDropOnSlot = (event, slotIndex) => {
+    event.preventDefault();
+    if (slotIndex < 0 || slotIndex >= FUNCTION_BUTTON_SLOT_COUNT) return;
+    const droppedId = String(event.dataTransfer.getData('text/plain') || '').trim();
+    if (!FUNCTION_BUTTON_ITEM_IDS.includes(droppedId)) return;
+    setFunctionButtonSlots((prev) => {
+      const next = [...prev];
+      const existingIndex = next.findIndex((id) => id === droppedId);
+      if (existingIndex >= 0) next[existingIndex] = '';
+      next[slotIndex] = droppedId;
+      return next;
+    });
+    setSelectedFunctionButtonSlotIndex(slotIndex);
+  };
+
+  const handleRemoveFunctionButtonFromSlot = () => {
+    if (!Number.isInteger(selectedFunctionButtonSlotIndex)) return;
+    setFunctionButtonSlots((prev) => {
+      const next = [...prev];
+      if (!next[selectedFunctionButtonSlotIndex]) return prev;
+      next[selectedFunctionButtonSlotIndex] = '';
+      return next;
+    });
+    setSelectedFunctionButtonPoolItemId(null);
+  };
+
+  const hasSelectedFunctionButton = Number.isInteger(selectedFunctionButtonSlotIndex)
+    && !!functionButtonSlots[selectedFunctionButtonSlotIndex];
+  const assignedFunctionButtonIds = new Set(functionButtonSlots.filter(Boolean));
+  const assignedOptionButtonIds = new Set(optionButtonSlots.filter(Boolean));
+  const unassignedOptionButtons = OPTION_BUTTON_ITEMS.filter((item) => !assignedOptionButtonIds.has(item.id));
+
+  const handleOptionButtonDragStart = (event, itemId) => {
+    if (!itemId) return;
+    event.dataTransfer.setData('text/plain', itemId);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+  const handleOptionButtonDragStartFromSlot = (event, slotIndex) => {
+    const itemId = String(optionButtonSlots[slotIndex] || '').trim();
+    if (!itemId || itemId === OPTION_BUTTON_LOCKED_ID) return;
+    event.dataTransfer.setData('text/plain', itemId);
+    event.dataTransfer.effectAllowed = 'move';
+    setSelectedOptionButtonSlotIndex(slotIndex);
+  };
+
+  const handleOptionButtonDropOnSlot = (event, slotIndex) => {
+    event.preventDefault();
+    if (slotIndex < 0 || slotIndex >= OPTION_BUTTON_SLOT_COUNT) return;
+    const droppedId = String(event.dataTransfer.getData('text/plain') || '').trim();
+    if (!OPTION_BUTTON_ITEM_IDS.includes(droppedId)) return;
+    setOptionButtonSlots((prev) => {
+      const next = [...prev];
+      if (next[slotIndex] === OPTION_BUTTON_LOCKED_ID && droppedId !== OPTION_BUTTON_LOCKED_ID) {
+        return prev;
+      }
+      const existingIndex = next.findIndex((id) => id === droppedId);
+      if (existingIndex >= 0) next[existingIndex] = '';
+      next[slotIndex] = droppedId;
+      return next;
+    });
+    setSelectedOptionButtonSlotIndex(slotIndex);
+  };
+
+  const handleRemoveOptionButtonFromSlot = () => {
+    if (!Number.isInteger(selectedOptionButtonSlotIndex)) return;
+    setOptionButtonSlots((prev) => {
+      const next = [...prev];
+      if (!next[selectedOptionButtonSlotIndex]) return prev;
+      if (next[selectedOptionButtonSlotIndex] === OPTION_BUTTON_LOCKED_ID) return prev;
+      next[selectedOptionButtonSlotIndex] = '';
+      return next;
+    });
+    setSelectedOptionButtonPoolItemId(null);
+  };
+
+  const handleOptionButtonSlotClick = (slotIndex) => {
+    const assignedId = optionButtonSlots[slotIndex];
+    const hasPoolSelection = selectedOptionButtonPoolItemId && OPTION_BUTTON_ITEM_IDS.includes(selectedOptionButtonPoolItemId);
+    const hasGridSelection = Number.isInteger(selectedOptionButtonSlotIndex) && optionButtonSlots[selectedOptionButtonSlotIndex];
+
+    if (hasPoolSelection && !assignedId) {
+      setOptionButtonSlots((prev) => {
+        const next = [...prev];
+        next[slotIndex] = selectedOptionButtonPoolItemId;
+        return next;
+      });
+      setSelectedOptionButtonPoolItemId(null);
+      setSelectedOptionButtonSlotIndex(null);
+      return;
+    }
+    if (hasGridSelection && selectedOptionButtonSlotIndex !== slotIndex && optionButtonSlots[selectedOptionButtonSlotIndex] !== OPTION_BUTTON_LOCKED_ID) {
+      const sourceId = optionButtonSlots[selectedOptionButtonSlotIndex];
+      if (optionButtonSlots[slotIndex] === OPTION_BUTTON_LOCKED_ID && sourceId !== OPTION_BUTTON_LOCKED_ID) return;
+      setOptionButtonSlots((prev) => {
+        const next = [...prev];
+        const targetId = next[slotIndex];
+        next[selectedOptionButtonSlotIndex] = targetId || '';
+        next[slotIndex] = sourceId;
+        return next;
+      });
+      setSelectedOptionButtonSlotIndex(null);
+      setSelectedOptionButtonPoolItemId(null);
+      return;
+    }
+    if (assignedId) {
+      setSelectedOptionButtonSlotIndex(slotIndex);
+      setSelectedOptionButtonPoolItemId(null);
+    }
+  };
+
+  const handleFunctionButtonSlotClick = (slotIndex) => {
+    const assignedId = functionButtonSlots[slotIndex];
+    const hasPoolSelection = selectedFunctionButtonPoolItemId && FUNCTION_BUTTON_ITEM_IDS.includes(selectedFunctionButtonPoolItemId);
+    const hasGridSelection = Number.isInteger(selectedFunctionButtonSlotIndex) && functionButtonSlots[selectedFunctionButtonSlotIndex];
+
+    if (hasPoolSelection && !assignedId) {
+      setFunctionButtonSlots((prev) => {
+        const next = [...prev];
+        next[slotIndex] = selectedFunctionButtonPoolItemId;
+        return next;
+      });
+      setSelectedFunctionButtonPoolItemId(null);
+      setSelectedFunctionButtonSlotIndex(null);
+      return;
+    }
+    if (hasGridSelection && selectedFunctionButtonSlotIndex !== slotIndex) {
+      const sourceId = functionButtonSlots[selectedFunctionButtonSlotIndex];
+      setFunctionButtonSlots((prev) => {
+        const next = [...prev];
+        const targetId = next[slotIndex];
+        next[selectedFunctionButtonSlotIndex] = targetId || '';
+        next[slotIndex] = sourceId;
+        return next;
+      });
+      setSelectedFunctionButtonSlotIndex(null);
+      setSelectedFunctionButtonPoolItemId(null);
+      return;
+    }
+    if (assignedId) {
+      setSelectedFunctionButtonSlotIndex(slotIndex);
+      setSelectedFunctionButtonPoolItemId(null);
+    }
+  };
+
+  const hasSelectedOptionButton = Number.isInteger(selectedOptionButtonSlotIndex)
+    && !!optionButtonSlots[selectedOptionButtonSlotIndex];
+  const hasSelectedRemovableOptionButton = Number.isInteger(selectedOptionButtonSlotIndex)
+    && !!optionButtonSlots[selectedOptionButtonSlotIndex]
+    && optionButtonSlots[selectedOptionButtonSlotIndex] !== OPTION_BUTTON_LOCKED_ID;
+
+  useEffect(() => {
+    if (!showSystemSettingsModal) return;
+    fetchPriceGroups();
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_system_settings');
+      const saved = raw ? JSON.parse(raw) : {};
+      if (saved.useStockManagement != null) setSysUseStockManagement(!!saved.useStockManagement);
+      if (saved.usePriceGroups != null) setSysUsePriceGroups(!!saved.usePriceGroups);
+      if (saved.loginWithoutCode != null) setSysLoginWithoutCode(!!saved.loginWithoutCode);
+      if (saved.categorieenPerKassa != null) setSysCategorieenPerKassa(!!saved.categorieenPerKassa);
+      if (saved.autoAcceptQROrders != null) setSysAutoAcceptQROrders(!!saved.autoAcceptQROrders);
+      if (saved.qrOrdersAutomatischAfrekenen != null) setSysQrOrdersAutomatischAfrekenen(!!saved.qrOrdersAutomatischAfrekenen);
+      if (saved.enkelQROrdersKeukenscherm != null) setSysEnkelQROrdersKeukenscherm(!!saved.enkelQROrdersKeukenscherm);
+      if (saved.aspect169Windows != null) setSysAspect169Windows(!!saved.aspect169Windows);
+      if (saved.vatRateVariousProducts != null) setSysVatRateVariousProducts(saved.vatRateVariousProducts);
+      if (saved.arrangeProductsManually != null) setSysArrangeProductsManually(!!saved.arrangeProductsManually);
+      if (saved.limitOneUserPerTable != null) setSysLimitOneUserPerTable(!!saved.limitOneUserPerTable);
+      if (saved.oneWachtorderPerKlant != null) setSysOneWachtorderPerKlant(!!saved.oneWachtorderPerKlant);
+      if (saved.cashButtonVisibleMultiplePayment != null) setSysCashButtonVisibleMultiplePayment(!!saved.cashButtonVisibleMultiplePayment);
+      if (saved.usePlaceSettings != null) setSysUsePlaceSettings(!!saved.usePlaceSettings);
+      if (saved.tegoedAutomatischInladen != null) setSysTegoedAutomatischInladen(!!saved.tegoedAutomatischInladen);
+      if (saved.nieuwstePrijsGebruiken != null) setSysNieuwstePrijsGebruiken(!!saved.nieuwstePrijsGebruiken);
+      if (saved.leeggoedTerugname != null) setSysLeeggoedTerugname(saved.leeggoedTerugname);
+      if (saved.klantgegevensQRAfdrukken != null) setSysKlantgegevensQRAfdrukken(!!saved.klantgegevensQRAfdrukken);
+      if (saved.priceTakeAway != null) setSysPriceTakeAway(saved.priceTakeAway || '');
+      if (saved.priceDelivery != null) setSysPriceDelivery(saved.priceDelivery || '');
+      if (saved.priceCounterSale != null) setSysPriceCounterSale(saved.priceCounterSale || '');
+      if (saved.priceTableSale != null) setSysPriceTableSale(saved.priceTableSale || '');
+      if (saved.savingsPointsPerEuro != null) setSysSavingsPointsPerEuro(Number(saved.savingsPointsPerEuro) || 0);
+      if (saved.savingsPointsPerDiscount != null) setSysSavingsPointsPerDiscount(Number(saved.savingsPointsPerDiscount) || 0);
+      if (saved.savingsDiscount != null) setSysSavingsDiscount(saved.savingsDiscount || '');
+      if (saved.ticketVoucherValidity != null) setSysTicketVoucherValidity(saved.ticketVoucherValidity);
+      if (saved.ticketScheduledPrintMode != null) setSysTicketScheduledPrintMode(saved.ticketScheduledPrintMode);
+      if (saved.ticketScheduledCustomerSort != null) setSysTicketScheduledCustomerSort(saved.ticketScheduledCustomerSort);
+      if (saved.barcodeType != null) setSysBarcodeType(saved.barcodeType);
+    } catch (_) { }
+  }, [showSystemSettingsModal, fetchPriceGroups]);
+
+  const handleSaveSystemSettings = async () => {
+    setSavingSystemSettings(true);
+    try {
+      const payload = {
+        useStockManagement: sysUseStockManagement,
+        usePriceGroups: sysUsePriceGroups,
+        loginWithoutCode: sysLoginWithoutCode,
+        categorieenPerKassa: sysCategorieenPerKassa,
+        autoAcceptQROrders: sysAutoAcceptQROrders,
+        qrOrdersAutomatischAfrekenen: sysQrOrdersAutomatischAfrekenen,
+        enkelQROrdersKeukenscherm: sysEnkelQROrdersKeukenscherm,
+        aspect169Windows: sysAspect169Windows,
+        vatRateVariousProducts: sysVatRateVariousProducts,
+        arrangeProductsManually: sysArrangeProductsManually,
+        limitOneUserPerTable: sysLimitOneUserPerTable,
+        oneWachtorderPerKlant: sysOneWachtorderPerKlant,
+        cashButtonVisibleMultiplePayment: sysCashButtonVisibleMultiplePayment,
+        usePlaceSettings: sysUsePlaceSettings,
+        tegoedAutomatischInladen: sysTegoedAutomatischInladen,
+        nieuwstePrijsGebruiken: sysNieuwstePrijsGebruiken,
+        leeggoedTerugname: sysLeeggoedTerugname,
+        klantgegevensQRAfdrukken: sysKlantgegevensQRAfdrukken,
+        priceTakeAway: sysPriceTakeAway,
+        priceDelivery: sysPriceDelivery,
+        priceCounterSale: sysPriceCounterSale,
+        priceTableSale: sysPriceTableSale,
+        savingsPointsPerEuro: sysSavingsPointsPerEuro,
+        savingsPointsPerDiscount: sysSavingsPointsPerDiscount,
+        savingsDiscount: sysSavingsDiscount,
+        ticketVoucherValidity: sysTicketVoucherValidity,
+        ticketScheduledPrintMode: sysTicketScheduledPrintMode,
+        ticketScheduledCustomerSort: sysTicketScheduledCustomerSort,
+        barcodeType: sysBarcodeType
+      };
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_system_settings', JSON.stringify(payload));
+      setShowSystemSettingsModal(false);
+    } finally {
+      setSavingSystemSettings(false);
+    }
+  };
+
+  const openNewPaymentTypeModal = () => {
+    setEditingPaymentTypeId(null);
+    setPaymentTypeName('');
+    setPaymentTypeActive(true);
+    setPaymentTypeIntegration('generic');
+    setShowPaymentTypeModal(true);
+  };
+
+  const openEditPaymentTypeModal = (pt) => {
+    setEditingPaymentTypeId(pt.id);
+    setPaymentTypeName(pt.name || '');
+    setPaymentTypeActive(pt.active !== false);
+    setPaymentTypeIntegration(pt.integration || 'generic');
+    setShowPaymentTypeModal(true);
+  };
+
+  const closePaymentTypeModal = () => {
+    setShowPaymentTypeModal(false);
+    setEditingPaymentTypeId(null);
+    setPaymentTypeName('');
+    setPaymentTypeActive(true);
+    setPaymentTypeIntegration('generic');
+  };
+
+  const handleSavePaymentType = async () => {
+    const name = (paymentTypeName || '').trim();
+    if (!name) return;
+    setSavingPaymentType(true);
+    try {
+      const body = { name, active: paymentTypeActive, integration: paymentTypeIntegration };
+      if (editingPaymentTypeId) {
+        const res = await fetch(`${API}/payment-methods/${editingPaymentTypeId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || 'Failed to save payment method');
+      } else {
+        const res = await fetch(`${API}/payment-methods`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || 'Failed to create payment method');
+      }
+      await fetchPaymentTypes();
+      closePaymentTypeModal();
+    } catch (e) {
+      showToast('error', e?.message || 'Save failed');
+    } finally {
+      setSavingPaymentType(false);
+    }
+  };
+
+  const togglePaymentTypeActive = async (id) => {
+    const pt = paymentTypes.find((p) => p.id === id);
+    if (!pt) return;
+    try {
+      const res = await fetch(`${API}/payment-methods/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !pt.active }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to update');
+      await fetchPaymentTypes();
+    } catch (e) {
+      showToast('error', e?.message || 'Update failed');
+    }
+  };
+
+  const handleDeletePaymentType = async (id) => {
+    try {
+      const res = await fetch(`${API}/payment-methods/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to delete');
+      }
+      await fetchPaymentTypes();
+      if (editingPaymentTypeId === id) {
+        setShowPaymentTypeModal(false);
+        setEditingPaymentTypeId(null);
+      }
+      showToast('success', tr('control.paymentTypes.deleted', 'Payment method deleted.'));
+    } catch (e) {
+      showToast('error', e?.message || 'Delete failed');
+    } finally {
+      setDeleteConfirmPaymentTypeId(null);
+    }
+  };
+
+  const movePaymentType = async (id, direction) => {
+    const sorted = [...paymentTypes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const idx = sorted.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const swap = direction === 'up' ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= sorted.length) return;
+    [sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]];
+    const orderedIds = sorted.map((p) => p.id);
+    try {
+      const res = await fetch(`${API}/payment-methods/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to reorder');
+      await fetchPaymentTypes();
+    } catch (e) {
+      showToast('error', e?.message || 'Reorder failed');
+    }
+  };
+
+  const persistProductionMessages = (next) => {
+    setProductionMessages(next);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_production_messages', JSON.stringify(next));
+    } catch (_) { }
+  };
+
+  useEffect(() => {
+    if (!showProductionMessagesModal) return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_production_messages');
+      const list = raw ? JSON.parse(raw) : [];
+      setProductionMessages(Array.isArray(list) ? list : []);
+      setProductionMessageInput('');
+      setEditingProductionMessageId(null);
+    } catch (_) {
+      setProductionMessages([]);
+    }
+  }, [showProductionMessagesModal]);
+
+  const handleAddOrUpdateProductionMessage = () => {
+    const text = (productionMessageInput || '').trim();
+    if (!text) return;
+    const sorted = [...productionMessages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    if (editingProductionMessageId) {
+      const next = sorted.map((m) => (m.id === editingProductionMessageId ? { ...m, text } : m));
+      persistProductionMessages(next);
+      setEditingProductionMessageId(null);
+    } else {
+      const newId = 'pm-' + Date.now();
+      const next = [...sorted, { id: newId, text, sortOrder: sorted.length }];
+      persistProductionMessages(next);
+    }
+    setProductionMessageInput('');
+  };
+
+  const startEditProductionMessage = (m) => {
+    setEditingProductionMessageId(m.id);
+    setProductionMessageInput(m.text || '');
+  };
+
+  const cancelEditProductionMessage = () => {
+    setEditingProductionMessageId(null);
+    setProductionMessageInput('');
+  };
+
+  const handleDeleteProductionMessage = (id) => {
+    const next = productionMessages.filter((m) => m.id !== id).map((m, i) => ({ ...m, sortOrder: i }));
+    persistProductionMessages(next);
+    setDeleteConfirmProductionMessageId(null);
+    if (editingProductionMessageId === id) cancelEditProductionMessage();
+  };
+
+  const moveProductionMessage = (id, direction) => {
+    const sorted = [...productionMessages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const idx = sorted.findIndex((m) => m.id === id);
+    if (idx < 0) return;
+    const swap = direction === 'up' ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= sorted.length) return;
+    [sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]];
+    const withOrder = sorted.map((m, i) => ({ ...m, sortOrder: i }));
+    persistProductionMessages(withOrder);
+  };
+
+  const persistPrinters = (next) => {
+    setPrinters(next);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_printers', JSON.stringify(next));
+    } catch (_) { }
+  };
+
+  const parseSerialComPort = (connectionString = '') => {
+    const s = String(connectionString || '').trim();
+    if (!s) return '';
+    if (s.startsWith('serial://')) return (s.substring(9).split('?')[0] || '').trim().toUpperCase();
+    if (s.startsWith('\\\\.\\')) return s.substring(4).trim().toUpperCase();
+    return s.trim().toUpperCase();
+  };
+
+  const parseNetworkAddress = (connectionString = '') => {
+    const s = String(connectionString || '').trim();
+    if (!s.startsWith('tcp://')) return { ipAddress: '', port: '9100' };
+    const [ipAddress = '', port = '9100'] = s.substring(6).split(':');
+    return { ipAddress: ipAddress.trim(), port: String(port || '9100').trim() };
+  };
+
+  const parseCashmaticConnectionString = (connectionString = '') => {
+    const pickFromConfig = (config, keys) => {
+      for (const key of keys) {
+        if (config[key] != null && String(config[key]).trim() !== '') return String(config[key]).trim();
+        const lower = key.toLowerCase();
+        const match = Object.keys(config).find((k) => k.toLowerCase() === lower && config[k] != null && String(config[k]).trim() !== '');
+        if (match) return String(config[match]).trim();
+      }
+      return '';
+    };
+
+    const raw = String(connectionString || '').trim();
+    if (!raw) {
+      return { ip: '', port: '', username: '', password: '', url: '' };
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(raw);
+    } catch {
+      if (raw.startsWith('tcp://')) {
+        const [ip = '', port = '50301'] = raw.substring(6).split(':');
+        return { ip: ip.trim(), port: String(port || '50301').trim(), username: '', password: '', url: '' };
+      }
+      return { ip: raw, port: '', username: '', password: '', url: '' };
+    }
+
+    const url = pickFromConfig(config, ['url', 'apiUrl', 'api_url', 'endpoint']);
+    const ip = pickFromConfig(config, ['ip', 'ipAddress', 'ip_address']) || (() => {
+      if (!url) return '';
+      try {
+        return new URL(url).hostname || '';
+      } catch {
+        return '';
+      }
+    })();
+    const port = pickFromConfig(config, ['port']) || (() => {
+      if (!url) return '';
+      try {
+        return String(new URL(url).port || '');
+      } catch {
+        return '';
+      }
+    })();
+    const username =
+      pickFromConfig(config, ['username', 'userName', 'user_name', 'user', 'login']) ||
+      (() => {
+        if (!url) return '';
+        try {
+          return new URL(url).username || '';
+        } catch {
+          return '';
+        }
+      })();
+    const password =
+      pickFromConfig(config, ['password', 'pass', 'pwd']) ||
+      (() => {
+        if (!url) return '';
+        try {
+          return new URL(url).password || '';
+        } catch {
+          return '';
+        }
+      })();
+
+    return { ip, port, username, password, url };
+  };
+
+  const mapApiPrinterToUi = (p, index) => {
+    const apiType = String(p?.type || '').toLowerCase();
+    const connection = String(p?.connection_string || '');
+    if (apiType === 'serial') {
+      return {
+        id: p.id,
+        name: p.name || '',
+        type: 'COM',
+        comPort: parseSerialComPort(connection),
+        baudrate: String(p?.baud_rate ?? '9600'),
+        characters: '48',
+        printerName: '',
+        ipAddress: '',
+        port: '',
+        standard: p?.is_main === 1,
+        isDefault: p?.is_main === 1,
+        numberOfPrints: 1,
+        productionTicketSize: 'normal',
+        vatTicketSize: 'normal',
+        spaceBetweenProducts: 'none',
+        logo: 'disable',
+        printerType: 'Esc',
+        sortOrder: index,
+      };
+    }
+    if (apiType === 'windows') {
+      if (connection.startsWith('tcp://')) {
+        const { ipAddress, port } = parseNetworkAddress(connection);
+        return {
+          id: p.id,
+          name: p.name || '',
+          type: 'Network',
+          comPort: '',
+          baudrate: '9600',
+          characters: '48',
+          printerName: '',
+          ipAddress,
+          port,
+          standard: p?.is_main === 1,
+          isDefault: p?.is_main === 1,
+          numberOfPrints: 1,
+          productionTicketSize: 'normal',
+          vatTicketSize: 'normal',
+          spaceBetweenProducts: 'none',
+          logo: 'disable',
+          printerType: 'Esc',
+          sortOrder: index,
+        };
+      }
+      return {
+        id: p.id,
+        name: p.name || '',
+        type: 'USB',
+        comPort: '',
+        baudrate: '9600',
+        characters: '48',
+        printerName: connection || '',
+        ipAddress: '',
+        port: '',
+        standard: p?.is_main === 1,
+        isDefault: p?.is_main === 1,
+        numberOfPrints: 1,
+        productionTicketSize: 'normal',
+        vatTicketSize: 'normal',
+        spaceBetweenProducts: 'none',
+        logo: 'disable',
+        printerType: 'Esc',
+        sortOrder: index,
+      };
+    }
+    return {
+      id: p?.id ?? `p-${index}`,
+      name: p?.name || '',
+      type: 'COM',
+      comPort: '',
+      baudrate: '9600',
+      characters: '48',
+      printerName: '',
+      ipAddress: '',
+      port: '',
+      standard: false,
+      isDefault: false,
+      numberOfPrints: 1,
+      productionTicketSize: 'normal',
+      vatTicketSize: 'normal',
+      spaceBetweenProducts: 'none',
+      logo: 'disable',
+      printerType: 'Esc',
+      sortOrder: index,
+    };
+  };
+
+  const fetchPrintersFromDb = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/printers`);
+      const data = await res.json().catch(() => null);
+      const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      if (!Array.isArray(list)) return;
+      const mapped = list.map((p, i) => mapApiPrinterToUi(p, i));
+      if (mapped.length) {
+        persistPrinters(mapped);
+      } else {
+        persistPrinters([]);
+      }
+    } catch {
+      // Keep existing local state when backend is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrintersFromDb();
+  }, [fetchPrintersFromDb]);
+
+  const openNewPrinterModal = () => {
+    setEditingPrinterId(null);
+    setShowPrinterModal(true);
+  };
+
+  const openEditPrinterModal = (p) => {
+    setEditingPrinterId(p.id);
+    setShowPrinterModal(true);
+  };
+
+  const closePrinterModal = () => {
+    setShowPrinterModal(false);
+    setEditingPrinterId(null);
+  };
+
+  const handleSavePrinterPayload = async (payload) => {
+    const sorted = [...printers].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const type = String(payload?.type || 'COM');
+    const apiType = type === 'COM' ? 'serial' : 'windows';
+    const connectionString =
+      type === 'COM'
+        ? `serial://${(payload?.comPort || '').trim().toUpperCase()}`
+        : type === 'USB'
+          ? String(payload?.printerName || '').trim()
+          : `tcp://${String(payload?.ipAddress || '').trim()}:${String(payload?.port || '9100').trim()}`;
+    const requestBody = {
+      name: String(payload?.name || '').trim(),
+      type: apiType,
+      connection_string: connectionString,
+      baud_rate: type === 'COM' ? payload?.baudrate : null,
+      data_bits: null,
+      parity: null,
+      stop_bits: null,
+      is_main: payload?.standard ? 1 : 0,
+      enabled: 1,
+    };
+    try {
+      const endpoint = editingPrinterId ? `${API}/printers/${editingPrinterId}` : `${API}/printers`;
+      const method = editingPrinterId ? 'PUT' : 'POST';
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchPrintersFromDb();
+      showToast('success', 'Printer saved to database.');
+      closePrinterModal();
+    } catch {
+      // Fallback to old local-only behavior if DB save fails.
+      if (editingPrinterId) {
+        const next = sorted.map((p) => (p.id === editingPrinterId ? { ...p, ...payload } : p));
+        persistPrinters(next);
+      } else {
+        const newId = 'prn-' + Date.now();
+        const next = [...sorted, { id: newId, ...payload, isDefault: false, sortOrder: sorted.length }];
+        persistPrinters(next);
+      }
+      showToast('error', 'Failed to save printer to database. Saved locally only.');
+      closePrinterModal();
+    }
+  };
+
+  const setDefaultPrinter = async (id) => {
+    try {
+      const res = await fetch(`${API}/printers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_main: 1 }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await fetchPrintersFromDb();
+      showToast('success', 'Default printer updated.');
+    } catch {
+      const next = printers.map((p) => ({ ...p, isDefault: p.id === id }));
+      persistPrinters(next);
+      showToast('error', 'Failed to update default printer in database. Updated locally only.');
+    }
+  };
+
+  const handleDeletePrinter = async (id) => {
+    try {
+      const res = await fetch(`${API}/printers/${id}`, { method: 'DELETE' });
+      if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+      await fetchPrintersFromDb();
+      setDeleteConfirmPrinterId(null);
+      showToast('success', 'Printer deleted.');
+    } catch {
+      const next = printers.filter((p) => p.id !== id).map((p, i) => ({ ...p, sortOrder: i }));
+      persistPrinters(next);
+      setDeleteConfirmPrinterId(null);
+      showToast('error', 'Failed to delete printer from database. Deleted locally only.');
+    }
+  };
+
+  const movePrinter = (id, direction) => {
+    const sorted = [...printers].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const idx = sorted.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const swap = direction === 'up' ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= sorted.length) return;
+    [sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]];
+    const withOrder = sorted.map((p, i) => ({ ...p, sortOrder: i }));
+    persistPrinters(withOrder);
+  };
+
+  useEffect(() => {
+    if (printerTab !== 'Final tickets') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_final_tickets');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.companyData1 != null) setFinalTicketsCompanyData1(s.companyData1);
+        if (s.companyData2 != null) setFinalTicketsCompanyData2(s.companyData2);
+        if (s.companyData3 != null) setFinalTicketsCompanyData3(s.companyData3);
+        if (s.companyData4 != null) setFinalTicketsCompanyData4(s.companyData4);
+        if (s.companyData5 != null) setFinalTicketsCompanyData5(s.companyData5);
+        if (s.thankText != null) setFinalTicketsThankText(s.thankText);
+        if (s.proforma != null) setFinalTicketsProforma(!!s.proforma);
+        if (s.printPaymentType != null) setFinalTicketsPrintPaymentType(!!s.printPaymentType);
+        if (s.ticketTearable != null) setFinalTicketsTicketTearable(!!s.ticketTearable);
+        if (s.printLogo != null) setFinalTicketsPrintLogo(!!s.printLogo);
+        if (s.printingOrder != null) setFinalTicketsPrintingOrder(s.printingOrder);
+      }
+    } catch (_) { }
+  }, [printerTab]);
+
+  const finalTicketsKeyboardValue = finalTicketsActiveField === 'companyData1' ? finalTicketsCompanyData1
+    : finalTicketsActiveField === 'companyData2' ? finalTicketsCompanyData2
+      : finalTicketsActiveField === 'companyData3' ? finalTicketsCompanyData3
+        : finalTicketsActiveField === 'companyData4' ? finalTicketsCompanyData4
+          : finalTicketsActiveField === 'companyData5' ? finalTicketsCompanyData5
+            : finalTicketsActiveField === 'thankText' ? finalTicketsThankText
+              : '';
+
+  const finalTicketsKeyboardOnChange = (v) => {
+    if (finalTicketsActiveField === 'companyData1') setFinalTicketsCompanyData1(v);
+    else if (finalTicketsActiveField === 'companyData2') setFinalTicketsCompanyData2(v);
+    else if (finalTicketsActiveField === 'companyData3') setFinalTicketsCompanyData3(v);
+    else if (finalTicketsActiveField === 'companyData4') setFinalTicketsCompanyData4(v);
+    else if (finalTicketsActiveField === 'companyData5') setFinalTicketsCompanyData5(v);
+    else if (finalTicketsActiveField === 'thankText') setFinalTicketsThankText(v);
+  };
+
+  const handleSaveFinalTickets = () => {
+    setSavingFinalTickets(true);
+    try {
+      const payload = {
+        companyData1: finalTicketsCompanyData1,
+        companyData2: finalTicketsCompanyData2,
+        companyData3: finalTicketsCompanyData3,
+        companyData4: finalTicketsCompanyData4,
+        companyData5: finalTicketsCompanyData5,
+        thankText: finalTicketsThankText,
+        proforma: finalTicketsProforma,
+        printPaymentType: finalTicketsPrintPaymentType,
+        ticketTearable: finalTicketsTicketTearable,
+        printLogo: finalTicketsPrintLogo,
+        printingOrder: finalTicketsPrintingOrder
+      };
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_printer_final_tickets', JSON.stringify(payload));
+    } finally {
+      setSavingFinalTickets(false);
+    }
+  };
+
+  useEffect(() => {
+    if (printerTab !== 'Production Tickets') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_production_tickets');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.displayCategories != null) setProdTicketsDisplayCategories(!!s.displayCategories);
+        if (s.spaceAbove != null) setProdTicketsSpaceAbove(!!s.spaceAbove);
+        if (s.ticketTearable != null) setProdTicketsTicketTearable(!!s.ticketTearable);
+        if (s.keukenprinterBuzzer != null) setProdTicketsKeukenprinterBuzzer(!!s.keukenprinterBuzzer);
+        if (s.productenIndividueel != null) setProdTicketsProductenIndividueel(!!s.productenIndividueel);
+        if (s.eatInTakeOutOnderaan != null) setProdTicketsEatInTakeOutOnderaan(!!s.eatInTakeOutOnderaan);
+        if (s.nextCoursePrinter1 != null) setProdTicketsNextCoursePrinter1(s.nextCoursePrinter1);
+        if (s.nextCoursePrinter2 != null) setProdTicketsNextCoursePrinter2(s.nextCoursePrinter2);
+        if (s.nextCoursePrinter3 != null) setProdTicketsNextCoursePrinter3(s.nextCoursePrinter3);
+        if (s.nextCoursePrinter4 != null) setProdTicketsNextCoursePrinter4(s.nextCoursePrinter4);
+        if (s.printingOrder != null) setProdTicketsPrintingOrder(s.printingOrder);
+        if (s.groupingReceipt != null) setProdTicketsGroupingReceipt(s.groupingReceipt);
+        if (s.printerOverboeken != null) setProdTicketsPrinterOverboeken(s.printerOverboeken);
+      }
+    } catch (_) { }
+  }, [printerTab]);
+
+  const handleSaveProductionTickets = () => {
+    setSavingProdTickets(true);
+    try {
+      const payload = {
+        displayCategories: prodTicketsDisplayCategories,
+        spaceAbove: prodTicketsSpaceAbove,
+        ticketTearable: prodTicketsTicketTearable,
+        keukenprinterBuzzer: prodTicketsKeukenprinterBuzzer,
+        productenIndividueel: prodTicketsProductenIndividueel,
+        eatInTakeOutOnderaan: prodTicketsEatInTakeOutOnderaan,
+        nextCoursePrinter1: prodTicketsNextCoursePrinter1,
+        nextCoursePrinter2: prodTicketsNextCoursePrinter2,
+        nextCoursePrinter3: prodTicketsNextCoursePrinter3,
+        nextCoursePrinter4: prodTicketsNextCoursePrinter4,
+        printingOrder: prodTicketsPrintingOrder,
+        groupingReceipt: prodTicketsGroupingReceipt,
+        printerOverboeken: prodTicketsPrinterOverboeken
+      };
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_printer_production_tickets', JSON.stringify(payload));
+    } finally {
+      setSavingProdTickets(false);
+    }
+  };
+
+  const productionTicketsPrinterOptions = [
+    ...PRINTER_DISABLED_OPTIONS,
+    ...printers.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((p) => ({ value: p.id, label: p.name }))
+  ];
+
+  const sortedPrintersForProductModal = [...printers].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  const getUniqueProductPrinterOptions = (currentPrinterId, otherPrinterIds = []) => {
+    const usedIds = new Set(
+      (Array.isArray(otherPrinterIds) ? otherPrinterIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    );
+    return [
+      { value: '', label: tr('control.productModal.disabled', 'Disabled') },
+      ...sortedPrintersForProductModal
+        .filter((p) => p.id === currentPrinterId || !usedIds.has(p.id))
+        .map((p) => ({ value: p.id, label: p.name }))
+    ];
+  };
+
+  const labelsPrinterOptions = printers.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((p) => ({ value: p.id, label: p.name }));
+
+  const labelsTypeOptions = useMemo(
+    () => [{ value: 'production-labels', label: tr('control.labels.type.productionLabels', 'Production labels') }],
+    [tr]
+  );
+
+  useEffect(() => {
+    if (printerTab !== 'Labels') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_labels');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.type != null) setLabelsType(s.type);
+        if (s.printer != null) setLabelsPrinter(s.printer);
+      }
+      const rawList = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_labels_list');
+      if (rawList) {
+        const list = JSON.parse(rawList);
+        if (Array.isArray(list) && list.length) setLabelsList(list);
+      }
+    } catch (_) { }
+  }, [printerTab]);
+
+  useEffect(() => {
+    if (printerTab !== 'Labels') setLabelsListPage(0);
+  }, [printerTab]);
+
+  const persistLabelsList = (next) => {
+    setLabelsList(next);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_printer_labels_list', JSON.stringify(next));
+    } catch (_) { }
+  };
+
+  const saveLabelsSettings = (updates) => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem('pos_printer_labels');
+      const prev = raw ? JSON.parse(raw) : {};
+      const next = { type: labelsType, printer: labelsPrinter, ...updates };
+      localStorage.setItem('pos_printer_labels', JSON.stringify(next));
+      if (updates.type != null) setLabelsType(updates.type);
+      if (updates.printer != null) setLabelsPrinter(updates.printer);
+    } catch (_) { }
+  };
+
+  const openNewLabelModal = () => {
+    setEditingLabelId(null);
+    setLabelName('');
+    setLabelHeight('');
+    setLabelWidth('');
+    setLabelStandard(false);
+    setLabelMarginLeft('0');
+    setLabelMarginRight('0');
+    setLabelMarginBottom('0');
+    setLabelMarginTop('0');
+    setShowLabelModal(true);
+  };
+
+  const openEditLabelModal = (item) => {
+    setEditingLabelId(item.id);
+    setLabelName(item.name ?? item.sizeLabel ?? '');
+    setLabelHeight(String(item.height ?? ''));
+    setLabelWidth(String(item.width ?? ''));
+    setLabelStandard(!!item.standard);
+    setLabelMarginLeft(String(item.marginLeft ?? '0'));
+    setLabelMarginRight(String(item.marginRight ?? '0'));
+    setLabelMarginBottom(String(item.marginBottom ?? '0'));
+    setLabelMarginTop(String(item.marginTop ?? '0'));
+    setShowLabelModal(true);
+  };
+
+  const closeLabelModal = () => {
+    setShowLabelModal(false);
+    setEditingLabelId(null);
+    setLabelName('');
+    setLabelHeight('');
+    setLabelWidth('');
+    setLabelStandard(false);
+    setLabelMarginLeft('0');
+    setLabelMarginRight('0');
+    setLabelMarginBottom('0');
+    setLabelMarginTop('0');
+  };
+
+  const handleSaveLabel = () => {
+    const name = (labelName || '').trim();
+    if (!name) return;
+    const sorted = [...labelsList].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const payload = {
+      name,
+      sizeLabel: name,
+      height: labelHeight.trim() || undefined,
+      width: labelWidth.trim() || undefined,
+      standard: labelStandard,
+      marginLeft: Number(labelMarginLeft) || 0,
+      marginRight: Number(labelMarginRight) || 0,
+      marginBottom: Number(labelMarginBottom) || 0,
+      marginTop: Number(labelMarginTop) || 0
+    };
+    if (editingLabelId) {
+      const next = sorted.map((l) => (l.id === editingLabelId ? { ...l, ...payload } : l));
+      persistLabelsList(next);
+    } else {
+      const newId = 'lbl-' + Date.now();
+      const next = [...sorted, { id: newId, ...payload, sortOrder: sorted.length }];
+      persistLabelsList(next);
+    }
+    closeLabelModal();
+  };
+
+  const handleDeleteLabel = (id) => {
+    const next = labelsList.filter((l) => l.id !== id).map((l, i) => ({ ...l, sortOrder: i }));
+    persistLabelsList(next);
+    setDeleteConfirmLabelId(null);
+  };
+
+  const moveLabel = (id, direction) => {
+    const sorted = [...labelsList].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const idx = sorted.findIndex((l) => l.id === id);
+    if (idx < 0) return;
+    const swap = direction === 'up' ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= sorted.length) return;
+    [sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]];
+    const withOrder = sorted.map((l, i) => ({ ...l, sortOrder: i }));
+    persistLabelsList(withOrder);
+  };
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'Price Display') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_price_display');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.type != null) setPriceDisplayType(s.type);
+      }
+    } catch (_) { }
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'RFID Reader') return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API}/settings/rfid-reader`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data.type != null) {
+          setRfidReaderType(data.type);
+          return;
+        }
+      } catch (_) { }
+      try {
+        const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_rfid_reader');
+        if (raw && !cancelled) {
+          const s = JSON.parse(raw);
+          if (s.type != null) setRfidReaderType(s.type);
+        }
+      } catch (_) { }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'Barcode Scanner') return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API}/settings/barcode-scanner`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data.type != null) {
+          setBarcodeScannerType(data.type);
+          return;
+        }
+      } catch (_) { }
+      try {
+        const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_barcode_scanner');
+        if (raw && !cancelled) {
+          const s = JSON.parse(raw);
+          if (s.type != null) setBarcodeScannerType(s.type);
+        }
+      } catch (_) { }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'Credit Card') return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`${API}/settings/credit-card`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data.type != null) {
+          setCreditCardType(data.type);
+          return;
+        }
+      } catch (_) { }
+      try {
+        const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_credit_card');
+        if (raw && !cancelled) {
+          const s = JSON.parse(raw);
+          if (s.type != null) setCreditCardType(s.type);
+        }
+      } catch (_) { }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'Libra') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_scale');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.type != null) setScaleType(s.type);
+        if (s.port != null) setScalePort(s.port);
+      }
+    } catch (_) { }
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'Cashmatic') return;
+    let cancelled = false;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_cashmatic');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.name != null) setCashmaticName(String(s.name));
+        if (s.connectionType != null) setCashmaticConnectionType(String(s.connectionType).toLowerCase() === 'api' ? 'api' : 'tcp');
+        if (s.ip != null) setCashmaticIpAddress(String(s.ip));
+        if (s.port != null) setCashmaticPort(String(s.port));
+        if (s.username != null) setCashmaticUsername(String(s.username));
+        if (s.password != null) setCashmaticPassword(String(s.password));
+        if (s.url != null) setCashmaticUrl(String(s.url));
+        // Backward compatibility with old "ipPort" format
+        if ((s.ip == null || s.port == null) && s.ipPort) {
+          const [ip, port] = String(s.ipPort).split(':');
+          if (ip && s.ip == null) setCashmaticIpAddress(ip);
+          if (port && s.port == null) setCashmaticPort(port);
+        }
+      }
+    } catch (_) { }
+    const loadCashmaticFromDb = async () => {
+      try {
+        const res = await fetch(`${API}/payment-terminals`);
+        const data = await res.json().catch(() => null);
+        if (!res.ok) return;
+        const terminals = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+        const cashmatic = terminals.find((t) => String(t?.type || '').toLowerCase() === 'cashmatic');
+        if (!cashmatic || cancelled) return;
+        const parsed = parseCashmaticConnectionString(cashmatic.connection_string);
+        setCashmaticTerminalId(cashmatic.id || null);
+        if (cashmatic.name != null) setCashmaticName(String(cashmatic.name));
+        if (cashmatic.connection_type != null) {
+          setCashmaticConnectionType(String(cashmatic.connection_type).toLowerCase() === 'api' ? 'api' : 'tcp');
+        }
+        if (parsed.ip) setCashmaticIpAddress(parsed.ip);
+        if (parsed.port) setCashmaticPort(parsed.port);
+        if (parsed.username) setCashmaticUsername(parsed.username);
+        if (parsed.password) setCashmaticPassword(parsed.password);
+        if (parsed.url) setCashmaticUrl(parsed.url);
+      } catch {
+        // Keep local values if backend is unavailable.
+      }
+    };
+    loadCashmaticFromDb();
+    return () => {
+      cancelled = true;
+    };
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (topNavId !== 'external-devices' || subNavId !== 'Payworld') return;
+    let cancelled = false;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_payworld');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.name != null) setPayworldName(String(s.name));
+        if (s.ip != null) setPayworldIpAddress(String(s.ip));
+        if (s.port != null) setPayworldPort(String(s.port));
+      }
+    } catch (_) { }
+    const loadPayworldFromDb = async () => {
+      try {
+        const res = await fetch(`${API}/payment-terminals`);
+        const data = await res.json().catch(() => null);
+        if (!res.ok) return;
+        const terminals = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+        const payworld = terminals.find((t) => String(t?.type || '').toLowerCase() === 'payworld');
+        if (!payworld || cancelled) return;
+        let parsed = {};
+        try {
+          parsed = typeof payworld.connection_string === 'string' ? JSON.parse(payworld.connection_string) : (payworld.connection_string || {});
+        } catch (_) { }
+        setPayworldTerminalId(payworld.id || null);
+        if (payworld.name != null) setPayworldName(String(payworld.name));
+        if (parsed.ip != null) setPayworldIpAddress(String(parsed.ip));
+        if (parsed.port != null) setPayworldPort(String(parsed.port));
+      } catch {
+        // Keep local values if backend is unavailable.
+      }
+    };
+    loadPayworldFromDb();
+    return () => { cancelled = true; };
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (controlSidebarId !== 'reports' || reportTabId !== 'settings') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_report_settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && typeof s === 'object') setReportSettings((prev) => ({ ...prev, ...s }));
+      }
+    } catch (_) { }
+  }, [controlSidebarId, reportTabId]);
+
+  const handleSavePriceDisplay = () => {
+    setSavingPriceDisplay(true);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_price_display', JSON.stringify({ type: priceDisplayType }));
+    } finally {
+      setSavingPriceDisplay(false);
+    }
+  };
+
+  const handleSaveRfidReader = async () => {
+    setSavingRfidReader(true);
+    try {
+      const res = await fetch(`${API}/settings/rfid-reader`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: rfidReaderType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to save');
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_rfid_reader', JSON.stringify({ type: rfidReaderType }));
+      showToast('success', tr('control.saved', 'Saved.'));
+    } catch (e) {
+      showToast('error', e?.message || tr('control.saveFailed', 'Save failed.'));
+    } finally {
+      setSavingRfidReader(false);
+    }
+  };
+
+  const handleSaveBarcodeScanner = async () => {
+    setSavingBarcodeScanner(true);
+    try {
+      const res = await fetch(`${API}/settings/barcode-scanner`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: barcodeScannerType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to save');
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_barcode_scanner', JSON.stringify({ type: barcodeScannerType }));
+      showToast('success', tr('control.saved', 'Saved.'));
+    } catch (e) {
+      showToast('error', e?.message || tr('control.saveFailed', 'Save failed.'));
+    } finally {
+      setSavingBarcodeScanner(false);
+    }
+  };
+
+  const handleSaveCreditCard = async () => {
+    setSavingCreditCard(true);
+    try {
+      const res = await fetch(`${API}/settings/credit-card`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: creditCardType }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to save');
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_credit_card', JSON.stringify({ type: creditCardType }));
+      showToast('success', tr('control.saved', 'Saved.'));
+    } catch (e) {
+      showToast('error', e?.message || tr('control.saveFailed', 'Save failed.'));
+    } finally {
+      setSavingCreditCard(false);
+    }
+  };
+
+  const handleSaveScale = () => {
+    setSavingScale(true);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_scale', JSON.stringify({ type: scaleType, port: scalePort }));
+    } finally {
+      setSavingScale(false);
+    }
+  };
+
+  const handleSaveCashmatic = async () => {
+    setSavingCashmatic(true);
+    try {
+      const trimmedUsername = String(cashmaticUsername || '').trim();
+      const trimmedPassword = String(cashmaticPassword || '').trim();
+      const trimmedIp = String(cashmaticIpAddress || '').trim();
+      const trimmedUrl = String(cashmaticUrl || '').trim();
+      const trimmedPort = String(cashmaticPort || '').trim();
+      const resolvedPort = trimmedPort || '50301';
+      const validPort = Number.parseInt(resolvedPort, 10);
+      if (!trimmedUsername || !trimmedPassword) {
+        throw new Error('Cashmatic username and password are required.');
+      }
+      if (cashmaticConnectionType === 'tcp' && !trimmedIp) {
+        throw new Error('Cashmatic IP address is required for TCP/IP.');
+      }
+      if (cashmaticConnectionType === 'tcp' && /^[0-9]+$/.test(trimmedIp)) {
+        throw new Error('Cashmatic IP address is invalid. Please enter a full IP like 192.168.1.60.');
+      }
+      if (cashmaticConnectionType === 'api' && !trimmedUrl && !trimmedIp) {
+        throw new Error('Cashmatic URL or IP address is required for API mode.');
+      }
+      if (!Number.isInteger(validPort) || validPort < 1 || validPort > 65535) {
+        throw new Error('Cashmatic port must be a number between 1 and 65535.');
+      }
+
+      const connectionConfig = cashmaticConnectionType === 'api'
+        ? {
+          url: trimmedUrl,
+          ip: trimmedIp,
+          port: resolvedPort,
+          username: trimmedUsername,
+          password: trimmedPassword,
+        }
+        : {
+          ip: trimmedIp,
+          port: resolvedPort,
+          username: trimmedUsername,
+          password: trimmedPassword,
+        };
+
+      const terminalPayload = {
+        name: String(cashmaticName || '').trim() || 'Cashmatic Terminal',
+        type: 'cashmatic',
+        connection_type: cashmaticConnectionType === 'api' ? 'api' : 'tcp',
+        connection_string: JSON.stringify(connectionConfig),
+        enabled: 1,
+        is_main: 1,
+      };
+
+      let terminalId = cashmaticTerminalId;
+      if (!terminalId) {
+        const listRes = await fetch(`${API}/payment-terminals`);
+        const listData = await listRes.json().catch(() => null);
+        const list = Array.isArray(listData?.data) ? listData.data : (Array.isArray(listData) ? listData : []);
+        const existing = list.find((t) => String(t?.type || '').toLowerCase() === 'cashmatic');
+        if (existing?.id) terminalId = existing.id;
+      }
+
+      const endpoint = terminalId ? `${API}/payment-terminals/${terminalId}` : `${API}/payment-terminals`;
+      const method = terminalId ? 'PUT' : 'POST';
+      const saveRes = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(terminalPayload),
+      });
+      const saved = await saveRes.json().catch(() => ({}));
+      if (!saveRes.ok) {
+        throw new Error(saved?.error || `Failed to save Cashmatic terminal (HTTP ${saveRes.status})`);
+      }
+      if (saved?.id) setCashmaticTerminalId(saved.id);
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pos_cashmatic', JSON.stringify({
+          name: terminalPayload.name,
+          connectionType: cashmaticConnectionType,
+          ip: connectionConfig.ip,
+          port: connectionConfig.port,
+          username: connectionConfig.username,
+          password: connectionConfig.password,
+          url: connectionConfig.url || '',
+          ipPort: `${connectionConfig.ip}${connectionConfig.port ? `:${connectionConfig.port}` : ''}`,
+        }));
+      }
+      showToast('success', 'Cashmatic settings saved.');
+    } catch (err) {
+      showToast('error', err?.message || 'Failed to save Cashmatic settings.');
+    } finally {
+      setSavingCashmatic(false);
+    }
+  };
+
+  const handleSavePayworld = async () => {
+    setSavingPayworld(true);
+    try {
+      const trimmedIp = String(payworldIpAddress || '').trim();
+      const trimmedPort = String(payworldPort || '').trim();
+      const resolvedPort = trimmedPort || '5015';
+      const validPort = Number.parseInt(resolvedPort, 10);
+      if (!trimmedIp) {
+        throw new Error('Payworld IP address is required.');
+      }
+      if (/^[0-9]+$/.test(trimmedIp)) {
+        throw new Error('Payworld IP address is invalid. Please enter a full IP like 192.168.1.60.');
+      }
+      if (!Number.isInteger(validPort) || validPort < 1 || validPort > 65535) {
+        throw new Error('Payworld port must be a number between 1 and 65535.');
+      }
+      const connectionConfig = { ip: trimmedIp, port: resolvedPort };
+      const terminalPayload = {
+        name: String(payworldName || '').trim() || 'Payworld Terminal',
+        type: 'payworld',
+        connection_type: 'tcp',
+        connection_string: JSON.stringify(connectionConfig),
+        enabled: 1,
+        is_main: 1,
+      };
+      let terminalId = payworldTerminalId;
+      if (!terminalId) {
+        const listRes = await fetch(`${API}/payment-terminals`);
+        const listData = await listRes.json().catch(() => null);
+        const list = Array.isArray(listData?.data) ? listData.data : (Array.isArray(listData) ? listData : []);
+        const existing = list.find((t) => String(t?.type || '').toLowerCase() === 'payworld');
+        if (existing?.id) terminalId = existing.id;
+      }
+      const endpoint = terminalId ? `${API}/payment-terminals/${terminalId}` : `${API}/payment-terminals`;
+      const method = terminalId ? 'PUT' : 'POST';
+      const saveRes = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(terminalPayload),
+      });
+      const saved = await saveRes.json().catch(() => ({}));
+      if (!saveRes.ok) {
+        throw new Error(saved?.error || `Failed to save Payworld terminal (HTTP ${saveRes.status})`);
+      }
+      if (saved?.id) setPayworldTerminalId(saved.id);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pos_payworld', JSON.stringify({
+          name: terminalPayload.name,
+          ip: connectionConfig.ip,
+          port: connectionConfig.port,
+        }));
+      }
+      showToast('success', 'Payworld settings saved.');
+    } catch (err) {
+      showToast('error', err?.message || 'Failed to save Payworld settings.');
+    } finally {
+      setSavingPayworld(false);
+    }
+  };
+
+  const cashmaticKeyboardValue =
+    cashmaticActiveField === 'name' ? cashmaticName
+      : cashmaticActiveField === 'ip' ? cashmaticIpAddress
+        : cashmaticActiveField === 'port' ? cashmaticPort
+          : cashmaticActiveField === 'username' ? cashmaticUsername
+            : cashmaticActiveField === 'password' ? cashmaticPassword
+              : cashmaticActiveField === 'url' ? cashmaticUrl
+                : '';
+
+  const cashmaticKeyboardOnChange = (v) => {
+    if (cashmaticActiveField === 'name') setCashmaticName(v);
+    else if (cashmaticActiveField === 'ip') setCashmaticIpAddress(v);
+    else if (cashmaticActiveField === 'port') setCashmaticPort(v);
+    else if (cashmaticActiveField === 'username') setCashmaticUsername(v);
+    else if (cashmaticActiveField === 'password') setCashmaticPassword(v);
+    else if (cashmaticActiveField === 'url') setCashmaticUrl(v);
+  };
+
+  const payworldKeyboardValue =
+    payworldActiveField === 'name' ? payworldName
+      : payworldActiveField === 'ip' ? payworldIpAddress
+        : payworldActiveField === 'port' ? payworldPort
+          : '';
+
+  const payworldKeyboardOnChange = (v) => {
+    if (payworldActiveField === 'name') setPayworldName(v);
+    else if (payworldActiveField === 'ip') setPayworldIpAddress(v);
+    else if (payworldActiveField === 'port') setPayworldPort(v);
+  };
+
+  const setReportSetting = (rowId, column, value) => {
+    setReportSettings((prev) => ({
+      ...prev,
+      [rowId]: { ...prev[rowId], [column]: value }
+    }));
+  };
+
+  const handleSaveReportSettings = () => {
+    setSavingReportSettings(true);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_report_settings', JSON.stringify(reportSettings));
+    } finally {
+      setSavingReportSettings(false);
+    }
+  };
+
+  const openNewUserModal = () => {
+    setEditingUserId(null);
+    setUserName('');
+    setUserPin('');
+    setUserModalTab('general');
+    setUserAvatarColorIndex(0);
+    setUserModalActiveField(null);
+    setUserPrivileges({ ...DEFAULT_USER_PRIVILEGES });
+    setShowUserModal(true);
+  };
+
+  const openEditUserModal = async (u) => {
+    setEditingUserId(u.id);
+    setUserName(u.name || '');
+    setUserPin('');
+    setUserModalTab('general');
+    setUserAvatarColorIndex(0);
+    setUserModalActiveField(null);
+    setUserPrivileges({ ...DEFAULT_USER_PRIVILEGES });
+    try {
+      const res = await fetch(`${API}/users/${u.id}`);
+      const data = await res.json();
+      if (res.ok && data) {
+        setUserName(data.name || '');
+        setUserPin(data.pin != null ? String(data.pin) : '');
+      } else {
+        showToast('error', data?.error || 'Failed to load user details');
+      }
+    } catch {
+      showToast('error', 'Failed to load user details');
+    }
+    setShowUserModal(true);
+  };
+
+  const closeUserModal = () => {
+    setShowUserModal(false);
+    setEditingUserId(null);
+    setUserName('');
+    setUserPin('');
+    setUserModalTab('general');
+    setUserAvatarColorIndex(0);
+    setUserModalActiveField(null);
+    setUserPrivileges({ ...DEFAULT_USER_PRIVILEGES });
+  };
+
+  const userModalKeyboardValue = userModalActiveField === 'name' ? userName : userModalActiveField === 'pincode' ? userPin : '';
+  const userModalKeyboardOnChange = (v) => {
+    if (userModalActiveField === 'name') setUserName(v);
+    else if (userModalActiveField === 'pincode') setUserPin(v);
+  };
+
+  const handleSaveUser = async () => {
+    setSavingUser(true);
+    try {
+      if (editingUserId) {
+        const body = { name: userName.trim() || 'New user' };
+        if (userPin !== '') body.pin = userPin;
+        const res = await fetch(`${API}/users/${editingUserId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const updated = await res.json();
+        if (res.ok && updated) {
+          setUsers((prev) => prev.map((u) => (u.id === editingUserId ? { ...u, ...updated } : u)));
+          closeUserModal();
+        }
+      } else {
+        const res = await fetch(`${API}/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: userName.trim() || 'New user', pin: userPin || '1234' })
+        });
+        const created = await res.json();
+        if (res.ok && created) {
+          setUsers((prev) => [...prev, created].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+          closeUserModal();
+        }
+      }
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (id) => {
+    try {
+      const res = await fetch(`${API}/users/${id}`, { method: 'DELETE' });
+      if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== id));
+      else fetchUsers();
+    } catch {
+      fetchUsers();
+    }
+    setDeleteConfirmUserId(null);
+  };
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Discounts') return;
+    try {
+      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_discounts');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) setDiscounts(list);
+      }
+    } catch (_) { }
+  }, [topNavId, subNavId]);
+
+  useEffect(() => {
+    if (!showDiscountModal) return;
+    let alive = true;
+    const loadProductsForDiscounts = async () => {
+      const normalizeOptions = (list) => {
+        const seen = new Set();
+        return list
+          .filter((p) => p && p.id != null)
+          .map((p) => ({ value: p.id, label: p.name || `#${p.id}` }))
+          .filter((opt) => {
+            const key = String(opt.value);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+      };
+      // Load through categories endpoints to avoid /api/products 404 noise
+      try {
+        const categoriesRes = await fetch(`${API}/categories`);
+        const categoriesData = await categoriesRes.json();
+        const cats = Array.isArray(categoriesData) ? categoriesData : [];
+        const settled = await Promise.allSettled(
+          cats
+            .filter((c) => c?.id != null)
+            .map((c) =>
+              fetch(`${API}/categories/${c.id}/products`)
+                .then((r) => (r.ok ? r.json() : []))
+                .catch(() => [])
+            )
+        );
+        if (!alive) return;
+        const merged = settled
+          .filter((x) => x.status === 'fulfilled')
+          .flatMap((x) => (Array.isArray(x.value) ? x.value : []));
+        setDiscountProductOptions(normalizeOptions(merged));
+      } catch {
+        if (alive) setDiscountProductOptions([]);
+      }
+    };
+    loadProductsForDiscounts();
+    return () => { alive = false; };
+  }, [showDiscountModal]);
+
+  const openNewDiscountModal = () => {
+    setEditingDiscountId(null);
+    setDiscountName('');
+    setDiscountTrigger('number');
+    setDiscountType('amount');
+    setDiscountValue('');
+    const today = new Date().toISOString().slice(0, 10);
+    setDiscountStartDate(today);
+    setDiscountEndDate(today);
+    setDiscountOn('products');
+    setDiscountTargetId('');
+    setDiscountTargetIds([]);
+    setDiscountPieces('');
+    setDiscountCombinable(false);
+    setDiscountKeyboardValue('');
+    setShowDiscountModal(true);
+  };
+
+  const openEditDiscountModal = (d) => {
+    setEditingDiscountId(d.id);
+    setDiscountName(d.name || '');
+    setDiscountTrigger(d.trigger || 'number');
+    setDiscountType(d.type || 'amount');
+    setDiscountValue(String(d.value ?? ''));
+    setDiscountStartDate(d.startDate || '');
+    setDiscountEndDate(d.endDate || '');
+    setDiscountOn(d.discountOn || 'products');
+    const ids = Array.isArray(d.targetIds) ? d.targetIds.filter(Boolean) : (d.targetId ? [d.targetId] : []);
+    setDiscountTargetIds(ids);
+    setDiscountTargetId('');
+    setDiscountPieces(String(d.pieces ?? ''));
+    setDiscountCombinable(!!d.combinable);
+    setDiscountKeyboardValue('');
+    setShowDiscountModal(true);
+  };
+
+  const closeDiscountModal = () => {
+    setShowDiscountModal(false);
+    setEditingDiscountId(null);
+    setDiscountName('');
+    setDiscountTargetId('');
+    setDiscountTargetIds([]);
+    setDiscountKeyboardValue('');
+    setDiscountCalendarField(null);
+  };
+
+  const persistDiscounts = (list) => {
+    setDiscounts(list);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('pos_discounts', JSON.stringify(list));
+  };
+
+  const handleSaveDiscount = () => {
+    setSavingDiscount(true);
+    try {
+      const payload = {
+        id: editingDiscountId || `d-${Date.now()}`,
+        name: discountName.trim() || 'New discount',
+        trigger: discountTrigger,
+        type: discountType,
+        value: discountValue.trim(),
+        startDate: discountStartDate,
+        endDate: discountEndDate,
+        discountOn,
+        targetId: discountTargetIds[0] || '',
+        targetIds: discountTargetIds,
+        pieces: discountPieces.trim(),
+        combinable: discountCombinable
+      };
+      if (editingDiscountId) {
+        const next = discounts.map((d) => (d.id === editingDiscountId ? payload : d));
+        persistDiscounts(next);
+      } else {
+        persistDiscounts([...discounts, payload]);
+      }
+      closeDiscountModal();
+    } finally {
+      setSavingDiscount(false);
+    }
+  };
+
+  const handleDeleteDiscount = (id) => {
+    persistDiscounts(discounts.filter((d) => d.id !== id));
+    setDeleteConfirmDiscountId(null);
+  };
+
+  const fetchKitchens = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/kitchens`);
+      const data = await res.json().catch(() => []);
+      if (!res.ok) return;
+      const list = Array.isArray(data) ? data : [];
+      setKitchens(list.filter((k) => k?.id !== KITCHEN_ADMIN_CREDENTIAL_ID));
+    } catch {
+      setKitchens([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (topNavId !== 'categories-products' || subNavId !== 'Kitchen') return;
+    fetchKitchens();
+  }, [topNavId, subNavId, fetchKitchens]);
+
+  const openNewKitchenModal = () => {
+    setEditingKitchenId(null);
+    setKitchenModalName('');
+    setShowKitchenModal(true);
+  };
+
+  const openEditKitchenModal = (m) => {
+    setEditingKitchenId(m?.id ?? null);
+    setKitchenModalName(m?.name || '');
+    setShowKitchenModal(true);
+  };
+
+  const closeKitchenModal = () => {
+    setShowKitchenModal(false);
+    setEditingKitchenId(null);
+    setKitchenModalName('');
+  };
+
+  const handleSaveKitchen = async () => {
+    setSavingKitchen(true);
+    try {
+      const name = kitchenModalName.trim() || tr('control.kitchen.defaultNewName', 'New Kitchen');
+      if (editingKitchenId) {
+        const res = await fetch(`${API}/kitchens/${editingKitchenId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (!res.ok) throw new Error('save failed');
+        const updated = await res.json();
+        setKitchens((prev) =>
+          prev
+            .map((k) =>
+              k.id === updated.id
+                ? { ...k, id: updated.id, name: updated.name, productIds: updated.productIds ?? k.productIds ?? [] }
+                : k
+            )
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        );
+      } else {
+        const res = await fetch(`${API}/kitchens`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        if (!res.ok) throw new Error('save failed');
+        const created = await res.json();
+        setKitchens((prev) =>
+          [...prev, { ...created, productIds: created.productIds ?? [] }].sort((a, b) =>
+            (a.name || '').localeCompare(b.name || '')
+          )
+        );
+      }
+      closeKitchenModal();
+    } catch {
+      await fetchKitchens();
+    } finally {
+      setSavingKitchen(false);
+    }
+  };
+
+  const handleDeleteKitchen = async (id) => {
+    try {
+      const res = await fetch(`${API}/kitchens/${id}`, { method: 'DELETE' });
+      if (res.ok) setKitchens((prev) => prev.filter((k) => k.id !== id));
+      else await fetchKitchens();
+    } catch {
+      await fetchKitchens();
+    }
+    setDeleteConfirmKitchenId(null);
+  };
+
+  const closeKitchenProductsModal = useCallback(() => {
+    setShowKitchenProductsModal(false);
+    setKitchenProductsKitchen(null);
+    setKitchenProductsCatalog([]);
+    setKitchenProductsModalCategories([]);
+    setKitchenProductsCategoryFilter('');
+    setKitchenProductsLinked([]);
+    setKitchenProductsLeftSelectedIds(new Set());
+    setKitchenProductsRightSelectedIds(new Set());
+  }, []);
+
+  const openKitchenProductsModal = useCallback(async (kitchen) => {
+    if (!kitchen?.id) return;
+    setKitchenProductsKitchen(kitchen);
+    setKitchenProductsCategoryFilter('');
+    setKitchenProductsLeftSelectedIds(new Set());
+    setKitchenProductsRightSelectedIds(new Set());
+    setShowKitchenProductsModal(true);
+    setLoadingKitchenProductsCatalog(true);
+    setKitchenProductsCatalog([]);
+    setKitchenProductsModalCategories([]);
+    setKitchenProductsLinked([]);
+    try {
+      const [catRes, prodRes] = await Promise.all([
+        fetch(`${API}/categories`),
+        fetch(`${API}/products/catalog`)
+      ]);
+      const catsRaw = await catRes.json().catch(() => []);
+      const data = await prodRes.json().catch(() => []);
+      const catalog = prodRes.ok && Array.isArray(data) ? data : [];
+      setKitchenProductsCatalog(catalog);
+      const catOpts = Array.isArray(catsRaw)
+        ? catsRaw.map((c) => ({ id: c.id, name: c.name || c.id })).filter((c) => c.id)
+        : [];
+      setKitchenProductsModalCategories(catOpts);
+      const linkedIds = Array.isArray(kitchen.productIds) ? kitchen.productIds : [];
+      const linked = linkedIds.map((id) => {
+        const p = catalog.find((x) => x.id === id);
+        return {
+          productId: id,
+          productName: p?.name || id,
+          categoryName: p?.categoryName || ''
+        };
+      });
+      setKitchenProductsLinked(linked);
+    } catch {
+      setKitchenProductsCatalog([]);
+      setKitchenProductsModalCategories([]);
+    } finally {
+      setLoadingKitchenProductsCatalog(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showKitchenProductsModal) return;
+    setKitchenProductsLeftSelectedIds(new Set());
+  }, [showKitchenProductsModal, kitchenProductsCategoryFilter]);
+
+  const kitchenProductsOptionsFiltered = useMemo(() => {
+    if (!kitchenProductsCategoryFilter) return kitchenProductsCatalog;
+    return kitchenProductsCatalog.filter((p) => p.categoryId === kitchenProductsCategoryFilter);
+  }, [kitchenProductsCatalog, kitchenProductsCategoryFilter]);
+
+  const kitchenProductsAvailable = useMemo(() => {
+    const linkedIds = new Set(kitchenProductsLinked.map((l) => l.productId));
+    const takenByOtherKitchen = new Set();
+    const currentKitchenId = kitchenProductsKitchen?.id;
+    for (const k of kitchens) {
+      if (!k?.id || k.id === currentKitchenId) continue;
+      for (const pid of Array.isArray(k.productIds) ? k.productIds : []) {
+        if (pid) takenByOtherKitchen.add(pid);
+      }
+    }
+    return kitchenProductsOptionsFiltered.filter(
+      (p) => p?.id && !linkedIds.has(p.id) && !takenByOtherKitchen.has(p.id)
+    );
+  }, [kitchenProductsOptionsFiltered, kitchenProductsLinked, kitchens, kitchenProductsKitchen?.id]);
+
+  const handleAddKitchenProductLinks = useCallback(() => {
+    if (!kitchenProductsLeftSelectedIds.size) return;
+    const toAdd = kitchenProductsAvailable.filter((p) => kitchenProductsLeftSelectedIds.has(p.id));
+    if (!toAdd.length) return;
+    setKitchenProductsLinked((prev) => {
+      const existing = new Set(prev.map((l) => l.productId));
+      const newRows = toAdd
+        .filter((p) => !existing.has(p.id))
+        .map((p) => ({
+          productId: p.id,
+          productName: p.name || p.id,
+          categoryName: p.categoryName || ''
+        }));
+      return [...prev, ...newRows];
+    });
+    setKitchenProductsLeftSelectedIds(new Set());
+  }, [kitchenProductsLeftSelectedIds, kitchenProductsAvailable]);
+
+  const handleRemoveKitchenProductLinks = useCallback(() => {
+    if (!kitchenProductsRightSelectedIds.size) return;
+    setKitchenProductsLinked((prev) => prev.filter((l) => !kitchenProductsRightSelectedIds.has(l.productId)));
+    setKitchenProductsRightSelectedIds(new Set());
+  }, [kitchenProductsRightSelectedIds]);
+
+  const removeKitchenProductLink = useCallback((productId) => {
+    setKitchenProductsLinked((prev) => prev.filter((l) => l.productId !== productId));
+  }, []);
+
+  const handleSaveKitchenProducts = useCallback(async () => {
+    if (!kitchenProductsKitchen?.id) return;
+    setSavingKitchenProducts(true);
+    try {
+      const productIds = kitchenProductsLinked.map((l) => l.productId);
+      const res = await fetch(`${API}/kitchens/${kitchenProductsKitchen.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds })
+      });
+      if (!res.ok) throw new Error('save failed');
+      await res.json();
+      await fetchKitchens();
+      closeKitchenProductsModal();
+    } catch {
+      await fetchKitchens();
+    } finally {
+      setSavingKitchenProducts(false);
+    }
+  }, [kitchenProductsKitchen, kitchenProductsLinked, closeKitchenProductsModal, fetchKitchens]);
+
+  return (
+    <div className="flex h-full bg-pos-bg text-pos-text">
+      {/* Control left sidebar */}
+      <aside className="w-1/5 shrink-0 flex flex-col bg-pos-panel border-r border-pos-border">
+        <nav className="flex flex-col gap-0.5 flex-1 p-3">
+          {CONTROL_SIDEBAR_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`flex items-center gap-3 px-2 py-3 rounded-lg text-left text-md transition-colors ${controlSidebarId === item.id
+                ? 'bg-pos-bg text-pos-text font-medium'
+                : 'text-pos-muted active:bg-green-500 active:text-pos-text'
+                }`}
+              onClick={() => setControlSidebarId(item.id)}
+            >
+              <SidebarIcon id={item.icon} className="w-6 h-6 shrink-0" />
+              {tr(`control.sidebar.${item.id}`, item.label)}
+            </button>
+          ))}
+        </nav>
+        <div className="p-4 w-full flex flex-col items-center gap-2">
+          {currentUser && (
+            <p className="text-pos-text text-xl font-medium truncate px-1">{currentUser.label}</p>
+          )}
+          <div className="flex flex-col">
+            <button
+              type="button"
+              className="px-3 py-1 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 text-2xl"
+              onClick={() => onBack?.()}
+            >
+              {tr('backName', 'Back')}
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg text-rose-500 active:text-pos-text active:bg-green-500 text-2xl font-medium"
+              onClick={() => setShowLogoutModal(true)}
+            >
+              {tr('logOut', 'Log out')}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Top navigation - Personalize only */}
+        {controlSidebarId === 'personalize' && (
+          <div className="flex items-center gap-1 py-2 px-4 justify-between w-full bg-pos-bg/50">
+            {TOP_NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`flex items-center gap-2 px-2 py-3 rounded-lg text-lg transition-colors ${topNavId === item.id
+                  ? 'bg-pos-panel text-pos-text font-medium border border-pos-border'
+                  : 'text-pos-muted active:text-pos-text active:bg-green-500 border border-transparent'
+                  }`}
+                onClick={() => {
+                  setTopNavId(item.id);
+                  if (item.id === 'categories-products') setSubNavId('Price Groups');
+                  if (item.id === 'cash-register') setSubNavId('Template Settings');
+                  if (item.id === 'external-devices') setSubNavId('Printer');
+                }}
+              >
+                <TopNavIcon id={item.icon} className="w-6 h-6 shrink-0" />
+                {tr(`control.topNav.${item.id}`, item.label)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Reports tabs - when Reports sidebar selected */}
+        {controlSidebarId === 'reports' && (
+          <div className="flex items-center gap-1 px-4 py-2 justify-around w-full bg-pos-bg/50">
+            {REPORT_TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${reportTabId === item.id
+                  ? 'bg-pos-panel text-pos-text font-medium border border-pos-border'
+                  : 'text-pos-muted active:text-pos-text active:bg-green-500 border border-transparent'
+                  }`}
+                onClick={() => setReportTabId(item.id)}
+              >
+                <ReportTabIcon id={item.icon} className="w-5 h-5 shrink-0" />
+                {tr(`control.reportTabs.${item.id}`, item.label)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Sub-navigation - Categories and products */}
+        {controlSidebarId === 'personalize' && topNavId === 'categories-products' && (
+          <div className="flex items-center w-full justify-between gap-1 px-4 bg-pos-bg">
+            {SUB_NAV_ITEMS.map((label) => (
+              <button
+                key={label}
+                type="button"
+                className={`px-4 py-2 rounded-lg text-sm transition-colors ${subNavId === label
+                  ? 'bg-pos-panel text-pos-text font-medium'
+                  : 'text-pos-muted active:text-pos-text active:bg-green-500'
+                  }`}
+                onClick={() => setSubNavId(label)}
+              >
+                {tr(`control.subNav.${label}`, label)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Sub-navigation - Cash Register Settings */}
+        {controlSidebarId === 'personalize' && topNavId === 'cash-register' && (
+          <div className="flex items-center w-full justify-around gap-1 px-4 py-3 bg-pos-bg">
+            {CASH_REGISTER_SUB_NAV_ITEMS.map((label) => (
+              <button
+                key={label}
+                type="button"
+                className={`px-4 py-2 rounded-lg text-sm transition-colors ${subNavId === label
+                  ? 'bg-pos-panel text-pos-text font-medium'
+                  : 'text-pos-muted active:text-pos-text active:bg-green-500'
+                  }`}
+                onClick={() => {
+                  setSubNavId(label);
+                  if (label === 'Device Settings') setShowDeviceSettingsModal(true);
+                  if (label === 'System Settings') setShowSystemSettingsModal(true);
+                  if (label === 'Production messages') setShowProductionMessagesModal(true);
+                }}
+              >
+                {tr(`control.subNav.${label}`, label)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Sub-navigation - External Devices */}
+        {controlSidebarId === 'personalize' && topNavId === 'external-devices' && (
+          <div className="flex items-center w-full justify-between gap-1 px-4 bg-pos-bg">
+            {EXTERNAL_DEVICES_SUB_NAV_ITEMS.map((label) => (
+              <button
+                key={label}
+                type="button"
+                className={`px-4 py-2 rounded-lg text-sm transition-colors ${subNavId === label
+                  ? 'bg-pos-panel text-pos-text font-medium'
+                  : 'text-pos-muted active:text-pos-text active:bg-green-500'
+                  }`}
+                onClick={() => setSubNavId(label)}
+              >
+                {tr(`control.subNav.${label}`, label)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Content area */}
+        <main className="flex-1 overflow-hidden px-4 pt-2">
+          {controlSidebarId === 'reports' ? (
+            <div className="flex flex-col h-full gap-4">
+              {reportTabId === 'financial' && (
+                <div className="flex gap-4 flex-col min-h-0 flex-1 w-full">
+                  <div className="shrink-0 flex justify-around gap-2 h-[46px] w-full items-center">
+                    <span className="text-pos-text text-sm font-medium">Z</span>
+                    <span className="text-pos-text text-sm font-medium">X</span>
+                    <button type="button" className="text-pos-text active:underline text-sm active:bg-green-500">{tr('control.reports.history', 'History')}</button>
+                  </div>
+                  <div className="relative grid grid-cols-2 flex-1 px-4 min-h-0 gap-4">
+                    <div className="flex flex-col min-h-0 gap-3">
+                      <div id="financial-report-pospoint-scroll" className="flex-1 overflow-auto rounded-xl border border-pos-border bg-white text-gray-800 p-4 min-h-[400px]">
+                        <div className="text-sm font-mono space-y-1 whitespace-pre-wrap text-center">
+                          <div className="text-base font-medium mb-2">pospoint demo</div>
+                          <div className="mb-2">BE.0.0.0</div>
+                          <div className="flex justify-between border-b border-dotted border-gray-400 pb-1 mb-2">
+                            <span>Date : {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}</span>
+                            <span>Tijd: {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                          </div>
+                          <div className="border-b border-dotted border-gray-400 pb-2 mb-4 font-semibold text-sm">Z FINANCIEEL #2</div>
+                          <div className="text-left space-y-1">
+                            <div className="font-medium">Terminals:</div>
+                            <div>Kassa 2 — 16/01-08:26 =&gt; 25/01-11:04</div>
+                            <div>Kassa 4 — 13/01-19:07 =&gt; 25/02-14:27</div>
+                            <div className="mt-4 font-medium">BTW per tarief</div>
+                            <table className="w-full border-collapse text-sm mt-1 text-left">
+                              <thead>
+                                <tr className="border-b border-gray-300">
+                                  <th className="py-1">MvH NS</th>
+                                  <th className="py-1">MvH NR</th>
+                                  <th className="py-1">Btw</th>
+                                  <th className="py-1">{tr('total', 'Total')}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b border-gray-200">
+                                  <td className="py-1">333.73</td>
+                                  <td className="py-1">2.83</td>
+                                  <td className="py-1">19.85</td>
+                                  <td className="py-1">350.75</td>
+                                </tr>
+                                <tr className="font-medium">
+                                  <td className="py-1">{tr('total', 'Total')}</td>
+                                  <td className="py-1">333.73</td>
+                                  <td className="py-1">2.83</td>
+                                  <td className="py-1">350.75</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <div className="mt-4 font-medium">Betalingen</div>
+                            <div>Cash — 174.75</div>
+                            <div>Credit Card — 117.00</div>
+                            <div>Visa — 59.00</div>
+                            <div className="font-medium">{tr('total', 'Total')} 350.75</div>
+                            <div className="mt-4 font-medium">Eat-in / Take-out</div>
+                            <div>10 Take-Out — 350.75</div>
+                            <div className="font-medium">{tr('total', 'Total')} 350.75</div>
+                            <div className="mt-4 font-medium">Ticket types</div>
+                            <div>11 Counter Sales — 350.75</div>
+                            <div className="font-medium">{tr('total', 'Total')} 350.75</div>
+                            <div className="mt-4 font-medium">Issued VAT tickets:</div>
+                            <div>NS: 10</div>
+                            <div>NR: 1</div>
+                            <div className="mt-2">Number of return tickets: 1</div>
+                            <div>Drawer opened without sale: 0</div>
+                            <div>Pro Forma tickets: 7</div>
+                            <div>Pro Forma returns: 0</div>
+                            <div>Pro Forma turnover (incl. VAT): 126.20</div>
+                            <div>Gift vouchers sold: 0</div>
+                            <div>Value of gift vouchers sold: 0.00</div>
+                            <div>Applied discounts: 0</div>
+                            <div>Total discount amount (incl. VAT): 0.00</div>
+                            <div>Total cash rounding amount: 0.00</div>
+                            <div>Credit top-up: 0.00</div>
+                            <div>Staff consumption: 0.00</div>
+                            <div>Online payment cash refunded: 0.00</div>
+                            <div>Number of online orders: 0.00</div>
+                            <div>Database ID: 2</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between px-2 py-2 shrink-0">
+                        <div className="flex-1" />
+                        <PaginationArrows
+                          canPrev={true}
+                          canNext={true}
+                          onPrev={() => {
+                            const el = document.getElementById('financial-report-pospoint-scroll');
+                            if (el) el.scrollBy({ top: -200, behavior: 'smooth' });
+                          }}
+                          onNext={() => {
+                            const el = document.getElementById('financial-report-pospoint-scroll');
+                            if (el) el.scrollBy({ top: 200, behavior: 'smooth' });
+                          }}
+                          className="relative py-0"
+                        />
+                        <div className="flex-1" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col h-full gap-3 shrink-0 justify-center items-center">
+                      <div className="flex items-center gap-4 w-full justify-center">
+                        <label className="text-pos-text text-sm shrink-0">{tr('control.reports.createTo', 'Create to :')}</label>
+                        <Dropdown options={mapTranslatedOptions(REPORT_GENERATE_UNTIL_OPTIONS)} value={reportGenerateUntil} onChange={setReportGenerateUntil} placeholder={tr('control.reports.currentTime', 'Current time')} className="text-sm min-w-[180px] max-w-[180px]" />
+                      </div>
+                      <button type="button" className="flex mt-4 items-center gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm justify-center w-[120px]">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        {tr('control.reports.print', 'Print')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {reportTabId === 'user' && (
+                <div className="flex gap-4 flex-col min-h-[650px] max-h-[650px] w-full">
+                  <div className="shrink-0 flex justify-around gap-2 h-[46px] w-full items-center">
+                    <span className="text-pos-text text-sm font-medium">Z</span>
+                    <span className="text-pos-text text-sm font-medium">X</span>
+                  </div>
+                  <div className="relative grid grid-cols-2 h-full gap-4">
+                    <div className='flex flex-col h-full gap-3'>
+                      <div className="flex-1 overflow-auto rounded-xl border border-pos-border bg-white text-gray-800 p-4 min-h-[400px]">
+                        <div className="">
+
+                        </div>
+
+                      </div>
+                      <div className="flex items-center justify-between px-2 py-2">
+                        <div className="flex-1" />
+                        <PaginationArrows canPrev={true} canNext={true} onPrev={() => { }} onNext={() => { }} className="relative py-0" />
+                        <div className="flex-1" />
+                      </div>
+                    </div>
+                    <div className='flex justify-center items-center'>
+                      <button type="button" className="flex items-center h-[40px] w-[120px] gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        {tr('control.reports.print', 'Print')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {reportTabId === 'periodic' && (
+                <div className="flex flex-col gap-4 flex-1 min-h-0">
+                  {/* Date and time row */}
+                  <div className="flex flex-wrap items-center justify-around gap-3 shrink-0">
+                    <Dropdown options={PERIODIC_REPORT_TIME_OPTIONS} value={periodicReportStartTime} onChange={setPeriodicReportStartTime} placeholder="00:00" className="text-sm min-w-[80px]" />
+                    <input type="text" value={periodicReportStartDate} onChange={(e) => setPeriodicReportStartDate(e.target.value)} placeholder="dd-mm-yyyy" className="w-[120px] px-3 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text text-sm" />
+                    <span className="text-pos-text text-sm">{tr('control.reports.to', 'to')}</span>
+                    <Dropdown options={PERIODIC_REPORT_TIME_OPTIONS} value={periodicReportEndTime} onChange={setPeriodicReportEndTime} placeholder="24:00" className="text-sm min-w-[80px]" />
+                    <input type="text" value={periodicReportEndDate} onChange={(e) => setPeriodicReportEndDate(e.target.value)} placeholder="dd-mm-yyyy" className="w-[120px] px-3 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text text-sm" />
+                    <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm font-medium">
+                      {tr('control.reports.makeReport', 'Make report')}
+                    </button>
+                  </div>
+                  {/* Report area (left) + Info panel (right) */}
+                  <div className="flex gap-4 flex-1 min-h-0">
+                    <div className="relative flex-1 min-w-0 flex flex-col rounded-xl border border-pos-border bg-white min-h-[400px] overflow-hidden">
+                      <div className="flex-1 overflow-auto p-4 text-gray-800 min-h-[300px]">
+                        <p className="text-gray-500 text-sm">{tr('control.reports.selectPeriodHint', 'Select period and click "Make report" to generate the report.')}</p>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 bg-gray-50 shrink-0">
+                        <div className="flex-1" />
+                        <PaginationArrows canPrev={true} canNext={true} onPrev={() => { }} onNext={() => { }} className="relative py-0" />
+                        <div className="flex-1 flex justify-end">
+                          <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            {tr('control.reports.print', 'Print')}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="shrink-0 w-[280px] rounded-xl border border-pos-border bg-white p-4 text-gray-800 text-sm leading-relaxed">
+                      <p className="font-medium text-gray-900 mb-2 text-sm">{tr('control.reports.periodicInfo1', 'In this new management system we work with 24:00 instead of 00:00 as the end point as in the web panel.')}</p>
+                      <p className="mb-2">{tr('control.reports.periodicExample', 'Example,')}</p>
+                      <p className="mb-2">{tr('control.reports.periodicExample2', 'all turnover of 27-02-2026')}</p>
+                      <p className="font-medium mt-3">{tr('control.reports.periodicEarlier', 'Earlier:')}</p>
+                      <p className="mb-2">{tr('control.reports.periodicEarlierExample', '00:00 27-02-2026 to 00:00 28-02-2026')}</p>
+                      <p className="font-medium mt-3">{tr('control.reports.periodicNot', 'Not:')}</p>
+                      <p>{tr('control.reports.periodicNotExample', '00:00 27-02-2026 to 24:00 27-02-2026')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {reportTabId === 'settings' && (
+                <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px] min-h-[650px]">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left">
+                      <thead>
+                        <tr className="border-b border-pos-border">
+                          <th className="text-pos-text text-sm font-medium py-2 pr-4"></th>
+                          <th className="text-pos-text text-sm font-medium py-2 px-3 text-center w-16">Z</th>
+                          <th className="text-pos-text text-sm font-medium py-2 px-3 text-center w-16">X</th>
+                          <th className="text-pos-text text-sm font-medium py-2 px-3 text-center w-20">{tr('control.reports.periodic', 'Periodic')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {REPORT_SETTINGS_ROWS.map((row) => (
+                          <tr key={row.id} className="border-b border-pos-border/70">
+                            <td className="text-pos-text text-sm py-2 pr-4">{tr(row.labelKey, row.fallback)}</td>
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={reportSettings[row.id]?.z ?? false}
+                                onChange={(e) => setReportSetting(row.id, 'z', e.target.checked)}
+                                className="w-5 h-5 rounded border-pos-border bg-pos-bg text-green-600 focus:ring-green-500"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={reportSettings[row.id]?.x ?? false}
+                                onChange={(e) => setReportSetting(row.id, 'x', e.target.checked)}
+                                className="w-5 h-5 rounded border-pos-border bg-pos-bg text-green-600 focus:ring-green-500"
+                              />
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={reportSettings[row.id]?.periodic ?? false}
+                                onChange={(e) => setReportSetting(row.id, 'periodic', e.target.checked)}
+                                className="w-5 h-5 rounded border-pos-border bg-pos-bg text-green-600 focus:ring-green-500"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-center mt-6">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-sm"
+                      disabled={savingReportSettings}
+                      onClick={handleSaveReportSettings}
+                    >
+                      <svg fill="currentColor" className="w-4 h-4" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : controlSidebarId === 'users' ? (
+            <div className="relative min-h-[750px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+              <div className="flex items-center w-full justify-center mb-2">
+                <button
+                  type="button"
+                  className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                  disabled={usersLoading}
+                  onClick={openNewUserModal}
+                >
+                  {tr('control.users.new', 'New user')}
+                </button>
+              </div>
+              {usersLoading ? (
+                <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl py-4">{tr('loginLoadingUsers', 'Loading users...')}</li></ul>
+              ) : users.length === 0 ? (
+                <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.users.empty', 'No users yet.')}</li></ul>
+              ) : (
+                <>
+                  <div
+                    ref={usersListRef}
+                    className="max-h-[610px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    onScroll={updateUsersScrollState}
+                  >
+                    <ul className="w-full flex flex-col">
+                      {[...users].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((u) => (
+                        <li
+                          key={u.id}
+                          className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                        >
+                          <span className="font-medium">{u.name || '—'}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="p-2 rounded text-pos-text mr-5 active:text-green-500"
+                              onClick={() => openEditUserModal(u)}
+                              aria-label={tr('control.edit', 'Edit')}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="p-2 rounded text-pos-text active:text-rose-500"
+                              onClick={() => setDeleteConfirmUserId(u.id)}
+                              aria-label={tr('delete', 'Delete')}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <PaginationArrows
+                    canPrev={canUsersScrollUp}
+                    canNext={canUsersScrollDown}
+                    onPrev={() => scrollUsersByPage('up')}
+                    onNext={() => scrollUsersByPage('down')}
+                  />
+                </>
+              )}
+            </div>
+          ) : controlSidebarId === 'language' ? (
+            <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-8 min-h-[750px]">
+              <h2 className="text-pos-text text-2xl font-medium mb-6">{tr('control.languageTitle', 'Language')}</h2>
+              <p className="text-pos-muted text-xl mb-8">{tr('control.languageDescription', 'Select the language for the application.')}</p>
+              <div className="flex flex-wrap gap-4 w-full flex justify-center min-h-[200px] items-center">
+                {LANGUAGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setAppLanguage(opt.value)}
+                    className={`px-8 py-4 rounded-xl text-xl font-medium border-2 transition-colors ${appLanguage === opt.value
+                      ? 'bg-pos-panel border-green-500 text-green-400'
+                      : 'bg-pos-bg border-pos-border text-pos-text active:border-pos-muted active:bg-green-500'
+                      }`}
+                  >
+                    {tr(`control.languageOption.${opt.value}`, opt.label)}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-10 flex w-full justify-center">
+                <button
+                  type="button"
+                  className="flex items-center gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-2xl"
+                  disabled={savingAppLanguage || appLanguage === lang}
+                  onClick={handleSaveAppLanguage}
+                >
+                  <svg fill="currentColor" width="24" height="24" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                  {tr('control.save', 'Save')}
+                </button>
+              </div>
+              <p className="text-pos-muted text-lg mt-8 text-center">{tr('control.currentLanguage', 'Current language')}: {tr(`control.languageOption.${appLanguage}`, LANGUAGE_OPTIONS.find((o) => o.value === appLanguage)?.label ?? 'English')}</p>
+            </div>
+          ) : topNavId === 'cash-register' ? (
+            <div className="relative min-h-[580px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+              {subNavId === 'Template Settings' && (
+                <div className="flex flex-col items-center justify-center min-h-[580px] gap-4">
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setTemplateTheme('light')}
+                      className={`px-6 py-3 rounded-xl text-sm font-medium transition-colors min-w-[150px] ${templateTheme === 'light'
+                        ? 'bg-pos-panel border-2 border-green-500 text-green-400'
+                        : 'bg-pos-bg border border-pos-border text-pos-muted active:text-pos-text active:border-pos-border'
+                        }`}
+                    >
+                      Light
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTemplateTheme('dark')}
+                      className={`px-6 py-3 rounded-xl text-sm font-medium transition-colors min-w-[150px] ${templateTheme === 'dark'
+                        ? 'bg-gray-900 border-2 border-green-500 text-green-400'
+                        : 'bg-[#1a1a1a] border border-pos-border text-pos-muted active:text-pos-text'
+                        }`}
+                    >
+                      Dark
+                    </button>
+                  </div>
+                  <div className="flex justify-center pt-5 pb-5">
+                    <button
+                      type="button"
+                      disabled={savingTemplateSettings}
+                      onClick={() => {
+                        setSavingTemplateSettings(true);
+                        try {
+                          if (typeof localStorage !== 'undefined') localStorage.setItem('pos-template-theme', templateTheme);
+                        } finally {
+                          setSavingTemplateSettings(false);
+                        }
+                      }}
+                      className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                    >
+                    <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
+                    </svg>
+                    {tr('control.save', 'Save')}
+                  </button>
+                  </div>
+                </div>
+              )}
+              {subNavId === 'Payment types' && (
+                <div className="relative flex flex-col min-h-[610px] pb-[60px]">
+                  <div className="flex items-center justify-center mb-2">
+                    <button
+                      type="button"
+                      className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                      disabled={paymentTypesLoading}
+                      onClick={openNewPaymentTypeModal}
+                    >
+                      {tr('control.paymentTypes.new', 'New Payment Method')}
+                    </button>
+                  </div>
+                  {(() => {
+                    if (paymentTypesLoading) {
+                      return (
+                        <ul className="w-full flex flex-col">
+                          <li className="text-pos-muted text-xl py-4">{tr('control.paymentTypes.loading', 'Loading payment methods...')}</li>
+                        </ul>
+                      );
+                    }
+                    const sorted = [...paymentTypes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                    if (sorted.length === 0) {
+                      return (
+                        <ul className="w-full flex flex-col">
+                          <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.paymentTypes.empty', 'No payment methods yet.')}</li>
+                        </ul>
+                      );
+                    }
+                    return (
+                      <>
+                        <div
+                          ref={paymentTypesListRef}
+                          className="max-h-[510px] overflow-y-auto rounded-lg border border-pos-border [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                          onScroll={updatePaymentTypesScrollState}
+                        >
+                          <ul className="w-full flex flex-col">
+                            {sorted.map((pt) => (
+                              <li
+                                key={pt.id}
+                                className="flex items-center w-full px-4 py-1 border-b border-pos-border last:border-b-0 bg-pos-bg active:bg-green-500 transition-colors"
+                              >
+                                <span className="flex-1 text-pos-text text-sm font-medium">{pt.name}</span>
+                                <span className="w-[160px] shrink-0 text-pos-muted text-xs mr-2">
+                                  {tr(`control.paymentTypes.integration.${pt.integration}`, pt.integration || '—')}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
+                                  aria-label={pt.active ? tr('control.paymentTypes.deactivate', 'Deactivate') : tr('control.paymentTypes.activate', 'Activate')}
+                                  onClick={() => togglePaymentTypeActive(pt.id)}
+                                >
+                                  {pt.active ? (
+                                    <span className="w-4 h-4 inline-flex justify-center items-center text-green-500 text-sm">{'\u2713'}</span>
+                                  ) : (
+                                    <span className="w-4 h-4 inline-block rounded-full border-2 border-pos-muted" />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
+                                  onClick={() => openEditPaymentTypeModal(pt)}
+                                  aria-label={tr('control.edit', 'Edit')}
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="p-2 mr-5 rounded text-pos-text active:bg-green-500 shrink-0"
+                                  onClick={() => setDeleteConfirmPaymentTypeId(pt.id)}
+                                  aria-label={tr('delete', 'Delete')}
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <PaginationArrows
+                          canPrev={canPaymentTypesScrollUp}
+                          canNext={canPaymentTypesScrollDown}
+                          onPrev={() => scrollPaymentTypesByPage('up')}
+                          onNext={() => scrollPaymentTypesByPage('down')}
+                        />
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          ) : topNavId === 'categories-products' && subNavId === 'Price Groups' ? (
+            <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+              <div className="flex items-center w-full justify-center mb-2">
+                <button
+                  type="button"
+                  className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                  disabled={priceGroupsLoading}
+                  onClick={openPriceGroupModal}
+                >
+                  {tr('control.priceGroups.new', 'New price group')}
+                </button>
+              </div>
+              {(() => {
+                if (priceGroupsLoading) {
+                  return <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl py-4">{tr('control.priceGroups.loading', 'Loading price groups...')}</li></ul>;
+                }
+                if (priceGroups.length === 0) {
+                  return <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.priceGroups.empty', 'No price groups yet.')}</li></ul>;
+                }
+                return (
+                  <>
+                    <div
+                      ref={priceGroupsListRef}
+                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      onScroll={updatePriceGroupsScrollState}
+                    >
+                      <ul className="w-full flex flex-col">
+                        {priceGroups.map((pg) => (
+                          <li
+                            key={pg.id}
+                            className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                          >
+                            <span className="font-medium">{pg.name}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text mr-5 active:text-green-500"
+                                onClick={() => openEditPriceGroupModal(pg)}
+                                aria-label="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text active:text-rose-500"
+                                onClick={() => setDeleteConfirmId(pg.id)}
+                                aria-label="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <PaginationArrows
+                      canPrev={canPriceGroupsScrollUp}
+                      canNext={canPriceGroupsScrollDown}
+                      onPrev={() => scrollPriceGroupsByPage('up')}
+                      onNext={() => scrollPriceGroupsByPage('down')}
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          ) : topNavId === 'categories-products' && subNavId === 'Categories' ? (() => {
+            const sortedCategories = [...categories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+            return (
+              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                <div className="flex items-center w-full justify-center mb-2">
+                  <button
+                    type="button"
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                    disabled={categoriesLoading}
+                    onClick={openCategoryModal}
+                  >
+                    {tr('control.categories.new', 'New category')}
+                  </button>
+                </div>
+                {categoriesLoading ? (
+                  <ul className="w-full flex flex-col">
+                    <li className="text-pos-muted text-xl py-4">{tr('control.categories.loading', 'Loading categories...')}</li>
+                  </ul>
+                ) : sortedCategories.length === 0 ? (
+                  <ul className="w-full flex flex-col">
+                    <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.categories.empty', 'No categories yet.')}</li>
+                  </ul>
+                ) : (
+                  <>
+                    <div
+                      ref={categoriesListRef}
+                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      onScroll={updateCategoriesScrollState}
+                    >
+                      <ul className="w-full flex flex-col">
+                        {sortedCategories.map((cat, index) => (
+                          <li
+                            key={cat.id}
+                            className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                          >
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text active:text-rose-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                                onClick={() => handleMoveCategory(cat.id, 'down')}
+                                disabled={index >= sortedCategories.length - 1}
+                                aria-label="Move down"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text active:text-rose-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                                onClick={() => handleMoveCategory(cat.id, 'up')}
+                                disabled={index <= 0}
+                                aria-label="Move up"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v14" /></svg>
+                              </button>
+                            </div>
+                            <span className="flex-1 text-center font-medium">{cat.name}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                className="p-2 mr-5 rounded text-pos-text active:bg-green-500"
+                                onClick={() => openEditCategoryModal(cat)}
+                                aria-label="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text active:text-rose-500"
+                                onClick={() => setDeleteConfirmCategoryId(cat.id)}
+                                aria-label="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+                {sortedCategories.length > 0 && !categoriesLoading && (
+                  <PaginationArrows
+                    canPrev={canCategoriesScrollUp}
+                    canNext={canCategoriesScrollDown}
+                    onPrev={() => scrollCategoriesByPage('up')}
+                    onNext={() => scrollCategoriesByPage('down')}
+                  />
+                )}
+              </div>
+            );
+          })() : topNavId === 'categories-products' && subNavId === 'Products' ? (() => {
+            return (
+              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px] flex flex-col">
+                {/* Action bar: New Product, Positioning, Search */}
+                <div className="flex items-center w-full justify-center gap-4 mb-2 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={!selectedCategoryId || productsLoading}
+                    onClick={openProductModal}
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                  >
+                    {tr('control.products.new', 'New Product')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openProductPositioningModal}
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                  >
+                    {tr('control.products.positioning', 'Positioning')}
+                  </button>
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder={tr('control.products.searchPlaceholder', 'Search products')}
+                    onClick={() => setShowProductSearchKeyboard(true)}
+                    onFocus={() => setShowProductSearchKeyboard(true)}
+                    className="px-4 py-3 rounded-lg bg-pos-bg border border-pos-border z-[20] text-pos-text text-sm min-w-[200px] placeholder:text-pos-muted cursor-pointer"
+                  />
+                </div>
+                {/* Category tabs: horizontal, scrollable, selected with underline */}
+                {categories.length > 0 && (
+                  <div className="flex items-center gap-2 mb-2 overflow-hidden">
+                    <button
+                      type="button"
+                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
+                      onClick={() => {
+                        const currentIndex = categories.findIndex((cat) => cat.id === selectedCategoryId);
+                        if (currentIndex <= 0) return;
+                        setSelectedCategoryId(categories[currentIndex - 1].id);
+                        setSelectedProductId(null);
+                      }}
+                      aria-label="Scroll left"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <div
+                      ref={productsCategoryTabsRef}
+                      className="flex gap-2 overflow-x-auto flex-1 min-w-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                      {categories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          data-category-id={String(cat.id)}
+                          type="button"
+                          className={`px-4 py-2 text-sm font-medium whitespace-nowrap shrink-0 transition-colors border-b-2 ${selectedCategoryId === cat.id
+                            ? 'bg-pos-bg/80 text-pos-text border-green-500'
+                            : 'text-pos-muted active:text-pos-text bg-transparent border-transparent active:bg-green-500'
+                            }`}
+                          onClick={() => { setSelectedCategoryId(cat.id); setSelectedProductId(null); }}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
+                      onClick={() => {
+                        const currentIndex = categories.findIndex((cat) => cat.id === selectedCategoryId);
+                        if (currentIndex < 0 || currentIndex >= categories.length - 1) return;
+                        setSelectedCategoryId(categories[currentIndex + 1].id);
+                        setSelectedProductId(null);
+                      }}
+                      aria-label="Scroll right"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+                )}
+                {/* Product list: name (left), Subproducts (center), Edit/Delete (right) */}
+                <div
+                  ref={productsListRef}
+                  className="flex-1 overflow-auto max-h-[470px] min-h-0 bg-pos-bg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  onScroll={updateProductsScrollState}
+                >
+                  {!selectedCategoryId ? (
+                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.products.selectCategoryHint', 'Select a category or add one in Categories.')}</p>
+                  ) : productsLoading ? (
+                    <p className="text-pos-muted text-xl py-4">{tr('control.products.loading', 'Loading products...')}</p>
+                  ) : filteredProducts.length === 0 ? (
+                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.products.emptyInCategory', 'No products in this category yet.')}</p>
+                  ) : (
+                    <ul className="w-full flex flex-col">
+                      {filteredProducts.map((product) => (
+                        <li
+                          key={product.id}
+                          className={`flex items-center w-full justify-between px-4 py-2 border-y border-pos-panel text-pos-text text-sm cursor-pointer ${selectedProductId === product.id ? 'bg-pos-panel/70' : 'bg-pos-bg'}`}
+                          onClick={(e) => { if (!e.target.closest('button')) setSelectedProductId(product.id); }}
+                        >
+                          <span className="min-w-[30%] text-left font-medium truncate" title={product.name}>
+                            {product.name}
+                          </span>
+                          <span className="flex-shrink-0 min-w-[30%] text-center text-pos-muted text-sm">
+                            <button
+                              type="button"
+                              className={`px-2 py-1 rounded text-sm active:text-pos-text active:bg-green-500 ${productHasSubproductsById[product.id] ? 'text-white font-medium' : 'text-pos-muted'}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openProductSubproductsModal(product);
+                              }}
+                            >
+                              {tr('control.products.subproductsColumn', 'Subproducts')}
+                            </button>
+                          </span>
+                          <div className="flex items-center justify-end min-w-[40%] gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="p-2 rounded text-pos-text mr-5 active:text-green-500"
+                              onClick={() => openEditProductModal(product)}
+                              aria-label="Edit"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="p-2 rounded text-pos-text active:text-rose-500"
+                              onClick={() => setDeleteConfirmProductId(product.id)}
+                              aria-label="Delete"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {selectedCategoryId && filteredProducts.length > 0 && (
+                  <PaginationArrows
+                    canPrev={canProductsScrollUp}
+                    canNext={canProductsScrollDown}
+                    onPrev={() => scrollProductsByPage('up')}
+                    onNext={() => scrollProductsByPage('down')}
+                  />
+                )}
+              </div>
+            );
+          })() : topNavId === 'categories-products' && subNavId === 'Subproducts' ? (() => {
+            return (
+              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px] flex flex-col">
+                <div className="flex items-center w-full justify-center gap-4 mb-2 flex-wrap">
+                  <button
+                    type="button"
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                    disabled={subproductsLoading}
+                    onClick={openSubproductModal}
+                  >
+                    {tr('control.subproducts.new', 'New subproduct')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors"
+                    onClick={() => setShowManageGroupsModal(true)}
+                  >
+                    {tr('control.subproducts.manageGroups', 'Manage Groups')}
+                  </button>
+                </div>
+                {subproductGroups.length > 0 && (
+                  <div className="flex items-center gap-2 mb-2 overflow-hidden">
+                    <button
+                      type="button"
+                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
+                      onClick={() => {
+                        const currentIndex = subproductGroups.findIndex((grp) => grp.id === selectedSubproductGroupId);
+                        if (currentIndex <= 0) return;
+                        setSelectedSubproductGroupId(subproductGroups[currentIndex - 1].id);
+                        setSelectedSubproductId(null);
+                      }}
+                      aria-label="Scroll left"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <div
+                      ref={subproductsGroupTabsRef}
+                      className="flex gap-2 overflow-x-auto flex-1 min-w-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                      {subproductGroups.map((grp) => (
+                        <button
+                          key={grp.id}
+                          data-group-id={String(grp.id)}
+                          type="button"
+                          className={`px-4 py-2 text-sm font-medium whitespace-nowrap shrink-0 transition-colors border-b-2 ${selectedSubproductGroupId === grp.id
+                            ? 'bg-pos-bg/80 text-pos-text border-green-500'
+                            : 'text-pos-muted active:text-pos-text bg-transparent border-transparent active:bg-green-500'
+                            }`}
+                          onClick={() => setSelectedSubproductGroupId(grp.id)}
+                        >
+                          {grp.name}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
+                      onClick={() => {
+                        const currentIndex = subproductGroups.findIndex((grp) => grp.id === selectedSubproductGroupId);
+                        if (currentIndex < 0 || currentIndex >= subproductGroups.length - 1) return;
+                        setSelectedSubproductGroupId(subproductGroups[currentIndex + 1].id);
+                        setSelectedSubproductId(null);
+                      }}
+                      aria-label="Scroll right"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+                )}
+                <div
+                  ref={subproductsListRef}
+                  className="flex-1 overflow-auto min-h-0 bg-pos-bg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  onScroll={updateSubproductsScrollState}
+                >
+                  {!selectedSubproductGroupId ? (
+                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.subproducts.selectGroupHint', 'Select a group or add one via Manage Groups.')}</p>
+                  ) : subproductGroupsLoading ? (
+                    <p className="text-pos-muted text-xl py-4">{tr('control.subproducts.loadingGroups', 'Loading groups...')}</p>
+                  ) : subproductsLoading ? (
+                    <p className="text-pos-muted text-xl py-4">{tr('control.subproducts.loading', 'Loading subproducts...')}</p>
+                  ) : subproducts.length === 0 ? (
+                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.subproducts.empty', 'No subproducts in this group yet.')}</p>
+                  ) : (
+                    <ul className="w-full flex flex-col">
+                      {subproducts.map((sp) => (
+                        <li
+                          key={sp.id}
+                          className={`flex items-center w-full justify-between px-4 py-2 border-y border-pos-panel text-pos-text text-sm cursor-pointer ${selectedSubproductId === sp.id ? 'bg-pos-panel/70' : 'bg-pos-bg'}`}
+                          onClick={(e) => { if (!e.target.closest('button')) setSelectedSubproductId(sp.id); }}
+                        >
+                          <span className="flex-1 font-medium truncate" title={sp.name}>{sp.name}</span>
+                          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className="p-2 rounded text-pos-text mr-5 active:bg-green-500" onClick={() => openEditSubproductModal(sp)} aria-label="Edit">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button type="button" className="p-2 rounded text-pos-text active:text-rose-500" onClick={() => setDeleteConfirmSubproductId(sp.id)} aria-label="Delete">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {selectedSubproductGroupId && subproducts.length > 0 && (
+                  <PaginationArrows
+                    canPrev={canSubproductsScrollUp}
+                    canNext={canSubproductsScrollDown}
+                    onPrev={() => scrollSubproductsByPage('up')}
+                    onNext={() => scrollSubproductsByPage('down')}
+                  />
+                )}
+              </div>
+            );
+          })() : topNavId === 'categories-products' && subNavId === 'Kitchen' ? (() => {
+            return (
+              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                <div className="flex items-center w-full justify-center mb-2">
+                  <button
+                    type="button"
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors"
+                    onClick={openNewKitchenModal}
+                  >
+                    {tr('control.kitchen.newKitchen', 'New Kitchen')}
+                  </button>
+                </div>
+                {kitchens.length === 0 ? (
+                  <ul className="w-full flex flex-col">
+                    <li className="text-pos-muted text-xl py-4 text-center">{tr('control.kitchen.empty', 'No kitchens yet.')}</li>
+                  </ul>
+                ) : (
+                  <>
+                    <div
+                      ref={kitchenListRef}
+                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      onScroll={updateKitchenScrollState}
+                    >
+                      <ul className="w-full flex flex-col">
+                        {kitchens.map((m) => {
+                          const kitchenHasProducts = Array.isArray(m.productIds) && m.productIds.length > 0;
+                          return (
+                          <li
+                            key={m.id}
+                            className="flex items-center w-full gap-2 px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                          >
+                            <span className="min-w-0 flex-1 font-medium truncate" title={m.name || '—'}>{m.name || '—'}</span>
+                            <div className="justify-center min-w-0 absolute left-1/2">
+                              <button
+                                type="button"
+                                className={`shrink-0 py-1.5 text-xs font-semibold active:bg-green-500 active:border-white/30 ${kitchenHasProducts ? 'text-white' : 'text-pos-muted'}`}
+                                onClick={() => openKitchenProductsModal(m)}
+                              >
+                                {tr('control.kitchen.setProduct', 'Set product')}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text mr-5 active:text-green-500"
+                                onClick={() => openEditKitchenModal(m)}
+                                aria-label="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text active:text-rose-500"
+                                onClick={() => setDeleteConfirmKitchenId(m.id)}
+                                aria-label="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                    <PaginationArrows
+                      canPrev={canKitchenScrollUp}
+                      canNext={canKitchenScrollDown}
+                      onPrev={() => scrollKitchenByPage('up')}
+                      onNext={() => scrollKitchenByPage('down')}
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })() : topNavId === 'categories-products' && subNavId === 'Discounts' ? (() => {
+            return (
+              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                <div className="flex items-center w-full justify-center mb-2">
+                  <button
+                    type="button"
+                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors"
+                    onClick={openNewDiscountModal}
+                  >
+                    {tr('control.discounts.new', 'New discount')}
+                  </button>
+                </div>
+                {discounts.length === 0 ? (
+                  <ul className="w-full flex flex-col">
+                    <li className="text-pos-muted text-xl py-4 text-center">{tr('control.discounts.empty', 'No discounts yet.')}</li>
+                  </ul>
+                ) : (
+                  <>
+                    <div
+                      ref={discountsListRef}
+                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      onScroll={updateDiscountsScrollState}
+                    >
+                      <ul className="w-full flex flex-col">
+                        {discounts.map((d) => (
+                          <li
+                            key={d.id}
+                            className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                          >
+                            <span className="flex-1 font-medium truncate" title={d.name || '—'}>{d.name || '—'}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text mr-5 active:text-green-500"
+                                onClick={() => openEditDiscountModal(d)}
+                                aria-label="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="p-2 rounded text-pos-text active:text-rose-500"
+                                onClick={() => setDeleteConfirmDiscountId(d.id)}
+                                aria-label="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <PaginationArrows
+                      canPrev={canDiscountsScrollUp}
+                      canNext={canDiscountsScrollDown}
+                      onPrev={() => scrollDiscountsByPage('up')}
+                      onNext={() => scrollDiscountsByPage('down')}
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })() : topNavId === 'categories-products' ? (
+            <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-8 min-h-[300px] flex items-center justify-center">
+              <p className="text-pos-muted text-xl">
+                Select a section above to manage {subNavId.toLowerCase()}.
+              </p>
+            </div>
+          ) : topNavId === 'external-devices' ? (
+            <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-8 py-2 min-h-[650px] max-h-[550px]">
+              {subNavId === 'Printer' && (
+                <div className="flex flex-col">
+                  <div className="flex justify-around mb-6 shrink-0">
+                    {PRINTER_TAB_DEFS.map(({ id, labelKey, fallback }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${printerTab === id ? 'border-blue-500 text-pos-text' : 'border-transparent text-pos-muted active:text-pos-text'} active:bg-green-500`}
+                        onClick={() => setPrinterTab(id)}
+                      >
+                        {tr(labelKey, fallback)}
+                      </button>
+                    ))}
+                  </div>
+                  {printerTab === 'General' && (
+                    <div className="relative min-h-[580px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                      <div className="flex items-center w-full justify-center mb-2">
+                        <button
+                          type="button"
+                          className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                          onClick={openNewPrinterModal}
+                        >
+                          {tr('control.printer.addPrinter', 'Add printer')}
+                        </button>
+                      </div>
+                      {(() => {
+                        const sorted = [...printers].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                        const total = sorted.length;
+                        const totalPages = Math.max(1, Math.ceil(total / PRINTERS_PAGE_SIZE));
+                        const page = Math.min(printersPage, totalPages - 1);
+                        const start = page * PRINTERS_PAGE_SIZE;
+                        const paginated = sorted.slice(start, start + PRINTERS_PAGE_SIZE);
+                        const canPrev = page > 0;
+                        const canNext = page < totalPages - 1;
+                        return sorted.length === 0 ? (
+                          <ul className="w-full flex flex-col">
+                            <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.printer.empty', 'No printers yet.')}</li>
+                          </ul>
+                        ) : (
+                          <>
+                            <div className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                              <ul className="w-full flex flex-col">
+                                {paginated.map((p) => (
+                                  <li
+                                    key={p.id}
+                                    className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                                  >
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        type="button"
+                                        className="p-2 flex justify-center rounded text-pos-text active:bg-green-500 shrink-0"
+                                        onClick={() => setDefaultPrinter(p.id)}
+                                        aria-label={p.isDefault ? tr('control.printer.defaultPrinter', 'Default printer') : tr('control.printer.setAsDefault', 'Set as default')}
+                                      >
+                                        {p.isDefault ? (
+                                          <span className="w-4 h-4 inline-flex justify-center items-center text-green-500 text-sm">{'\u2713'}</span>
+                                        ) : (
+                                          <span className="w-4 h-4 inline-block rounded-full border-2 border-pos-muted" />
+                                        )}
+                                      </button>
+                                    </div>
+                                    <span className="flex-1 text-center font-medium">{p.name}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        type="button"
+                                        className="p-2 mr-5 rounded text-pos-text active:bg-green-500"
+                                        onClick={() => openEditPrinterModal(p)}
+                                        aria-label={tr('control.edit', 'Edit')}
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="p-2 rounded text-pos-text active:text-rose-500"
+                                        onClick={() => setDeleteConfirmPrinterId(p.id)}
+                                        aria-label={tr('delete', 'Delete')}
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                      </button>
+                                    </div>
+                                    <PaginationArrows
+                                      canPrev={canPrev}
+                                      canNext={canNext}
+                                      onPrev={() => setPrintersPage((p) => Math.max(0, p - 1))}
+                                      onNext={() => setPrintersPage((p) => Math.min(totalPages - 1, p + 1))}
+                                    />
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                  {printerTab === 'Final tickets' && (
+                    <div className="relative min-h-[580px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                      <div className="grid grid-cols-1 text-sm md:grid-cols-2 gap-x-10 gap-y-4 mb-6">
+                        <div className="flex flex-col gap-4">
+                          <div className='flex items-start gap-2'>
+                            <label className="block text-pos-text font-medium min-w-[130px] max-w-[130px]">{tr('control.finalTickets.companyData', 'Company data:')}</label>
+                            <div className='grid grid-cols-2 items-start gap-4'>
+                              <input type="text" value={finalTicketsCompanyData1} onChange={(e) => setFinalTicketsCompanyData1(e.target.value)} onFocus={() => setFinalTicketsActiveField('companyData1')} className="px-4 min-w-[100px] max-w-[100px] flex py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg justify-start items-start text-gray-200" />
+                              {[2, 3, 4, 5].map((i) => (
+                                <div key={i}>
+                                  <input type="text" value={i === 2 ? finalTicketsCompanyData2 : i === 3 ? finalTicketsCompanyData3 : i === 4 ? finalTicketsCompanyData4 : finalTicketsCompanyData5} onChange={(e) => { if (i === 2) setFinalTicketsCompanyData2(e.target.value); else if (i === 3) setFinalTicketsCompanyData3(e.target.value); else if (i === 4) setFinalTicketsCompanyData4(e.target.value); else setFinalTicketsCompanyData5(e.target.value); }} onFocus={() => setFinalTicketsActiveField('companyData' + i)} className="px-4 min-w-[100px] max-w-[100px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200" placeholder="" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className='flex items-center gap-2'>
+                            <label className="block text-pos-text font-medium min-w-[130px] max-w-[130px]">{tr('control.finalTickets.thankText', 'Thank text:')}</label>
+                            <input type="text" value={finalTicketsThankText} onChange={(e) => setFinalTicketsThankText(e.target.value)} onFocus={() => setFinalTicketsActiveField('thankText')} className="px-4 min-w-[200px] max-w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200" />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-4">
+                          <div className="flex gap-2 items-center">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px]">{tr('control.finalTickets.proformaTicket', 'Proforma ticket:')}</label>
+                            <input type="checkbox" checked={finalTicketsProforma} onChange={(e) => setFinalTicketsProforma(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px]">{tr('control.finalTickets.printPaymentType', 'Print payment type:')}</label>
+                            <input type="checkbox" checked={finalTicketsPrintPaymentType} onChange={(e) => setFinalTicketsPrintPaymentType(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px]">{tr('control.finalTickets.ticketTearable', 'Ticket tearable:')}</label>
+                            <input type="checkbox" checked={finalTicketsTicketTearable} onChange={(e) => setFinalTicketsTicketTearable(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px]">{tr('control.finalTickets.printLogo', 'Print logo:')}</label>
+                            <input type="checkbox" checked={finalTicketsPrintLogo} onChange={(e) => setFinalTicketsPrintLogo(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.finalTickets.printingOrder', 'Printing order of ticket:')}</label>
+                            <Dropdown options={mapTranslatedOptions(PRINTING_ORDER_OPTIONS)} value={finalTicketsPrintingOrder} onChange={setFinalTicketsPrintingOrder} placeholder={tr('control.external.select', 'Select')} className="min-w-[150px]" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-center pt-5 pb-5">
+                        <button type="button" className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingFinalTickets} onClick={handleSaveFinalTickets}>
+                          <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                          {tr('control.save', 'Save')}
+                        </button>
+                      </div>
+                      <div className="shrink-0">
+                        <SmallKeyboardWithNumpad value={finalTicketsKeyboardValue} onChange={finalTicketsKeyboardOnChange} />
+                      </div>
+                    </div>
+                  )}
+                  {printerTab === 'Production Tickets' && (
+                    <div className="relative min-h-[580px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 mb-6 text-sm">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex gap-10 items-center">
+                            <label className="block text-pos-text font-medium min-w-[200px] max-w-[200px]">{tr('control.prodTickets.displayCategories', 'Display categories on production ticket:')}</label>
+                            <input type="checkbox" checked={prodTicketsDisplayCategories} onChange={(e) => setProdTicketsDisplayCategories(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-10 items-center">
+                            <label className="block text-pos-text font-medium min-w-[200px] max-w-[200px]">{tr('control.prodTickets.spaceAbove', 'Space above ticket:')}</label>
+                            <input type="checkbox" checked={prodTicketsSpaceAbove} onChange={(e) => setProdTicketsSpaceAbove(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-10 items-center">
+                            <label className="block text-pos-text font-medium min-w-[200px] max-w-[200px]">{tr('control.finalTickets.ticketTearable', 'Ticket tearable:')}</label>
+                            <input type="checkbox" checked={prodTicketsTicketTearable} onChange={(e) => setProdTicketsTicketTearable(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-10 items-center">
+                            <label className="block text-pos-text font-medium min-w-[200px] max-w-[200px]">{tr('control.prodTickets.keukenprinterBuzzer', 'Kitchen printer buzzer:')}</label>
+                            <input type="checkbox" checked={prodTicketsKeukenprinterBuzzer} onChange={(e) => setProdTicketsKeukenprinterBuzzer(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-10 items-center">
+                            <label className="block text-pos-text font-medium min-w-[200px] max-w-[200px]">{tr('control.prodTickets.productsIndividually', 'Print products individually:')}</label>
+                            <input type="checkbox" checked={prodTicketsProductenIndividueel} onChange={(e) => setProdTicketsProductenIndividueel(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <div className="flex gap-10 items-center">
+                            <label className="block text-pos-text font-medium min-w-[200px] max-w-[200px]">{tr('control.prodTickets.eatInTakeOutBottom', 'Print Eat in / Take out at bottom:')}</label>
+                            <input type="checkbox" checked={prodTicketsEatInTakeOutOnderaan} onChange={(e) => setProdTicketsEatInTakeOutOnderaan(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.nextCoursePrinter', 'Next course printer {n}:').replace('{n}', '1')}</label>
+                            <Dropdown options={mapTranslatedOptions(productionTicketsPrinterOptions)} value={prodTicketsNextCoursePrinter1} onChange={setProdTicketsNextCoursePrinter1} placeholder={tr('control.external.disabled', 'Disabled')} className="min-w-[150px]" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.nextCoursePrinter', 'Next course printer {n}:').replace('{n}', '2')}</label>
+                            <Dropdown options={mapTranslatedOptions(productionTicketsPrinterOptions)} value={prodTicketsNextCoursePrinter2} onChange={setProdTicketsNextCoursePrinter2} placeholder={tr('control.external.disabled', 'Disabled')} className="min-w-[150px]" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.nextCoursePrinter', 'Next course printer {n}:').replace('{n}', '3')}</label>
+                            <Dropdown options={mapTranslatedOptions(productionTicketsPrinterOptions)} value={prodTicketsNextCoursePrinter3} onChange={setProdTicketsNextCoursePrinter3} placeholder={tr('control.external.disabled', 'Disabled')} className="min-w-[150px]" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.nextCoursePrinter', 'Next course printer {n}:').replace('{n}', '4')}</label>
+                            <Dropdown options={mapTranslatedOptions(productionTicketsPrinterOptions)} value={prodTicketsNextCoursePrinter4} onChange={setProdTicketsNextCoursePrinter4} placeholder={tr('control.external.disabled', 'Disabled')} className="min-w-[150px]" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.printingOrder', 'Printing order of production ticket:')}</label>
+                            <Dropdown options={mapTranslatedOptions(PRINTING_ORDER_OPTIONS)} value={prodTicketsPrintingOrder} onChange={setProdTicketsPrintingOrder} placeholder={tr('control.external.select', 'Select')} className="min-w-[150px]" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.groupingReceipt', 'Grouping receipt:')}</label>
+                            <Dropdown options={mapTranslatedOptions(GROUPING_RECEIPT_OPTIONS)} value={prodTicketsGroupingReceipt} onChange={setProdTicketsGroupingReceipt} placeholder={tr('control.external.select', 'Select')} className="min-w-[150px]" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="block text-pos-text font-medium min-w-[180px] max-w-[180px] shrink-0">{tr('control.prodTickets.transferPrinter', 'Transfer printer:')}</label>
+                            <Dropdown options={mapTranslatedOptions(productionTicketsPrinterOptions)} value={prodTicketsPrinterOverboeken} onChange={setProdTicketsPrinterOverboeken} placeholder={tr('control.external.disabled', 'Disabled')} className="min-w-[150px]" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-center pt-5 pb-5 text-md">
+                        <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingProdTickets} onClick={handleSaveProductionTickets}>
+                          <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                          {tr('control.save', 'Save')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {printerTab === 'Labels' && (() => {
+                    const sortedLabels = [...labelsList].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                    return (
+                      <div className="relative min-h-[400px] max-h-[580px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+                        <div className="flex flex-wrap items-center justify-center w-full gap-4 mb-2">
+                          <Dropdown options={labelsTypeOptions} value={labelsType} onChange={(v) => saveLabelsSettings({ type: v })} placeholder={tr('control.labels.selectPlaceholder', 'Select')} className="text-sm min-w-[200px]" />
+                          <Dropdown options={labelsPrinterOptions} value={labelsPrinter} onChange={(v) => saveLabelsSettings({ printer: v })} placeholder={tr('control.labels.selectPrinter', 'Select printer')} className="text-sm min-w-[200px]" />
+                          <button type="button" className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50" onClick={openNewLabelModal}>
+                            {tr('control.labels.new', 'New label')}
+                          </button>
+                        </div>
+                        {sortedLabels.length === 0 ? (
+                          <ul className="w-full flex flex-col">
+                            <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.labels.empty', 'No labels yet.')}</li>
+                          </ul>
+                        ) : (
+                          <>
+                            <div
+                              ref={labelsListRef}
+                              onScroll={updateLabelsScrollState}
+                              className="max-h-[450px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                            >
+                              <ul className="w-full flex flex-col">
+                                {sortedLabels.map((item) => (
+                                  <li
+                                    key={item.id}
+                                    className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                                  >
+                                    <span className="flex-1 text-left font-medium">{item.sizeLabel || item.name || ''}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        type="button"
+                                        className="p-2 mr-5 rounded text-pos-text active:bg-green-500"
+                                        onClick={() => openEditLabelModal(item)}
+                                        aria-label={tr('control.edit', 'Edit')}
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="p-2 rounded text-pos-text active:text-rose-500"
+                                        onClick={() => setDeleteConfirmLabelId(item.id)}
+                                        aria-label={tr('delete', 'Delete')}
+                                      >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                      </button>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <PaginationArrows
+                              canPrev={canLabelsScrollUp}
+                              canNext={canLabelsScrollDown}
+                              onPrev={() => scrollLabelsByPage('up')}
+                              onNext={() => scrollLabelsByPage('down')}
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {printerTab !== 'General' && printerTab !== 'Final tickets' && printerTab !== 'Production Tickets' && printerTab !== 'Labels' && (
+                    <p className="text-pos-muted text-xl py-4">{tr('control.printerTabPlaceholder', 'Settings for "{tab}" will be available here.').replace('{tab}', printerTab)}</p>
+                  )}
+                </div>
+              )}
+              {subNavId === 'Price Display' && (
+                <div className="flex flex-col min-h-[650px] max-h-[550px] justify-between items-center">
+                  <div className="flex flex-col gap-6 mb-6 pt-[150px]">
+                    <div className="flex items-center gap-10">
+                      <label className="block text-pos-text text-sm font-medium shrink-0">{tr('control.external.type', 'Type:')}</label>
+                      <Dropdown options={mapTranslatedOptions(PRICE_DISPLAY_TYPE_OPTIONS)} value={priceDisplayType} onChange={setPriceDisplayType} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[220px]" />
+                    </div>
+                    <div className="flex justify-center mt-[100px] text-md">
+                      <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingPriceDisplay} onClick={handleSavePriceDisplay}>
+                        <svg fill="currentColor" width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                        {tr('control.save', 'Save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {subNavId === 'RFID Reader' && (
+                <div className="flex flex-col min-h-[650px] max-h-[550px] justify-between items-center">
+                  <div className="flex flex-col gap-6 mb-6 pt-[150px]">
+                    <div className="flex items-center gap-10">
+                      <label className="block text-pos-text text-sm font-medium shrink-0">{tr('control.external.type', 'Type:')}</label>
+                      <Dropdown options={mapTranslatedOptions(RFID_READER_TYPE_OPTIONS)} value={rfidReaderType} onChange={setRfidReaderType} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[220px]" />
+                    </div>
+                    <div className="flex justify-center mt-[100px] text-md">
+                      <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingRfidReader} onClick={handleSaveRfidReader}>
+                        <svg fill="currentColor" width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                        {tr('control.save', 'Save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {subNavId === 'Barcode Scanner' && (
+                <div className="flex flex-col min-h-[650px] max-h-[550px] justify-between items-center">
+                  <div className="flex flex-col gap-6 mb-6 pt-[150px]">
+                    <div className="flex items-center gap-10">
+                      <label className="block text-pos-text text-sm font-medium shrink-0">{tr('control.external.type', 'Type:')}</label>
+                      <Dropdown options={mapTranslatedOptions(BARCODE_SCANNER_TYPE_OPTIONS)} value={barcodeScannerType} onChange={setBarcodeScannerType} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[220px]" />
+                    </div>
+                    <div className="flex justify-center mt-[100px] text-md">
+                      <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingBarcodeScanner} onClick={handleSaveBarcodeScanner}>
+                        <svg fill="currentColor" width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                        {tr('control.save', 'Save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {subNavId === 'Credit Card' && (
+                <div className="flex flex-col min-h-[650px] max-h-[550px] justify-between items-center">
+                  <div className="flex flex-col gap-6 mb-6 pt-[150px]">
+                    <div className="flex items-center gap-10">
+                      <label className="block text-pos-text text-sm font-medium shrink-0">{tr('control.external.type', 'Type:')}</label>
+                      <Dropdown options={mapTranslatedOptions(CREDIT_CARD_TYPE_OPTIONS)} value={creditCardType} onChange={setCreditCardType} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[220px]" />
+                    </div>
+                    <div className="flex justify-center mt-[100px] text-md">
+                      <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingCreditCard} onClick={handleSaveCreditCard}>
+                        <svg fill="currentColor" width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                        {tr('control.save', 'Save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {subNavId === 'Libra' && (
+                <div className="flex flex-col min-h-[550px] max-h-[550px] justify-between items-center">
+                  <div className="flex flex-col gap-6 mb-6 pt-[150px]">
+                    <div className="flex items-center">
+                      <label className="block text-pos-text min-w-[200px] text-sm font-medium shrink-0">{tr('control.external.protocolType', 'Protocol / Type:')}</label>
+                      <Dropdown options={mapTranslatedOptions(SCALE_TYPE_OPTIONS)} value={scaleType} onChange={setScaleType} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[220px]" />
+                    </div>
+                    <div className="flex items-center">
+                      <label className="block text-pos-text min-w-[200px] text-sm font-medium shrink-0">{tr('control.external.port', 'Port:')}</label>
+                      <Dropdown options={SCALE_PORT_OPTIONS} value={scalePort} onChange={setScalePort} placeholder={tr('control.external.selectPort', 'Select port')} className="text-sm min-w-[220px]" />
+                    </div>
+                    <div className="flex justify-center mt-[100px] text-md">
+                      <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingScale} onClick={handleSaveScale}>
+                        <svg fill="currentColor" width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                        {tr('control.save', 'Save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {subNavId === 'Cashmatic' && (
+                <div className="relative min-h-[630px] rounded-xl border border-pos-border bg-pos-panel/30 p-4">
+                  <div className="grid grid-cols-1 mt-10 text-sm md:grid-cols-2 gap-x-10 gap-y-4 mb-6">
+                    <div className="flex items-center gap-2">
+                      <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.name', 'Name *')}</label>
+                      <input
+                        type="text"
+                        value={cashmaticName}
+                        onChange={(e) => setCashmaticName(e.target.value)}
+                        onFocus={() => setCashmaticActiveField('name')}
+                        onClick={() => setCashmaticActiveField('name')}
+                        className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                      />
+                    </div>
+                    <div></div>
+                    <div className="flex items-center gap-2">
+                      <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.connectionType', 'Connection type *')}</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className={`px-6 py-2 text-sm font-medium rounded-lg ${cashmaticConnectionType === 'tcp' ? 'bg-cyan-500 text-white' : 'bg-pos-panel text-pos-text border border-gray-300'} active:bg-green-500`}
+                          onClick={() => setCashmaticConnectionType('tcp')}
+                        >
+                          {tr('control.cashmatic.tcpIp', 'TCP/IP')}
+                        </button>
+                        <button
+                          type="button"
+                          className={`px-6 py-2 text-sm font-medium rounded-lg ${cashmaticConnectionType === 'api' ? 'bg-cyan-500 text-white' : 'bg-pos-panel text-pos-text border border-gray-300'} active:bg-green-500`}
+                          onClick={() => setCashmaticConnectionType('api')}
+                        >
+                          {tr('control.cashmatic.api', 'API')}
+                        </button>
+                      </div>
+                    </div>
+                    <div></div>
+                    {cashmaticConnectionType === 'tcp' ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.ipAddress', 'IP address *')}</label>
+                          <input
+                            type="text"
+                            value={cashmaticIpAddress}
+                            onChange={(e) => setCashmaticIpAddress(e.target.value)}
+                            onFocus={() => setCashmaticActiveField('ip')}
+                            onClick={() => setCashmaticActiveField('ip')}
+                            className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 focus:outline-none focus:border-green-500"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.port', 'Port *')}</label>
+                          <input
+                            type="text"
+                            value={cashmaticPort}
+                            onChange={(e) => setCashmaticPort(e.target.value)}
+                            onFocus={() => setCashmaticActiveField('port')}
+                            onClick={() => setCashmaticActiveField('port')}
+                            className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 focus:outline-none focus:border-green-500"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.username', 'Username')}</label>
+                          <input
+                            type="text"
+                            value={cashmaticUsername}
+                            onChange={(e) => setCashmaticUsername(e.target.value)}
+                            onFocus={() => setCashmaticActiveField('username')}
+                            onClick={() => setCashmaticActiveField('username')}
+                            placeholder={tr('control.cashmatic.optional', 'Optional')}
+                            className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.password', 'Password')}</label>
+                          <input
+                            type="text"
+                            value={cashmaticPassword}
+                            onChange={(e) => setCashmaticPassword(e.target.value)}
+                            onFocus={() => setCashmaticActiveField('password')}
+                            onClick={() => setCashmaticActiveField('password')}
+                            placeholder={tr('control.cashmatic.optional', 'Optional')}
+                            className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <label className="block text-pos-text font-medium min-w-[120px] max-w-[120px] shrink-0">{tr('control.cashmatic.url', 'URL *')}</label>
+                        <input
+                          type="text"
+                          value={cashmaticUrl}
+                          onChange={(e) => setCashmaticUrl(e.target.value)}
+                          onFocus={() => setCashmaticActiveField('url')}
+                          onClick={() => setCashmaticActiveField('url')}
+                          placeholder={tr('control.cashmatic.urlPlaceholder', 'https://api.example.com')}
+                          className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-center pt-5 pb-5">
+                    <button type="button" className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingCashmatic} onClick={handleSaveCashmatic}>
+                      <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                  <div className="absolute shrink-0">
+                    <SmallKeyboardWithNumpad value={cashmaticKeyboardValue} onChange={cashmaticKeyboardOnChange} />
+                  </div>
+                </div>
+              )}
+              {subNavId === 'Payworld' && (
+                <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4">
+                  <div className="flex text-sm  gap-x-10 gap-y-4 mb-6">
+                    <div className="flex flex-col gap-4 pt-[100px] w-full justify-center items-center">
+                      <div className="flex items-center gap-2">
+                        <label className="block text-pos-text font-medium min-w-[100px] max-w-[100px] shrink-0">{tr('control.payworld.name', 'Name *')}</label>
+                        <input
+                          type="text"
+                          value={payworldName}
+                          onChange={(e) => setPayworldName(e.target.value)}
+                          onFocus={() => setPayworldActiveField('name')}
+                          onClick={() => setPayworldActiveField('name')}
+                          className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="block text-pos-text font-medium min-w-[100px] max-w-[100px] shrink-0">{tr('control.payworld.ipAddress', 'IP address *')}</label>
+                        <input
+                          type="text"
+                          value={payworldIpAddress}
+                          onChange={(e) => setPayworldIpAddress(e.target.value)}
+                          onFocus={() => setPayworldActiveField('ip')}
+                          onClick={() => setPayworldActiveField('ip')}
+                          placeholder={tr('control.payworld.ipPlaceholder', 'e.g. 192.168.1.60')}
+                          className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="block text-pos-text font-medium min-w-[100px] max-w-[100px] shrink-0">{tr('control.payworld.port', 'Port *')}</label>
+                        <input
+                          type="text"
+                          value={payworldPort}
+                          onChange={(e) => setPayworldPort(e.target.value)}
+                          onFocus={() => setPayworldActiveField('port')}
+                          onClick={() => setPayworldActiveField('port')}
+                          placeholder={tr('control.payworld.portPlaceholder', '5015')}
+                          className="px-4 w-[200px] py-3 bg-pos-panel h-[40px] border border-gray-300 rounded-lg text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center pt-5 pb-5">
+                    <button type="button" className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingPayworld} onClick={handleSavePayworld}>
+                      <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                  <div className="shrink-0 absolute bottom-0">
+                    <SmallKeyboardWithNumpad value={payworldKeyboardValue} onChange={payworldKeyboardOnChange} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : topNavId === 'tables' ? (() => {
+            return (
+              <div className="relative rounded-xl border border-pos-border bg-pos-panel/30 p-4 min-h-[690px] pb-16">
+                <div className="flex items-center w-full justify-center mb-4">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
+                    disabled={tableLocationsLoading}
+                    onClick={openTableLocationModal}
+                  >
+                    {tr('control.tables.new', 'New table setting')}
+                  </button>
+                </div>
+                <div
+                  ref={tableLocationsListRef}
+                  className="w-full max-h-[560px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  onScroll={updateTableLocationsScrollState}
+                >
+                  <ul className="w-full flex flex-col">
+                    {tableLocationsLoading ? (
+                      <li className="text-pos-muted text-sm py-4 text-center">{tr('control.tables.loading', 'Loading table locations...')}</li>
+                    ) : tableLocations.length === 0 ? (
+                      <li className="text-pos-muted text-sm py-6 text-center">{tr('control.tables.empty', 'No table locations yet.')}</li>
+                    ) : (
+                      tableLocations.map((loc) => {
+                        const hasSavedLayout = (() => {
+                          try {
+                            if (loc?.layoutJson == null || loc.layoutJson === '') return false;
+                            const parsed = JSON.parse(loc.layoutJson);
+                            return Array.isArray(parsed?.tables) && parsed.tables.length > 0;
+                          } catch {
+                            return false;
+                          }
+                        })();
+                        return (
+                          <li
+                            key={loc.id}
+                            className="flex justify-between relative items-center w-full px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                          >
+                            <span className="font-medium">{loc.name}</span>
+                            <div className="flex absolute right-1/2 items-center justify-center">
+                              <button
+                                type="button"
+                                className={`w-full text-center px-3 py-1 rounded-lg text-sm active:bg-green-500 ${hasSavedLayout ? 'text-white' : 'text-pos-muted active:text-pos-text'
+                                  }`}
+                                onClick={() => openSetTablesModal(loc)}
+                              >
+                                {tr('control.tables.setTables', 'Set tables')}
+                              </button>
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                className="p-1 rounded text-pos-text active:bg-green-500"
+                                onClick={() => openEditTableLocationModal(loc)}
+                                aria-label="Edit"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="p-1 rounded text-pos-text active:bg-green-500"
+                                onClick={() => setDeleteConfirmTableLocationId(loc.id)}
+                                aria-label="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                </div>
+                {tableLocations.length > 0 && (
+                  <PaginationArrows
+                    canPrev={canTableLocationsScrollUp}
+                    canNext={canTableLocationsScrollDown}
+                    onPrev={() => scrollTableLocationsByPage('up')}
+                    onNext={() => scrollTableLocationsByPage('down')}
+                  />
+                )}
+              </div>
+            );
+          })() : null}
+        </main>
+      </div>
+
+      <DeleteConfirmModal
+        open={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => handleDeletePriceGroup(deleteConfirmId)}
+        message={tr('control.confirm.deletePriceGroup', 'Are you sure you want to delete this price group?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmCategoryId !== null}
+        onClose={() => setDeleteConfirmCategoryId(null)}
+        onConfirm={() => handleDeleteCategory(deleteConfirmCategoryId)}
+        message={tr('control.confirm.deleteCategory', 'Are you sure you want to delete this category?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmProductId !== null}
+        onClose={() => setDeleteConfirmProductId(null)}
+        onConfirm={() => handleDeleteProduct(deleteConfirmProductId)}
+        message={tr('control.confirm.deleteProduct', 'Are you sure you want to delete this product?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmSubproductId !== null}
+        onClose={() => setDeleteConfirmSubproductId(null)}
+        onConfirm={() => handleDeleteSubproduct(deleteConfirmSubproductId)}
+        message={tr('control.confirm.deleteSubproduct', 'Are you sure you want to delete this subproduct?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmGroupId !== null}
+        onClose={() => setDeleteConfirmGroupId(null)}
+        onConfirm={() => handleDeleteGroup(deleteConfirmGroupId)}
+        message={tr('control.confirm.deleteGroup', 'Are you sure you want to delete this group? Subproducts in it will also be deleted.')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmTableLocationId !== null}
+        onClose={() => setDeleteConfirmTableLocationId(null)}
+        onConfirm={() => handleDeleteTableLocation(deleteConfirmTableLocationId)}
+        message={tr('control.confirm.deleteTableLocation', 'Are you sure you want to delete this table location?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmProductionMessageId !== null}
+        onClose={() => setDeleteConfirmProductionMessageId(null)}
+        onConfirm={() => handleDeleteProductionMessage(deleteConfirmProductionMessageId)}
+        message={tr('control.confirm.deleteProductionMessage', 'Are you sure you want to delete this production message?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmPaymentTypeId !== null}
+        onClose={() => setDeleteConfirmPaymentTypeId(null)}
+        onConfirm={() => handleDeletePaymentType(deleteConfirmPaymentTypeId)}
+        message={tr('control.confirm.deletePaymentType', 'Are you sure you want to delete this payment method?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmPrinterId !== null}
+        onClose={() => setDeleteConfirmPrinterId(null)}
+        onConfirm={() => handleDeletePrinter(deleteConfirmPrinterId)}
+        message={tr('control.confirm.deletePrinter', 'Are you sure you want to delete this printer?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmLabelId !== null}
+        onClose={() => setDeleteConfirmLabelId(null)}
+        onConfirm={() => handleDeleteLabel(deleteConfirmLabelId)}
+        message={tr('control.confirm.deleteLabel', 'Are you sure you want to delete this label?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmUserId !== null}
+        onClose={() => setDeleteConfirmUserId(null)}
+        onConfirm={() => handleDeleteUser(deleteConfirmUserId)}
+        message={tr('control.confirm.deleteUser', 'Are you sure you want to delete this user?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmDiscountId !== null}
+        onClose={() => setDeleteConfirmDiscountId(null)}
+        onConfirm={() => handleDeleteDiscount(deleteConfirmDiscountId)}
+        message={tr('control.confirm.deleteDiscount', 'Are you sure you want to delete this discount?')}
+      />
+      <DeleteConfirmModal
+        open={deleteConfirmKitchenId !== null}
+        onClose={() => setDeleteConfirmKitchenId(null)}
+        onConfirm={() => handleDeleteKitchen(deleteConfirmKitchenId)}
+        message={tr('control.confirm.deleteKitchen', 'Are you sure you want to delete this kitchen?')}
+      />
+
+      {/* New / Edit user modal — General + Privileges tabs, keyboard like other modals */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative bg-pos-bg rounded-xl border border-pos-border shadow-2xl h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeUserModal} aria-label="Close">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex justify-around mt-[20px] shrink-0">
+              <button type="button" className={`px-8 py-4 text-md font-medium border-b-2 transition-colors ${userModalTab === 'general' ? 'border-blue-500 text-blue-500 bg-pos-panel/50' : 'border-transparent text-pos-text active:bg-green-500'}`} onClick={() => setUserModalTab('general')}>{tr('control.userModal.general', 'General')}</button>
+              <button type="button" className={`px-8 py-4 text-md font-medium border-b-2 transition-colors ${userModalTab === 'privileges' ? 'border-blue-500 text-blue-500 bg-pos-panel/50' : 'border-transparent text-pos-text active:bg-green-500'}`} onClick={() => setUserModalTab('privileges')}>{tr('control.userModal.privileges', 'Privileges')}</button>
+            </div>
+            <div className="flex-1 overflow-hidden px-6 py-4">
+              {userModalTab === 'general' ? (
+                <div className="grid grid-cols-2 mx-auto">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center">
+                      <label className="text-pos-text text-sm font-medium shrink-0 min-w-[100px] max-w-[100px]">{tr('control.userModal.name', 'Name')}:</label>
+                      <input
+                        type="text"
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        onFocus={() => setUserModalActiveField('name')}
+                        placeholder=""
+                        className="px-4 py-3 rounded-lg max-w-[150px] bg-pos-panel border border-pos-border text-pos-text placeholder-pos-muted focus:outline-none focus:border-green-500 text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <label className="text-pos-text text-sm font-medium shrink-0 min-w-[100px] max-w-[100px]">{tr('control.userModal.pincode', 'Pincode')}:</label>
+                      <input
+                        type="text"
+                        value={userPin}
+                        onChange={(e) => setUserPin(e.target.value)}
+                        onFocus={() => setUserModalActiveField('pincode')}
+                        placeholder=""
+                        className="px-4 py-3 rounded-lg max-w-[150px] bg-pos-panel border border-pos-border text-pos-text placeholder-pos-muted focus:outline-none focus:border-green-500 text-sm"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <div className="text-pos-text text-sm font-medium mb-2">{tr('control.userModal.privileges', 'Privileges')}</div>
+                    <div className="grid grid-cols-3 gap-4">
+                      {USER_PRIVILEGE_AVATAR_COLORS.map((color, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`w-14 h-14 rounded-full border-4 transition-colors ${userAvatarColorIndex === idx ? 'border-gray-400 ring-2 ring-offset-2 ring-offset-pos-bg ring-gray-300' : 'border-transparent active:opacity-90'} active:bg-green-500`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setUserAvatarColorIndex(idx)}
+                          aria-label={tr('control.userModal.avatarColor', 'Avatar color {n}').replace('{n}', String(idx + 1))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="">
+                  <div className="grid grid-cols-3 gap-x-12 w-full gap-y-5">
+                    {USER_PRIVILEGE_OPTIONS.map((p) => (
+                      <label key={p.id} className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-pos-text min-w-[200px] max-w-[200px]">{tr(`control.userModal.privilege.${p.id}`, p.label)}</span>
+                        <input
+                          type="checkbox"
+                          checked={!!userPrivileges[p.id]}
+                          onChange={(e) => setUserPrivileges((prev) => ({ ...prev, [p.id]: e.target.checked }))}
+                          className="w-10 h-10 rounded border-pos-border bg-pos-panel text-green-600 focus:ring-green-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex justify-center mt-20">
+                    <button type="button" className="flex items-center gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-md" disabled={savingUser} onClick={handleSaveUser}>
+                      <svg fill="currentColor" width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {userModalTab === 'general' && (
+                <div className="flex justify-center mt-14">
+                  <button type="button" className="flex items-center gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-md" disabled={savingUser} onClick={handleSaveUser}>
+                    <svg fill="currentColor" width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                    {tr('control.save', 'Save')}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 w-full flex justify-center">
+              <KeyboardWithNumpad value={userModalKeyboardValue} onChange={userModalKeyboardOnChange} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New / Edit discount modal */}
+      {showDiscountModal && (
+        (() => {
+          const discountTargetOptions = discountOn === 'categories'
+            ? categories
+              .filter((c) => c && c.id != null)
+              .map((c) => ({ value: c.id, label: c.name || `#${c.id}` }))
+            : discountProductOptions;
+          const discountTargetOptionMap = new Map(discountTargetOptions.map((o) => [String(o.value), o.label]));
+          const visibleDiscountTargetOptions = discountTargetOptions.filter((o) => !discountTargetIds.includes(o.value));
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeDiscountModal} aria-label="Close">
+                  <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <div className="flex-1 min-h-0 overflow-auto w-full">
+                  <div className="p-6 pb-0 flex text-sm space-y-3 w-full pt-14">
+                    <div className='flex flex-col w-2/3 gap-3'>
+                      <div className='flex w-full gap-5'>
+                        <div className="flex items-center">
+                          <label className="block font-medium min-w-[100px] text-gray-200">{tr('name', 'Name')} : </label>
+                          <input type="text" value={discountName} onChange={(e) => setDiscountName(e.target.value)} placeholder={tr('control.discounts.modal.discountNamePlaceholder', 'Discount name')} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200 placeholder:text-gray-500" />
+                        </div>
+                        <div className="flex w-full items-center">
+                          <label className="block font-medium text-gray-200 min-w-[100px]">{tr('control.discounts.modal.discountOn', 'Discount on')} : </label>
+                          <Dropdown options={DISCOUNT_ON_OPTIONS.map((opt) => ({ ...opt, label: tr(`control.discounts.on.${opt.value}`, opt.label) }))} value={discountOn} onChange={setDiscountOn} placeholder={tr('control.discounts.on.products', 'Products')} className="text-md min-w-[150px]" />
+                        </div>
+                      </div>
+                      <div className="flex w-full items-center flex-wrap">
+                        <div className="flex items-center">
+                          <label className="block min-w-[100px] font-medium text-gray-200">{tr('control.discounts.modal.trigger', 'Trigger')} : </label>
+                          <Dropdown options={DISCOUNT_TRIGGER_OPTIONS.map((opt) => ({ ...opt, label: tr(`control.discounts.trigger.${opt.value}`, opt.label) }))} value={discountTrigger} onChange={setDiscountTrigger} placeholder={tr('control.discounts.trigger.number', 'Number')} className="text-md min-w-[150px]" />
+                        </div>
+                        <div className="flex gap-5 items-center pl-5">
+                          <input type="text" value={discountPieces} onChange={(e) => setDiscountPieces(e.target.value)} placeholder="" className="px-4 w-[70px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                          <label className="block font-medium text-gray-200">{tr('control.discounts.modal.pieces', 'Piece(s)')}</label>
+                        </div>
+                        <div className="flex items-center gap-3 pl-5">
+                          <div className="flex items-center justify-start">
+                            <input type="checkbox" checked={discountCombinable} onChange={(e) => setDiscountCombinable(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                          </div>
+                          <label className="block items-center font-medium text-gray-200">{tr('control.discounts.modal.combinable', 'Combinable')}</label>
+                        </div>
+                      </div>
+                      <div className="flex w-full items-center flex-wrap">
+                        <div className="flex items-center">
+                          <label className="block min-w-[100px] font-medium text-gray-200">{tr('control.optionButton.discount', 'Discount')} : </label>
+                          <Dropdown options={DISCOUNT_TYPE_OPTIONS.map((opt) => ({ ...opt, label: tr(`control.discounts.type.${opt.value}`, opt.label) }))} value={discountType} onChange={setDiscountType} placeholder={tr('control.discounts.type.amount', 'Amount')} className="text-md min-w-[150px]" />
+                        </div>
+                        <div className="flex items-center pl-5 gap-5">
+                          <input type="text" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} placeholder="0" className="flex-1 px-4 max-w-[70px] h-[40px] py-3 border border-gray-300 rounded-lg bg-pos-panel text-gray-200" />
+                          <span className="text-md text-gray-200 shrink-0">{tr('control.discounts.modal.currency', 'euro')}</span>
+                        </div>
+                      </div>
+                      <div className="flex w-full items-center">
+                        <label className="block min-w-[100px] font-medium text-gray-200">{tr('control.discounts.modal.startDate', 'Starting date')} : </label>
+                        <div className="flex items-center gap-5 w-[150px]">
+                          <input
+                            type="text"
+                            readOnly
+                            value={formatDateForCurrentLanguage(discountStartDate)}
+                            placeholder={tr('control.discounts.modal.datePlaceholder', 'MM/DD/YYYY')}
+                            className="flex-1 px-4 h-[40px] w-[150px] py-3 border border-gray-300 rounded-lg bg-pos-panel text-gray-200 cursor-pointer focus:border-green-500 focus:outline-none"
+                            onClick={() => setDiscountCalendarField('start')}
+                          />
+                          <button type="button" className="p-2 rounded-lg bg-pos-panel border border-gray-300 text-gray-200 active:bg-green-500 shrink-0" onClick={() => setDiscountCalendarField('start')} aria-label={tr('control.discounts.modal.openCalendar', 'Open calendar')}>
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex w-full items-center">
+                        <label className="block min-w-[100px] font-medium text-gray-200 mb-2">{tr('control.discounts.modal.endDate', 'End date')} : </label>
+                        <div className="flex items-center gap-5 w-[150px]">
+                          <input
+                            type="text"
+                            readOnly
+                            value={formatDateForCurrentLanguage(discountEndDate)}
+                            placeholder={tr('control.discounts.modal.datePlaceholder', 'MM/DD/YYYY')}
+                            className="flex-1 px-4 h-[40px] py-3 w-[150px] border border-gray-300 rounded-lg bg-pos-panel text-gray-200 cursor-pointer focus:border-green-500 focus:outline-none"
+                            onClick={() => setDiscountCalendarField('end')}
+                          />
+                          <button type="button" className="p-2 rounded-lg bg-pos-panel border border-gray-300 text-gray-200 active:bg-green-500 shrink-0" onClick={() => setDiscountCalendarField('end')} aria-label={tr('control.discounts.modal.openCalendar', 'Open calendar')}>
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col w-1/3 max-w-md items-center gap-3">
+                      <Dropdown
+                        options={visibleDiscountTargetOptions}
+                        value={discountTargetId}
+                        onChange={(v) => {
+                          if (!v) return;
+                          setDiscountTargetIds((prev) => (prev.includes(v) ? prev : [...prev, v]));
+                          setDiscountTargetId('');
+                        }}
+                        placeholder={discountOn === 'categories' ? tr('control.discounts.on.categories', 'Categories') : tr('control.discounts.on.products', 'Products')}
+                        className="text-md min-w-[150px] w-full"
+                      />
+                      <div
+                        ref={discountTargetListRef}
+                        className="w-full min-h-[220px] max-h-[220px] rounded-lg border border-gray-300 bg-pos-panel/30 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                        onScroll={updateDiscountTargetScrollState}
+                      >
+                        <ul className="p-2">
+                          {discountTargetIds.map((id) => (
+                            <li key={id} className="text-md py-1.5 px-2 flex items-center justify-between gap-2 text-gray-200 active:bg-green-500 rounded">
+                              <span className="truncate">{discountTargetOptionMap.get(String(id)) || String(id)}</span>
+                              <button
+                                type="button"
+                                className="p-1 rounded active:bg-green-500"
+                                onClick={() => setDiscountTargetIds((prev) => prev.filter((x) => x !== id))}
+                                aria-label="Remove"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="flex w-full justify-around gap-2 items-center pt-2">
+                        <button
+                          type="button"
+                          className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300 disabled:opacity-40 disabled:pointer-events-none"
+                          aria-label="Scroll up"
+                          disabled={!canDiscountTargetScrollUp}
+                          onClick={() => scrollDiscountTargetByPage('up')}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300 disabled:opacity-40 disabled:pointer-events-none"
+                          aria-label="Scroll down"
+                          disabled={!canDiscountTargetScrollDown}
+                          onClick={() => scrollDiscountTargetByPage('down')}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-center pb-5 shrink-0">
+                  <button
+                    type="button"
+                    className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                    disabled={savingDiscount}
+                    onClick={handleSaveDiscount}
+                  >
+                    <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                    {tr('control.save', 'Save')}
+                  </button>
+                </div>
+                <div className="shrink-0">
+                  <KeyboardWithNumpad value={discountKeyboardValue} onChange={setDiscountKeyboardValue} />
+                </div>
+                {discountCalendarField && (
+                  <CalendarModal
+                    open
+                    onClose={() => setDiscountCalendarField(null)}
+                    value={discountCalendarField === 'start' ? discountStartDate : discountEndDate}
+                    onChange={(date) => {
+                      const yyyy = date.getFullYear();
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      const iso = `${yyyy}-${mm}-${dd}`;
+                      if (discountCalendarField === 'start') setDiscountStartDate(iso);
+                      else setDiscountEndDate(iso);
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })()
+      )}
+
+      {/* New / Edit table location modal */}
+      {showTableLocationModal && topNavId === 'tables' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeTableLocationModal} aria-label="Close">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-6 flex flex-col space-y-6 w-full justify-center items-center pt-20">
+              <div className="w-full flex flex-col justify-center items-center gap-10">
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[200px] text-md min-w-[100px] font-medium text-gray-200 mb-2">{tr('control.tables.tableName', 'Table Name :')}</label>
+                  <input
+                    type="text"
+                    ref={tableLocationNameInputRef}
+                    value={tableLocationName}
+                    onChange={(e) => setTableLocationName(e.target.value)}
+                    onClick={(e) => {
+                      setTableLocationSelectionStart(e.target.selectionStart ?? 0);
+                      setTableLocationSelectionEnd(e.target.selectionEnd ?? 0);
+                    }}
+                    onKeyUp={(e) => {
+                      setTableLocationSelectionStart(e.target.selectionStart ?? 0);
+                      setTableLocationSelectionEnd(e.target.selectionEnd ?? 0);
+                    }}
+                    onSelect={(e) => {
+                      setTableLocationSelectionStart(e.target.selectionStart ?? 0);
+                      setTableLocationSelectionEnd(e.target.selectionEnd ?? 0);
+                    }}
+                    placeholder={tr('control.tables.tableNamePlaceholder', 'e.g. room 1')}
+                    className="px-4 w-[200px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200 caret-white focus:outline-none focus:border-green-500"
+                  />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[200px] text-md min-w-[100px] font-medium text-gray-200 mb-2">{tr('control.tables.background', 'Background :')}</label>
+                  <Dropdown
+                    options={mapTranslatedOptions(TABLE_LOCATION_BACKGROUND_OPTIONS)}
+                    value={tableLocationBackground}
+                    onChange={setTableLocationBackground}
+                    placeholder={tr('control.tables.backgroundDefault', 'Default')}
+                    className="text-md min-w-[200px]"
+                  />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[200px] text-md min-w-[100px] font-medium text-gray-200 mb-2">{tr('control.tables.textColor', 'Text color :')}</label>
+                  <div className="w-[200px] flex gap-6 items-center justify-start">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="tableLocationTextColor" checked={tableLocationTextColor === 'light'} onChange={() => setTableLocationTextColor('light')} className="w-5 h-5 rounded border-gray-300" />
+                      <span className="text-gray-200 text-md">{tr('control.tables.textColorLight', 'light')}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="tableLocationTextColor" checked={tableLocationTextColor === 'dark'} onChange={() => setTableLocationTextColor('dark')} className="w-5 h-5 rounded border-gray-300" />
+                      <span className="text-gray-200 text-md">{tr('control.tables.textColorDark', 'dark')}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center pt-5 pb-5">
+              <button
+                type="button"
+                className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                disabled={savingTableLocation}
+                onClick={handleSaveTableLocation}
+              >
+                <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" id="save-16px" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                Save
+              </button>
+            </div>
+            <div className="shrink-0">
+              <KeyboardWithNumpad
+                value={tableLocationName}
+                onChange={setTableLocationName}
+                selectionStart={tableLocationSelectionStart}
+                selectionEnd={tableLocationSelectionEnd}
+                onSelectionChange={(start, end) => {
+                  setTableLocationSelectionStart(start);
+                  setTableLocationSelectionEnd(end);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSetTablesModal && topNavId === 'tables' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative bg-pos-bg rounded-xl border border-pos-border shadow-2xl w-full overflow-hidden flex">
+            <button
+              type="button"
+              className="absolute top-4 right-4 z-20 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500"
+              onClick={closeSetTablesModal}
+              aria-label="Close"
+            >
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="w-[250px] shrink-0 border-r border-pos-border bg-black px-6 py-6 overflow-auto text-sm">
+              <h3 className="text-pos-text text-lg font-semibold mb-4">
+                {tr('control.tables.setTables', 'Set tables')} - {setTablesLocationName || 'Restaurant'}
+              </h3>
+
+              <div className="space-y-3 text-pos-text">
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={addSetTable}>
+                    + {tr('control.tables.table', 'table')}
+                  </button>
+                  <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={removeSetTable}>
+                    - {tr('control.tables.table', 'table')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
+                    onClick={handleAddBoard}
+                    disabled={!setTablesSelectedTableId}
+                  >
+                    + {tr('control.tables.board', 'board')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
+                    onClick={handleRemoveBoard}
+                    disabled={!setTablesSelectedTableId || boards.length === 0}
+                  >
+                    - {tr('control.tables.board', 'board')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
+                    onClick={handleAddFlowerPot}
+                    disabled={!setTablesSelectedTableId}
+                  >
+                    + flower pot
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
+                    onClick={handleRemoveFlowerPot}
+                    disabled={!setTablesSelectedTableId || flowerPots.length === 0}
+                  >
+                    - flower pot
+                  </button>
+                </div>
+                <div className="h-px bg-pos-border my-2" />
+
+                {!selectedSetBoard && !selectedSetFlowerPot ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('name', 'Name')}</span>
+                      <input
+                        type="text"
+                        value={selectedSetTable?.name || ''}
+                        onChange={(e) => updateSelectedSetTable({ name: e.target.value })}
+                        className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                      />
+                    </div>
+
+                    {[
+                      { key: 'x', label: 'x' },
+                      { key: 'y', label: 'y' },
+                      { key: 'width', label: tr('control.tables.width', 'Width') },
+                      ...(!selectedSetTable?.round ? [{ key: 'height', label: tr('control.tables.height', 'Height') }] : [])
+                    ].map((field) => (
+                      <div key={field.key} className="flex items-center gap-3">
+                        <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
+                        <input
+                          type="number"
+                          value={selectedSetTable ? selectedSetTable[field.key] : 0}
+                          onChange={(e) => {
+                            const nextVal = Number(e.target.value);
+                            const safe = Number.isFinite(nextVal) ? nextVal : 0;
+                            if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, safe) });
+                            else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, safe) });
+                            else updateSelectedSetTable({ [field.key]: safe });
+                          }}
+                          className="min-w-[50px] max-w-[50px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                        />
+                        <button
+                          type="button"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          onClick={() => {
+                            const current = Number(selectedSetTable?.[field.key]) || 0;
+                            const nextVal = current - 10;
+                            if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, nextVal) });
+                            else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, nextVal) });
+                            else updateSelectedSetTable({ [field.key]: nextVal });
+                          }}
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          onClick={() => {
+                            const current = Number(selectedSetTable?.[field.key]) || 0;
+                            const nextVal = current + 10;
+                            if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, nextVal) });
+                            else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, nextVal) });
+                            else updateSelectedSetTable({ [field.key]: nextVal });
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="flex items-center gap-3 w-full justify-between">
+                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={360}
+                        value={selectedSetTable?.rotation ?? 0}
+                        onChange={(e) => updateSelectedSetTable({ rotation: Number(e.target.value) || 0 })}
+                        className="flex-1 max-w-[85px]"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={360}
+                        value={selectedSetTable?.rotation ?? 0}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
+                          updateSelectedSetTable({ rotation: clamped });
+                        }}
+                        className="min-w-[40px] max-w-[80px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
+                      />
+                    </div>
+
+                    <label className="flex items-center gap-3">
+                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.round', 'Round')}</span>
+                      <input
+                        type="checkbox"
+                        checked={!!selectedSetTable?.round}
+                        onChange={(e) => updateSelectedSetTable({ round: e.target.checked })}
+                        className="w-7 h-7"
+                      />
+                    </label>
+
+                    <div className="h-px bg-pos-border my-2" />
+                  </>
+                ) : null}
+
+                {selectedSetBoard ? (
+                  <div className="space-y-2 pt-1">
+                    {[
+                      { key: 'x', label: 'board x' },
+                      { key: 'y', label: 'board y' },
+                      { key: 'width', label: tr('control.tables.width', 'Width') },
+                      { key: 'height', label: tr('control.tables.height', 'Height') }
+                    ].map((field) => (
+                      <div key={`board-${field.key}`} className="flex items-center gap-3">
+                        <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
+                        <input
+                          type="number"
+                          value={selectedSetBoard[field.key]}
+                          onChange={(e) => {
+                            const nextVal = Number(e.target.value);
+                            const safe = Number.isFinite(nextVal) ? nextVal : 0;
+                            if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, safe) });
+                            else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, safe) });
+                            else updateSelectedSetBoard({ [field.key]: safe });
+                          }}
+                          className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                        />
+                        <button
+                          type="button"
+                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          onClick={() => {
+                            const current = Number(selectedSetBoard[field.key]) || 0;
+                            const nextVal = current - 10;
+                            if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, nextVal) });
+                            else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, nextVal) });
+                            else updateSelectedSetBoard({ [field.key]: nextVal });
+                          }}
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          onClick={() => {
+                            const current = Number(selectedSetBoard[field.key]) || 0;
+                            const nextVal = current + 10;
+                            if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, nextVal) });
+                            else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, nextVal) });
+                            else updateSelectedSetBoard({ [field.key]: nextVal });
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-3">
+                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={360}
+                        value={selectedSetBoard.rotation ?? 0}
+                        onChange={(e) => updateSelectedSetBoard({ rotation: Number(e.target.value) || 0 })}
+                        className="flex-1"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={360}
+                        value={selectedSetBoard.rotation ?? 0}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
+                          updateSelectedSetBoard({ rotation: clamped });
+                        }}
+                        className="min-w-[40px] max-w-[80px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedSetFlowerPot ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="text-pos-text font-medium">{tr('control.tables.flowerPot', 'Flower pot')}</div>
+                    {[
+                      { key: 'x', label: 'flower pot x' },
+                      { key: 'y', label: 'flower pot y' },
+                      { key: 'width', label: tr('control.tables.width', 'Width') },
+                      { key: 'height', label: tr('control.tables.height', 'Height') }
+                    ].map((field) => (
+                      <div key={`flowerpot-${field.key}`} className="flex items-center gap-3">
+                        <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
+                        <input
+                          type="number"
+                          value={selectedSetFlowerPot[field.key]}
+                          onChange={(e) => {
+                            const nextVal = Number(e.target.value);
+                            const safe = Number.isFinite(nextVal) ? nextVal : 0;
+                            if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, safe) });
+                            else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, safe) });
+                            else updateSelectedSetFlowerPot({ [field.key]: safe });
+                          }}
+                          className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                        />
+                        <button
+                          type="button"
+                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          onClick={() => {
+                            const current = Number(selectedSetFlowerPot[field.key]) || 0;
+                            const nextVal = current - 10;
+                            if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, nextVal) });
+                            else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, nextVal) });
+                            else updateSelectedSetFlowerPot({ [field.key]: nextVal });
+                          }}
+                        >
+                          -
+                        </button>
+                        <button
+                          type="button"
+                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          onClick={() => {
+                            const current = Number(selectedSetFlowerPot[field.key]) || 0;
+                            const nextVal = current + 10;
+                            if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, nextVal) });
+                            else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, nextVal) });
+                            else updateSelectedSetFlowerPot({ [field.key]: nextVal });
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-3">
+                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={360}
+                        value={selectedSetFlowerPot.rotation ?? 0}
+                        onChange={(e) => updateSelectedSetFlowerPot({ rotation: Number(e.target.value) || 0 })}
+                        className="flex-1"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={360}
+                        value={selectedSetFlowerPot.rotation ?? 0}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
+                          updateSelectedSetFlowerPot({ rotation: clamped });
+                        }}
+                        className="min-w-[40px] max-w-[80px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="pt-3 flex gap-3 w-full justify-center">
+                  <button
+                    type="button"
+                    className="px-5 py-2 rounded-lg bg-green-600 text-white active:bg-green-500 text-sm"
+                    onClick={saveSetTablesLayout}
+                  >
+                    {tr('control.save', 'Save')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-5 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm"
+                    onClick={closeSetTablesModal}
+                  >
+                    {tr('cancel', 'Cancel')}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0 bg-[#1f2b36] p-6">
+              <div ref={setTablesCanvasRef} className="w-full h-full rounded-lg border border-pos-border bg-[#2f3e50] relative overflow-auto">
+                <div
+                  style={{
+                    transform: `scale(${setTablesCanvasZoom / 100})`,
+                    transformOrigin: '0 0',
+                    width: `${setTablesDraft.floorWidth ?? 979}px`,
+                    height: `${setTablesDraft.floorHeight ?? 595.5}px`,
+                    minWidth: `${setTablesDraft.floorWidth ?? 979}px`,
+                    minHeight: `${setTablesDraft.floorHeight ?? 595.5}px`
+                  }}
+                  className="relative"
+                >
+                {setTablesDraft.tables.map((table) => {
+                  const template = TABLE_TEMPLATE_OPTIONS.find((item) => item.id === table.templateType) || null;
+                  const sizeStyle = table.round
+                    ? { width: `${Math.max(70, table.width)}px`, height: `${Math.max(70, table.width)}px` }
+                    : { width: `${table.width}px`, height: `${table.height}px` };
+                  return (
+                    <button
+                      key={table.id}
+                      type="button"
+                      className={`absolute flex items-center justify-center font-semibold border-2 text-white transition-colors overflow-hidden ${table.round
+                        ? 'rounded-full border-transparent bg-transparent'
+                        : 'rounded-md border-transparent bg-transparent'
+                        } ${setTablesSelectedTableId === table.id && selectedSetBoardIndex == null && selectedSetFlowerPotIndex == null ? 'ring-4 ring-yellow-400' : ''} ${setTablesDraggingId === table.id ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
+                      style={{
+                        left: `${Math.max(0, table.x)}px`,
+                        top: `${Math.max(0, table.y)}px`,
+                        transform: `rotate(${table.rotation || 0}deg)`,
+                        zIndex: 20,
+                        ...sizeStyle
+                      }}
+                      onClick={() => {
+                        setSetTablesSelectedTableId(table.id);
+                        setSetTablesSelectedBoardIndex(null);
+                        setSetTablesSelectedFlowerPotIndex(null);
+                      }}
+                      onMouseDown={(event) => startSetTableDrag(event, table)}
+                    >
+                      {template ? (
+                        <img src={template.src} alt={table.name} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+                      ) : null}
+                      <span className="relative z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]">{table.name}</span>
+                    </button>
+                  );
+                })}
+                {setTablesDraft.tables.flatMap((table) =>
+                  (Array.isArray(table.boards) ? table.boards : []).map((board, idx) => {
+                    const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedBoardIndex === idx;
+                    const isDraggingBoard = setTablesDraggingId === table.id && setTablesDraggingType === 'board' && setTablesDragRef.current?.boardIndex === idx;
+                    return (
+                      <button
+                        key={board.id || `board-${table.id}-${idx}`}
+                        type="button"
+                        className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} ${isDraggingBoard ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
+                        style={{
+                          left: `${Math.max(0, Number(board.x) || 0)}px`,
+                          top: `${Math.max(0, Number(board.y) || 0)}px`,
+                          width: `${Math.max(10, Number(board.width) || 10)}px`,
+                          height: `${Math.max(10, Number(board.height) || 10)}px`,
+                          transform: `rotate(${Number(board.rotation) || 0}deg)`,
+                          zIndex: 10,
+                          backgroundColor: board.color || '#facc15',
+                          opacity: 0.55
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSetTablesSelectedTableId(table.id);
+                          setSetTablesSelectedBoardIndex(idx);
+                          setSetTablesSelectedFlowerPotIndex(null);
+                        }}
+                        onMouseDown={(event) => startSetBoardDrag(event, table, idx)}
+                      />
+                    );
+                  })
+                )}
+                {setTablesDraft.tables.flatMap((table) =>
+                  (Array.isArray(table.flowerPots) ? table.flowerPots : []).map((fp, idx) => {
+                    const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedFlowerPotIndex === idx;
+                    const isDragging = setTablesDraggingId === table.id && setTablesDraggingType === 'flowerPot' && setTablesDragRef.current?.flowerPotIndex === idx;
+                    return (
+                      <button
+                        key={fp.id || `flowerpot-${table.id}-${idx}`}
+                        type="button"
+                        className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
+                        style={{
+                          left: `${Math.max(0, Number(fp.x) || 0)}px`,
+                          top: `${Math.max(0, Number(fp.y) || 0)}px`,
+                          width: `${Math.max(10, Number(fp.width) || 10)}px`,
+                          height: `${Math.max(10, Number(fp.height) || 10)}px`,
+                          transform: `rotate(${Number(fp.rotation) || 0}deg)`,
+                          zIndex: 15
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSetTablesSelectedTableId(table.id);
+                          setSetTablesSelectedBoardIndex(null);
+                          setSetTablesSelectedFlowerPotIndex(idx);
+                        }}
+                        onMouseDown={(event) => startSetFlowerPotDrag(event, table, idx)}
+                      >
+                        <img src="/flowerpot.svg" alt="Flower pot" className="w-full h-full object-contain pointer-events-none" />
+                      </button>
+                    );
+                  })
+                )}
+                </div>
+                <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-pos-border bg-pos-panel p-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
+                    onClick={() => setSetTablesCanvasZoom((z) => Math.max(SET_TABLES_ZOOM_MIN, z - SET_TABLES_ZOOM_STEP))}
+                    aria-label="Zoom out"
+                  >
+                    −
+                  </button>
+                  <span className="min-w-[3ch] text-center text-sm text-pos-text px-1">{setTablesCanvasZoom}%</span>
+                  <button
+                    type="button"
+                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
+                    onClick={() => setSetTablesCanvasZoom((z) => Math.min(SET_TABLES_ZOOM_MAX, z + SET_TABLES_ZOOM_STEP))}
+                    aria-label="Zoom in"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSetTableTypeModal && showSetTablesModal && topNavId === 'tables' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-pos-bg rounded-xl border border-pos-border shadow-2xl max-w-[900px] w-full p-6 text-sm">
+            <div className="grid grid-cols-3 gap-4">
+              {TABLE_TEMPLATE_OPTIONS.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="rounded-xl border border-pos-border bg-pos-panel active:bg-green-500 p-5 flex flex-col items-center gap-4"
+                  onClick={() => addSetTableWithTemplate(template.id)}
+                >
+                  <img src={template.src} alt={template.id} className="w-[170px] h-[170px] object-contain" />
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-center mt-6">
+              <button
+                type="button"
+                className="px-6 py-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm"
+                onClick={() => setShowSetTableTypeModal(false)}
+              >
+                {tr('cancel', 'Cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSetBoardColorModal && showSetTablesModal && topNavId === 'tables' && (
+        <div className="fixed inset-0 z-[61] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-pos-bg rounded-xl border border-pos-border shadow-2xl max-w-[640px] w-full p-6 text-sm">
+            <h3 className="text-pos-text text-lg font-semibold text-center mb-6">
+              {tr('control.tables.chooseBoardColor', 'Choose board color')}
+            </h3>
+            <div className="grid grid-cols-3 gap-4">
+              {TABLE_BOARD_COLOR_OPTIONS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className="h-16 rounded-lg border-2 border-pos-border active:bg-green-500"
+                  style={{ backgroundColor: color }}
+                  onClick={() => handleSelectBoardColor(color)}
+                  aria-label={`Board color ${color}`}
+                />
+              ))}
+            </div>
+            <div className="flex justify-center mt-6 gap-3">
+              <button
+                type="button"
+                className="px-6 py-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm"
+                onClick={() => setShowSetBoardColorModal(false)}
+              >
+                {tr('cancel', 'Cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device Settings modal */}
+      {showDeviceSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative text-sm bg-pos-bg rounded-xl shadow-2xl max-w-[1430px] h-[1000px] w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={() => setShowDeviceSettingsModal(false)} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex mt-16 mb-4 px-6 w-full justify-around text-sm shrink-0 overflow-x-auto">
+              {DEVICE_SETTINGS_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`px-4 py-2 font-medium whitespace-nowrap border-b-2 transition-colors ${deviceSettingsTab === tab ? 'border-blue-500 text-pos-text' : 'border-transparent text-pos-muted active:text-pos-text'} active:bg-green-500`}
+                  onClick={() => {
+                    setDeviceSettingsTab(tab);
+                    setSelectedOptionButtonPoolItemId(null);
+                    setSelectedFunctionButtonPoolItemId(null);
+                  }}
+                >
+                  {tr(DEVICE_SETTINGS_TAB_LABEL_KEYS[tab], tab)}
+                </button>
+              ))}
+            </div>
+            <div className="p-4 overflow-auto flex-1">
+              {deviceSettingsTab === 'General' && (
+                <div className="grid grid-cols-1 text-sm md:grid-cols-2 gap-x-10 gap-y-4">
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.general.useSubproducts', 'Use of subproducts:')}</span>
+                      <input type="checkbox" checked={deviceUseSubproducts} onChange={(e) => setDeviceUseSubproducts(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.general.autoLogoutAfterTransaction', 'Automatically log out after transaction:')}</span>
+                      <input type="checkbox" checked={deviceAutoLogoutAfterTransaction} onChange={(e) => setDeviceAutoLogoutAfterTransaction(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.general.autoReturnToTablePlan', 'Automatically return to table plan:')}</span>
+                      <input type="checkbox" checked={deviceAutoReturnToTablePlan} onChange={(e) => setDeviceAutoReturnToTablePlan(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.general.disableCashButton', 'Disable cash button in payment popup:')}</span>
+                      <input type="checkbox" checked={deviceDisableCashButtonInPayment} onChange={(e) => setDeviceDisableCashButtonInPayment(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.general.openPriceWithoutPopup', 'Open price without popup and without comma:')}</span>
+                      <input type="checkbox" checked={deviceOpenPriceWithoutPopup} onChange={(e) => setDeviceOpenPriceWithoutPopup(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.general.openCashDrawerAfterOrder', 'Open cash drawer after order:')}</span>
+                      <input type="checkbox" checked={deviceOpenCashDrawerAfterOrder} onChange={(e) => setDeviceOpenCashDrawerAfterOrder(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.general.autoReturnToCounterSale', 'Automatically return to counter sale:')}</span>
+                      <input type="checkbox" checked={deviceAutoReturnToCounterSale} onChange={(e) => setDeviceAutoReturnToCounterSale(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.general.askSendToKitchen', 'Ask to send to the kitchen screen:')}</span>
+                      <input type="checkbox" checked={deviceAskSendToKitchen} onChange={(e) => setDeviceAskSendToKitchen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.general.counterSaleVat', 'Counter sale VAT:')}</span>
+                      <Dropdown options={mapTranslatedOptions(VAT_OPTIONS)} value={deviceCounterSaleVat} onChange={setDeviceCounterSaleVat} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.general.tableSaleVat', 'Table sale VAT:')}</span>
+                      <Dropdown options={mapTranslatedOptions(VAT_OPTIONS)} value={deviceTableSaleVat} onChange={setDeviceTableSaleVat} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.general.timeoutLogout', 'Timeout log out:')}</span>
+                      <div className="flex items-center gap-2">
+                        <button type="button" className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm font-medium" onClick={() => setDeviceTimeoutLogout((n) => Math.max(0, n - 1))}>−</button>
+                        <input type="number" min={0} value={deviceTimeoutLogout} onChange={(e) => setDeviceTimeoutLogout(Number(e.target.value) || 0)} className="w-16 px-2 py-2 bg-pos-panel border border-gray-300 rounded text-pos-text text-sm text-center h-[40px]" />
+                        <button type="button" className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm font-medium" onClick={() => setDeviceTimeoutLogout((n) => n + 1)}>+</button>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.general.fixedBorder', 'Fixed edge: (Windows)')}</span>
+                      <input type="checkbox" checked={deviceFixedBorder} onChange={(e) => setDeviceFixedBorder(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.general.alwaysOnTop', 'Always in the foreground: (Windows)')}</span>
+                      <input type="checkbox" checked={deviceAlwaysOnTop} onChange={(e) => setDeviceAlwaysOnTop(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-3 cursor-pointer shrink-0">
+                        <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.general.askInvoiceOrTicket', 'Ask a question about an invoice or ticket')}</span>
+                        <input type="checkbox" checked={deviceAskInvoiceOrTicket} onChange={(e) => setDeviceAskInvoiceOrTicket(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                      </label>
+                      <Dropdown options={[{ value: '-', label: '-' }]} value="-" onChange={() => { }} placeholder="-" className="text-sm min-w-[120px] opacity-60 pointer-events-none" disabled />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {deviceSettingsTab === 'Printer' && (
+                <div className="grid grid-cols-1 text-sm md:grid-cols-2 gap-x-10 gap-y-4">
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.printer.groupingProducts', 'Grouping products on the ticket:')}</span>
+                      <input type="checkbox" checked={devicePrinterGroupingProducts} onChange={(e) => setDevicePrinterGroupingProducts(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.printer.displayErrorScreen', 'Display error screen on printer error:')}</span>
+                      <input type="checkbox" checked={devicePrinterShowErrorScreen} onChange={(e) => setDevicePrinterShowErrorScreen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.device.printer.printProductionOnVat', 'Print production message on VAT ticket:')}</span>
+                      <input type="checkbox" checked={devicePrinterProductionMessageOnVat} onChange={(e) => setDevicePrinterProductionMessageOnVat(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.printer.nextCourseOrder', 'Next course order:')}</span>
+                      <Dropdown options={mapTranslatedOptions(PRINTING_ORDER_OPTIONS)} value={devicePrinterNextCourseOrder} onChange={setDevicePrinterNextCourseOrder} placeholder={tr('control.external.asRegistered', 'As Registered')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.printer.standardModeTicket', 'Standard mode ticket printing:')}</span>
+                      <Dropdown options={mapTranslatedOptions(GROUPING_RECEIPT_OPTIONS)} value={devicePrinterStandardMode} onChange={setDevicePrinterStandardMode} placeholder={tr('control.external.enable', 'Enable')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.printer.qrOrderPrinter', 'QR order printer:')}</span>
+                      <Dropdown
+                        options={[{ value: '', label: tr('control.external.disabled', 'Disabled') }, ...printers.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((p) => ({ value: p.id, label: p.name }))]}
+                        value={devicePrinterQROrderPrinter}
+                        onChange={setDevicePrinterQROrderPrinter}
+                        placeholder={tr('control.external.selectPrinter', 'Select printer')}
+                        className="text-sm min-w-[150px] max-w-[150px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-8">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text  min-w-[300px] max-w-[300px]">{tr('control.device.printer.reprintWithNextCourse', 'Reprint products with next course:')}</span>
+                      <input type="checkbox" checked={devicePrinterReprintWithNextCourse} onChange={(e) => setDevicePrinterReprintWithNextCourse(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text  min-w-[300px] max-w-[300px]">{tr('control.device.printer.printZeroTickets', 'Print 0 euro tickets:')}</span>
+                      <input type="checkbox" checked={devicePrinterPrintZeroTickets} onChange={(e) => setDevicePrinterPrintZeroTickets(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text  min-w-[300px] max-w-[300px]">{tr('control.device.printer.printGiftVoucherAtMin', 'Print gift voucher at minimum amount:')}</span>
+                      <input type="checkbox" checked={devicePrinterGiftVoucherAtMin} onChange={(e) => setDevicePrinterGiftVoucherAtMin(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                  </div>
+                </div>
+              )}
+              {deviceSettingsTab === 'Category display' && (
+                <div className="grid grid-cols-1 text-sm px-4 md:grid-cols-3 lg:grid-cols-4 gap-x-10 gap-4">
+                  {categoriesLoading ? (
+                    <p className="text-pos-muted text-xl col-span-full">{tr('control.device.category.loading', 'Loading categories…')}</p>
+                  ) : (
+                    categories.map((cat) => {
+                      const isChecked = deviceCategoryDisplayIds.length === 0 || deviceCategoryDisplayIds.includes(cat.id);
+                      return (
+                        <label key={cat.id} className="flex items-center gap-5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setDeviceCategoryDisplayIds((prev) => {
+                                const allIds = categories.map((c) => c.id);
+                                if (prev.length === 0) return allIds.filter((id) => id !== cat.id);
+                                if (prev.includes(cat.id)) return prev.filter((id) => id !== cat.id);
+                                return [...prev, cat.id];
+                              });
+                            }}
+                            className="w-5 h-5 rounded border-gray-300"
+                          />
+                          <span className="text-pos-text  min-w-[150px] max-w-[150px] truncate">{cat.name || cat.id}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+              {deviceSettingsTab === 'Orders in waiting' && (
+                <div className="grid px-4 grid-cols-1 text-sm md:grid-cols-2 gap-x-10 gap-y-4">
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[300px] max-w-[300px]">{tr('control.device.orders.confirmOnHold', 'Confirm on hold orders:')}</span>
+                      <input type="checkbox" checked={deviceOrdersConfirmOnHold} onChange={(e) => setDeviceOrdersConfirmOnHold(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[300px] max-w-[300px]">{tr('control.device.orders.printBarcodeAfterCreate', 'Print barcode ticket after order creation:')}</span>
+                      <input type="checkbox" checked={deviceOrdersPrintBarcodeAfterCreate} onChange={(e) => setDeviceOrdersPrintBarcodeAfterCreate(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[330px] max-w-[330px] shrink-0">{tr('control.device.orders.customerCanBeModified', 'Customer on hold order can be modified:')}</span>
+                      <input type="checkbox" checked={deviceOrdersCustomerCanBeModified} onChange={(e) => setDeviceOrdersCustomerCanBeModified(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[330px] max-w-[330px]">{tr('control.device.orders.bookTableToWaiting', 'Book table to waiting order:')}</span>
+                      <input type="checkbox" checked={deviceOrdersBookTableToWaiting} onChange={(e) => setDeviceOrdersBookTableToWaiting(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[330px] max-w-[330px]">{tr('control.device.orders.fastCustomerName', 'Fast customer name on hold orders:')}</span>
+                      <input type="checkbox" checked={deviceOrdersFastCustomerName} onChange={(e) => setDeviceOrdersFastCustomerName(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                  </div>
+                </div>
+              )}
+              {deviceSettingsTab === 'Scheduled orders' && (
+                <div className="grid grid-cols-1 text-sm md:grid-cols-2 px-4 gap-x-10 gap-y-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-5">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.printer', 'Scheduled orders printer:')}</span>
+                      <Dropdown
+                        options={[{ value: '', label: tr('control.external.disabled', 'Disabled') }, ...printers.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((p) => ({ value: p.id, label: p.name }))]}
+                        value={deviceScheduledPrinter}
+                        onChange={setDeviceScheduledPrinter}
+                        placeholder={tr('control.external.selectPrinter', 'Select printer')}
+                        className="text-sm min-w-[150px] max-w-[150px]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.productionFlow', 'Scheduled orders production ticket flow:')}</span>
+                      <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_PRODUCTION_FLOW_OPTIONS)} value={deviceScheduledProductionFlow} onChange={setDeviceScheduledProductionFlow} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.loading', 'Scheduled orders loading:')}</span>
+                      <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_LOADING_OPTIONS)} value={deviceScheduledLoading} onChange={setDeviceScheduledLoading} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.mode', 'Scheduled order mode:')}</span>
+                      <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_MODE_OPTIONS)} value={deviceScheduledMode} onChange={setDeviceScheduledMode} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.invoiceLayout', 'Scheduled order invoice layout:')}</span>
+                      <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_INVOICE_LAYOUT_OPTIONS)} value={deviceScheduledInvoiceLayout} onChange={setDeviceScheduledInvoiceLayout} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-5">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.checkoutAt', 'Scheduled order checkout at:')}</span>
+                        <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS)} value={deviceScheduledCheckoutAt} onChange={setDeviceScheduledCheckoutAt} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px] shrink-0">{tr('control.device.scheduled.printLabel', 'Print barcode label:')}</span>
+                      <input type="checkbox" checked={deviceScheduledPrintBarcodeLabel} onChange={(e) => setDeviceScheduledPrintBarcodeLabel(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.scheduled.deliveryNoteToTurnover', 'Add delivery note to turnover when printing:')}</span>
+                      <input type="checkbox" checked={deviceScheduledDeliveryNoteToTurnover} onChange={(e) => setDeviceScheduledDeliveryNoteToTurnover(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.scheduled.printProductionReceipt', 'When new planning order print production receipt:')}</span>
+                      <input type="checkbox" checked={deviceScheduledPrintProductionReceipt} onChange={(e) => setDeviceScheduledPrintProductionReceipt(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.scheduled.printCustomerProductionReceipt', 'When new planning order print customer production receipt:')}</span>
+                      <input type="checkbox" checked={deviceScheduledPrintCustomerProductionReceipt} onChange={(e) => setDeviceScheduledPrintCustomerProductionReceipt(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[350px] max-w-[350px]">{tr('control.device.scheduled.webOrderAutoPrint', 'Automatically print scheduled web order production slip:')}</span>
+                      <input type="checkbox" checked={deviceScheduledWebOrderAutoPrint} onChange={(e) => setDeviceScheduledWebOrderAutoPrint(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                  </div>
+                </div>
+              )}
+              {deviceSettingsTab === 'Option buttons' && (
+                <div className="px-4 py-2">
+                  <div className="mx-auto max-w-[1000px] flex gap-8">
+                    <div className="flex-1 border border-[#aeb3bf] bg-[#d7d8de] px-3 py-5">
+                      <div className="grid grid-cols-7 gap-3">
+                        {Array.from({ length: OPTION_BUTTON_SLOT_COUNT }).map((_, slotIndex) => {
+                          const assignedId = optionButtonSlots[slotIndex];
+                          const assignedLabel = getOptionButtonLabel(assignedId);
+                          const isSelected = selectedOptionButtonSlotIndex === slotIndex;
+                          return (
+                            <button
+                              key={`option-slot-${slotIndex}`}
+                              type="button"
+                              draggable={!!assignedId && assignedId !== OPTION_BUTTON_LOCKED_ID}
+                              onDragStart={(event) => handleOptionButtonDragStartFromSlot(event, slotIndex)}
+                              onClick={() => handleOptionButtonSlotClick(slotIndex)}
+                              onDragOver={(event) => event.preventDefault()}
+                              onDrop={(event) => handleOptionButtonDropOnSlot(event, slotIndex)}
+                              className={`h-[74px] max-w-[70px] min-w-[70px] border px-2 text-center text-[12px] leading-[1.2] whitespace-pre-line transition-colors ${assignedId ? 'bg-[#b7b9c2] text-[#31353d]' : 'bg-[#dde0e7] text-transparent'
+                                } ${isSelected ? 'border-blue-500' : 'border-[#bcc0ca]'} active:brightness-95`}
+                            >
+                              {assignedLabel || ' '}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-10 text-center">
+                        <button
+                          type="button"
+                          onClick={handleRemoveOptionButtonFromSlot}
+                          disabled={!hasSelectedRemovableOptionButton}
+                          className={`text-[20px] ${hasSelectedRemovableOptionButton
+                            ? 'text-[#858d99] active:text-[#5c6370]'
+                            : 'text-[#9ca3af] opacity-60 cursor-not-allowed'
+                            } active:bg-green-500`}
+                        >
+                          {tr('control.optionButtons.removeFromPlace', 'Remove from place')}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="w-[380px] border border-[#aeb3bf] bg-[#d7d8de] px-6 py-5 flex flex-col">
+                      <div className="flex-1 overflow-auto space-y-4 text-center">
+                        {unassignedOptionButtons.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            draggable
+                            onDragStart={(event) => handleOptionButtonDragStart(event, item.id)}
+                            onClick={() => {
+                              setSelectedOptionButtonPoolItemId(item.id);
+                              setSelectedOptionButtonSlotIndex(null);
+                            }}
+                            className={`w-full text-[14px] min-w-[250px] leading-[1.15] whitespace-pre-line text-[#4a505c] active:text-[#2e333c] cursor-grab active:cursor-grabbing ${selectedOptionButtonPoolItemId === item.id ? 'text-rose-500' : ''}`}
+                          >
+                            {tr(item.labelKey, item.fallbackLabel)}
+                          </button>
+                        ))}
+                        {unassignedOptionButtons.length === 0 ? (
+                          <div className="text-[20px] text-[#8a919e]">-</div>
+                        ) : null}
+                      </div>
+                      <div className="pt-4 flex items-center justify-around text-[18px] text-[#596170]">
+                        <span aria-hidden>↑</span>
+                        <span aria-hidden>↓</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {deviceSettingsTab === 'Function buttons' && (
+                <div className="px-8 py-2">
+                  <div className="mx-auto rounded-sm bg-[#7f7f84] p-3">
+                    <div className="grid grid-cols-4 gap-6">
+                      {Array.from({ length: FUNCTION_BUTTON_SLOT_COUNT }).map((_, slotIndex) => {
+                        const assignedId = functionButtonSlots[slotIndex];
+                        const assignedLabel = getFunctionButtonLabel(assignedId);
+                        const isSelected = selectedFunctionButtonSlotIndex === slotIndex;
+                        return (
+                          <button
+                            key={`function-slot-${slotIndex}`}
+                            type="button"
+                            onClick={() => handleFunctionButtonSlotClick(slotIndex)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => handleFunctionButtonDropOnSlot(event, slotIndex)}
+                            className={`h-[40px] border bg-transparent text-md text-white transition-colors ${isSelected ? 'border-blue-400' : 'border-[#a8a8ad]'
+                              } active:bg-green-500`}
+                          >
+                            {assignedLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="mx-auto mt-5 max-w-[1030px] border border-[#9d9da3] bg-transparent py-3">
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={handleRemoveFunctionButtonFromSlot}
+                        disabled={!hasSelectedFunctionButton}
+                        className={`text-xl ${hasSelectedFunctionButton
+                          ? 'text-[#8e959d] active:text-[#b2b8be]'
+                          : 'text-[#646d76] opacity-50 cursor-not-allowed'
+                          } active:bg-green-500`}
+                      >
+                        {tr('control.functionButtons.removeFromPlace', 'Remove from place')}
+                      </button>
+                    </div>
+                    <div className="mt-4 space-y-5 text-center flex flex-col">
+                      {FUNCTION_BUTTON_ITEMS.filter((item) => !assignedFunctionButtonIds.has(item.id)).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          draggable
+                          onDragStart={(event) => handleFunctionButtonDragStart(event, item.id)}
+                          onClick={() => {
+                            setSelectedFunctionButtonPoolItemId(item.id);
+                            setSelectedFunctionButtonSlotIndex(null);
+                          }}
+                          className={`text-xl text-gray active:text-[#4b5d68] cursor-grab active:cursor-grabbing ${selectedFunctionButtonPoolItemId === item.id ? 'text-rose-500' : ''}`}
+                        >
+                          {tr(item.labelKey, item.fallbackLabel)}
+                        </button>
+                      ))}
+                      {FUNCTION_BUTTON_ITEMS.filter((item) => !assignedFunctionButtonIds.has(item.id)).length === 0 ? (
+                        <div className="text-xl text-[#54616b]">-</div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {deviceSettingsTab !== 'General' && deviceSettingsTab !== 'Printer' && deviceSettingsTab !== 'Category display' && deviceSettingsTab !== 'Orders in waiting' && deviceSettingsTab !== 'Scheduled orders' && deviceSettingsTab !== 'Option buttons' && deviceSettingsTab !== 'Function buttons' && (
+                <p className="text-pos-muted text-xl py-4">Settings for “{deviceSettingsTab}” will be available here.</p>
+              )}
+            </div>
+            <div className="w-full flex items-center px-4 pt-5 pb-5 justify-center shrink-0">
+              <button
+                type="button"
+                className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                disabled={savingDeviceSettings}
+                onClick={handleSaveDeviceSettings}
+              >
+                <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* System Settings modal */}
+      {showSystemSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative px-10 text-xl bg-pos-bg rounded-xl shadow-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={() => setShowSystemSettingsModal(false)} aria-label="Close">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex mt-10 mb-2 px-10 w-full justify-around text-xl shrink-0 overflow-x-auto">
+              {SYSTEM_SETTINGS_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`px-4 pb-2 font-medium whitespace-nowrap border-b-2 transition-colors ${systemSettingsTab === tab ? 'border-blue-500 text-pos-text' : 'border-transparent text-pos-muted active:text-pos-text'} active:bg-green-500`}
+                  onClick={() => setSystemSettingsTab(tab)}
+                >
+                  {tr(SYSTEM_SETTINGS_TAB_LABEL_KEYS[tab], tab)}
+                </button>
+              ))}
+            </div>
+            <div className="p-6 overflow-auto flex-1 text-sm">
+              {systemSettingsTab === 'General' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                  <div className="flex flex-col gap-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.useStockManagement', 'Use of stock management:')}</span>
+                      <input type="checkbox" checked={sysUseStockManagement} onChange={(e) => setSysUseStockManagement(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.usePriceGroups', 'Use of price groups:')}</span>
+                      <input type="checkbox" checked={sysUsePriceGroups} onChange={(e) => setSysUsePriceGroups(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.loginWithoutCode', 'Log in without code:')}</span>
+                      <input type="checkbox" checked={sysLoginWithoutCode} onChange={(e) => setSysLoginWithoutCode(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.categoriesPerRegister', 'Categories per register:')}</span>
+                      <input type="checkbox" checked={sysCategorieenPerKassa} onChange={(e) => setSysCategorieenPerKassa(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.autoAcceptQROrders', 'Automatically accept QR orders:')}</span>
+                      <input type="checkbox" checked={sysAutoAcceptQROrders} onChange={(e) => setSysAutoAcceptQROrders(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.qrOrdersAutoCheckout', 'QR orders auto checkout:')}</span>
+                      <input type="checkbox" checked={sysQrOrdersAutomatischAfrekenen} onChange={(e) => setSysQrOrdersAutomatischAfrekenen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.sendOnlyQROrdersToKitchen', 'Send only QR orders to kitchen screen:')}</span>
+                      <input type="checkbox" checked={sysEnkelQROrdersKeukenscherm} onChange={(e) => setSysEnkelQROrdersKeukenscherm(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.aspect169Windows', '16:9 aspect (Windows):')}</span>
+                      <input type="checkbox" checked={sysAspect169Windows} onChange={(e) => setSysAspect169Windows(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.general.vatRateVariousProducts', 'VAT rate of various products:')}</span>
+                      <Dropdown options={VAT_PERCENT_OPTIONS.filter((o) => o.value !== '')} value={sysVatRateVariousProducts} onChange={setSysVatRateVariousProducts} placeholder={tr('control.external.select', 'Select')} className="text-am min-w-[150px]" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-8">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.arrangeProductsManually', 'Arrange products manually:')}</span>
+                      <input type="checkbox" checked={sysArrangeProductsManually} onChange={(e) => setSysArrangeProductsManually(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.limitOneUserPerTable', 'Limit one user per table:')}</span>
+                      <input type="checkbox" checked={sysLimitOneUserPerTable} onChange={(e) => setSysLimitOneUserPerTable(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.oneWaitingOrderPerCustomer', 'One waiting order per customer:')}</span>
+                      <input type="checkbox" checked={sysOneWachtorderPerKlant} onChange={(e) => setSysOneWachtorderPerKlant(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.cashButtonVisibleMultiplePayment', 'Cash button visible with multiple payment options:')}</span>
+                      <input type="checkbox" checked={sysCashButtonVisibleMultiplePayment} onChange={(e) => setSysCashButtonVisibleMultiplePayment(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.usePlaceSettings', 'Use of place settings:')}</span>
+                      <input type="checkbox" checked={sysUsePlaceSettings} onChange={(e) => setSysUsePlaceSettings(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.autoLoadCredit', 'Auto load credit:')}</span>
+                      <input type="checkbox" checked={sysTegoedAutomatischInladen} onChange={(e) => setSysTegoedAutomatischInladen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.useLatestPrice', 'Use latest price:')}</span>
+                      <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.general.depositReturn', 'Deposit return:')}</span>
+                      <Dropdown options={mapTranslatedOptions(LEEGGOED_OPTIONS)} value={sysLeeggoedTerugname} onChange={setSysLeeggoedTerugname} placeholder={tr('control.external.select', 'Select')} className="min-w-[150px] max-w-[150px]" />
+                    </div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.printCustomerDetailsOnQR', 'Print customer details on QR:')}</span>
+                      <input type="checkbox" checked={sysKlantgegevensQRAfdrukken} onChange={(e) => setSysKlantgegevensQRAfdrukken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                  </div>
+                </div>
+              )}
+              {systemSettingsTab === 'Prices' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                  <div className="flex flex-col border border-gray-400 rounded-lg p-6 gap-8">
+                    <p className="text-pos-text font-medium text-2xl flex justify-center items-center mb-5">{tr('control.sys.prices.standardPriceGroup', 'Standard price group')}</p>
+                    <div className="flex items-center gap-10">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.takeAwayMeals', 'Take-away meals of selected customer:')}</span>
+                      <Dropdown
+                        options={[{ value: '', label: '—' }, ...(priceGroups || []).sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((pg) => ({ value: pg.id, label: pg.name || pg.id }))]}
+                        value={sysPriceTakeAway}
+                        onChange={setSysPriceTakeAway}
+                        placeholder={tr('control.external.select', 'Select')}
+                        className="text-sm min-w-[150px]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-10">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.deliveryOfCustomer', 'Delivery of selected customer:')}</span>
+                      <Dropdown
+                        options={[{ value: '', label: '—' }, ...(priceGroups || []).sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((pg) => ({ value: pg.id, label: pg.name || pg.id }))]}
+                        value={sysPriceDelivery}
+                        onChange={setSysPriceDelivery}
+                        placeholder={tr('control.external.select', 'Select')}
+                        className="text-sm min-w-[150px]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-10">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.counterSale', 'Counter sale:')}</span>
+                      <Dropdown
+                        options={[{ value: '', label: '—' }, ...(priceGroups || []).sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((pg) => ({ value: pg.id, label: pg.name || pg.id }))]}
+                        value={sysPriceCounterSale}
+                        onChange={setSysPriceCounterSale}
+                        placeholder={tr('control.external.select', 'Select')}
+                        className="text-sm min-w-[150px]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-10">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.tableSale', 'Table sale:')}</span>
+                      <Dropdown
+                        options={[{ value: '', label: '—' }, ...(priceGroups || []).sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((pg) => ({ value: pg.id, label: pg.name || pg.id }))]}
+                        value={sysPriceTableSale}
+                        onChange={setSysPriceTableSale}
+                        placeholder={tr('control.external.select', 'Select')}
+                        className="text-sm min-w-[150px]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col border border-gray-400 rounded-lg p-6 gap-8">
+                    <p className="text-pos-text font-medium text-2xl flex justify-center items-center mb-5">{tr('control.sys.prices.customerSavingsCard', 'Customer savings card settings')}</p>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.pointsPerEuro', 'Points / euro:')}</span>
+                      <div className="flex items-center gap-2">
+                        <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerEuro((n) => Math.max(0, n - 1))}>−</button>
+                        <input type="number" min={0} value={sysSavingsPointsPerEuro} onChange={(e) => setSysSavingsPointsPerEuro(Number(e.target.value) || 0)} className="w-20 px-3 py-2 bg-pos-panel border border-pos-border rounded text-pos-text text-xl text-center" />
+                        <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerEuro((n) => n + 1)}>+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.pointsPerDiscount', 'Points / discount:')}</span>
+                      <div className="flex items-center gap-2">
+                        <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerDiscount((n) => Math.max(0, n - 1))}>−</button>
+                        <input type="number" min={0} value={sysSavingsPointsPerDiscount} onChange={(e) => setSysSavingsPointsPerDiscount(Number(e.target.value) || 0)} className="w-20 px-3 py-2 bg-pos-panel border border-pos-border rounded text-pos-text text-xl text-center" />
+                        <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerDiscount((n) => n + 1)}>+</button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.discount', 'Discount:')}</span>
+                      <Dropdown options={mapTranslatedOptions(SAVINGS_DISCOUNT_OPTIONS)} value={sysSavingsDiscount} onChange={setSysSavingsDiscount} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[150px]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {systemSettingsTab === 'Ticket' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                  <div className="flex flex-col gap-8">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.askVatPrinter', 'Ask for VAT ticket printer:')}</span>
+                      <input type="checkbox" checked={sysUsePlaceSettings} onChange={(e) => setSysUsePlaceSettings(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.productionPrinterCascade', 'Production printer cascade:')}</span>
+                      <input type="checkbox" checked={sysTegoedAutomatischInladen} onChange={(e) => setSysTegoedAutomatischInladen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.displaySubproductsWithoutPrice', 'Display sub-products without price on VAT ticket:')}</span>
+                      <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.pricePerKiloPrints', 'Price per kilo prints:')}</span>
+                      <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.printUnitPrice', 'Print unit price:')}</span>
+                      <input type="checkbox" checked={sysKlantgegevensQRAfdrukken} onChange={(e) => setSysKlantgegevensQRAfdrukken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.typeBarcodeGenerated', 'Type barcode of generated barcode:')}</span>
+                      <Dropdown options={BARCODE_TYPE_OPTIONS} value={sysBarcodeType} onChange={setSysBarcodeType} placeholder="Code39" className="text-sm min-w-[150px]" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-8">
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.validityPeriodVoucher', 'Validity period voucher:')}</span>
+                      <Dropdown options={mapTranslatedOptions(TICKET_VOUCHER_VALIDITY_OPTIONS)} value={sysTicketVoucherValidity} onChange={setSysTicketVoucherValidity} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.scheduledOrdersPrintMode', 'Scheduled orders print mode:')}</span>
+                      <Dropdown options={mapTranslatedOptions(TICKET_SCHEDULED_PRINT_MODE_OPTIONS)} value={sysTicketScheduledPrintMode} onChange={setSysTicketScheduledPrintMode} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.scheduledOrdersCustomerSort', 'Scheduled orders customer sort:')}</span>
+                      <Dropdown options={mapTranslatedOptions(TICKET_SCHEDULED_CUSTOMER_SORT_OPTIONS)} value={sysTicketScheduledCustomerSort} onChange={setSysTicketScheduledCustomerSort} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {systemSettingsTab !== 'General' && systemSettingsTab !== 'Prices' && systemSettingsTab !== 'Ticket' && (
+                <p className="text-pos-muted text-xl py-4">Settings for “{systemSettingsTab}” will be available here.</p>
+              )}
+            </div>
+            <div className="w-full flex items-center px-6 py-8 justify-center shrink-0">
+              <button
+                type="button"
+                className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-xl"
+                disabled={savingSystemSettings}
+                onClick={handleSaveSystemSettings}
+              >
+                <svg fill="currentColor" width="24" height="24" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New / Edit payment type modal */}
+      {showPaymentTypeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative flex flex-col bg-pos-bg justify-between items-center rounded-xl border border-pos-border shadow-2xl max-w-[90%] w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closePaymentTypeModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-6 flex flex-col gap-4 pt-14 text-sm">
+              <div className="flex items-center gap-2">
+                <label className="text-pos-text font-medium shrink-0 min-w-[130px]">{tr('control.paymentTypes.name', 'Name :')}</label>
+                <input
+                  type="text"
+                  value={paymentTypeName}
+                  onChange={(e) => setPaymentTypeName(e.target.value)}
+                  placeholder={tr('control.paymentTypes.namePlaceholder', 'e.g. Cash, Bancontact')}
+                  className="flex-1 max-w-[200px] px-4 py-3 h-[40px] rounded-lg bg-pos-panel border border-gray-300 text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-pos-text font-medium shrink-0 min-w-[130px]">{tr('control.paymentTypes.active', 'Active :')}</span>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={paymentTypeActive} onChange={(e) => setPaymentTypeActive(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-pos-text font-medium shrink-0 min-w-[130px]">{tr('control.paymentTypes.integration', 'Integration:')}</label>
+                <Dropdown
+                  options={mapTranslatedOptions(PAYMENT_INTEGRATION_OPTIONS)}
+                  value={paymentTypeIntegration}
+                  onChange={setPaymentTypeIntegration}
+                  placeholder={tr('control.paymentTypes.selectIntegration', 'Select integration')}
+                  className="flex-1 min-w-[200px] max-w-[280px] text-md"
+                />
+              </div>
+              <div className="flex justify-center pt-5 pb-5">
+                <button
+                  type="button"
+                  className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                  disabled={savingPaymentType || !(paymentTypeName || '').trim()}
+                  onClick={handleSavePaymentType}
+                >
+                  <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                  {tr('control.save', 'Save')}
+                </button>
+              </div>
+            </div>
+            <div className="shrink-0">
+              <KeyboardWithNumpad value={paymentTypeName} onChange={setPaymentTypeName} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast ? (
+        <div className="fixed top-6 right-6 z-[100] pointer-events-none">
+          <div
+            className={`min-w-[320px] max-w-[520px] px-4 py-3 rounded-lg shadow-xl border text-xl ${toast.type === 'success'
+              ? 'bg-emerald-700/90 border-emerald-500 text-emerald-100'
+              : 'bg-rose-700/90 border-rose-500 text-rose-100'
+              }`}
+          >
+            {toast.text}
+          </div>
+        </div>
+      ) : null}
+
+      <PrinterModal
+        open={showPrinterModal}
+        initialPrinter={editingPrinterId ? (printers.find((p) => p.id === editingPrinterId) ?? null) : null}
+        onClose={closePrinterModal}
+        onSave={handleSavePrinterPayload}
+        onNotify={showToast}
+      />
+
+      {/* New / Edit label modal */}
+      {showLabelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeLabelModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-6 flex w-full pt-14 overflow-auto text-sm">
+              <div className='flex flex-col gap-3 w-1/3'>
+                <div className="flex gap-2 w-full items-center">
+                  <label className="block min-w-[80px] max-w-[80px] font-medium text-gray-200">{tr('name', 'Name')} : </label>
+                  <input type="text" value={labelName} onChange={(e) => setLabelName(e.target.value)} placeholder={tr('control.labelModal.placeholder', 'e.g. 5.6cm x 3.5cm')} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+                <div className="flex gap-2 w-full items-center">
+                  <label className="block min-w-[80px] max-w-[80px] font-medium text-gray-200">{tr('control.labelModal.height', 'Height')} : </label>
+                  <input type="text" value={labelHeight} onChange={(e) => setLabelHeight(e.target.value)} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+                <div className="flex gap-2 w-full items-center">
+                  <label className="block min-w-[80px] max-w-[80px] font-medium text-gray-200">{tr('control.labelModal.width', 'Width')} : </label>
+                  <input type="text" value={labelWidth} onChange={(e) => setLabelWidth(e.target.value)} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+              </div>
+              <div className="flex gap-2 w-1/3 justify-center">
+                <div className='flex gap-2 w-full h-[40px] justify-center items-center'>
+                  <label className="block min-w-[120px] max-w-[120px] font-medium text-gray-200">{tr('control.labelModal.standard', 'Standard')} : </label>
+                  <input type="checkbox" checked={labelStandard} onChange={(e) => setLabelStandard(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                </div>
+              </div>
+              <div className='flex flex-col gap-3 w-1/4'>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[120px] max-w-[120px] font-medium text-gray-200">{tr('control.labelModal.marginLeft', 'Margin left')} : </label>
+                  <input type="text" inputMode="numeric" value={labelMarginLeft} onChange={(e) => setLabelMarginLeft(e.target.value)} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[120px] max-w-[120px] font-medium text-gray-200 mb-2">{tr('control.labelModal.marginRight', 'Margin right')} : </label>
+                  <input type="text" inputMode="numeric" value={labelMarginRight} onChange={(e) => setLabelMarginRight(e.target.value)} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[120px] max-w-[120px] font-medium text-gray-200 mb-2">{tr('control.labelModal.marginBottom', 'Margin bottom')} : </label>
+                  <input type="text" inputMode="numeric" value={labelMarginBottom} onChange={(e) => setLabelMarginBottom(e.target.value)} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[120px] max-w-[120px] font-medium text-gray-200 mb-2">{tr('control.labelModal.marginTop', 'Margin top')} : </label>
+                  <input type="text" inputMode="numeric" value={labelMarginTop} onChange={(e) => setLabelMarginTop(e.target.value)} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center pt-5 pb-5">
+              <button type="button" className="flex items-center text-md gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={!(labelName || '').trim()} onClick={handleSaveLabel}>
+                <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+            <KeyboardWithNumpad value={labelName} onChange={setLabelName} />
+          </div>
+        </div>
+      )}
+
+      {/* Production messages modal */}
+      {showProductionMessagesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-5xl justify-center items-center w-full mx-4 overflow-hidden flex flex-col h-[700px]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={() => { setShowProductionMessagesModal(false); setProductionMessagesPage(0); cancelEditProductionMessage(); }} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="w-full flex items-center justify-center mt-[30px] px-6 gap-4 py-4 shrink-0 pr-14">
+              <div className="flex gap-2 items-center gap-[100px]">
+                <input
+                  type="text"
+                  value={productionMessageInput}
+                  onChange={(e) => setProductionMessageInput(e.target.value)}
+                  placeholder="New message"
+                  className="px-4 py-2 bg-pos-panel border border-pos-border rounded-lg min-w-[400px] text-pos-text text-sm"
+                />
+                <button
+                  type="button"
+                  className="px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-sm shrink-0"
+                  disabled={!(productionMessageInput || '').trim()}
+                  onClick={handleAddOrUpdateProductionMessage}
+                >
+                  {editingProductionMessageId ? 'Update' : 'Add'}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col rounded-xl p-6 py-0 w-full min-h-0 overflow-hidden pb-24 relative">
+              {(() => {
+                const sorted = [...productionMessages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+                const scrollProductionMessages = (dir) => {
+                  if (productionMessagesListRef.current) {
+                    productionMessagesListRef.current.scrollBy({ top: dir * 120, behavior: 'smooth' });
+                  }
+                };
+                return (
+                  <>
+                    <ul
+                      ref={productionMessagesListRef}
+                      className="overflow-auto min-h-[300px] mx-10 border border-pos-border rounded-xl relative p-2"
+                      onScroll={updateProductionMessagesScrollState}
+                    >
+                      {sorted.map((m) => (
+                        <li key={m.id} className="flex items-center px-4 py-1 border-b border-pos-border last:border-b-0 gap-2">
+                          <span className="flex-1 text-pos-text text-sm break-words min-w-0">{m.text || ''}</span>
+                          <button type="button" className="p-2 shrink-0 rounded text-pos-text active:bg-green-500" onClick={() => startEditProductionMessage(m)} aria-label="Edit">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          </button>
+                          <button type="button" className="p-2 shrink-0 rounded text-pos-text active:bg-green-500" onClick={() => setDeleteConfirmProductionMessageId(m.id)} aria-label="Delete">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex items-center justify-center gap-10 py-3">
+                      <button
+                        type="button"
+                        className="p-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        disabled={!canProductionMessagesScrollUp}
+                        onClick={() => scrollProductionMessages(-1)}
+                        aria-label={tr('scrollUp', 'Scroll up')}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                          <path d="M11 17V5.414l3.293 3.293a.999.999 0 101.414-1.414l-5-5a.999.999 0 00-1.414 0l-5 5a.997.997 0 000 1.414.999.999 0 001.414 0L9 5.414V17a1 1 0 102 0z" fill="currentColor" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="p-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                        disabled={!canProductionMessagesScrollDown}
+                        onClick={() => scrollProductionMessages(1)}
+                        aria-label={tr('scrollDown', 'Scroll down')}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                          <path d="M10.707 17.707l5-5a.999.999 0 10-1.414-1.414L11 14.586V3a1 1 0 10-2 0v11.586l-3.293-3.293a.999.999 0 10-1.414 1.414l5 5a.999.999 0 001.414 0z" fill="currentColor" />
+                        </svg>
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="shrink-0">
+              <KeyboardWithNumpad value={productionMessageInput} onChange={setProductionMessageInput} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New price group modal */}
+      {showPriceGroupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closePriceGroupModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-6 flex flex-col space-y-6 w-full justify-center items-center pt-20">
+              <div className='w-full flex flex-col justify-center items-center gap-10'>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block text-md min-w-[100px] font-medium text-gray-200">{tr('name', 'Name')} : </label>
+                  <input
+                    type="text"
+                    value={priceGroupName}
+                    onChange={(e) => setPriceGroupName(e.target.value)}
+                    placeholder={tr('control.enterName', 'Enter name')}
+                    className="px-4 w-[200px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200 focus:outline-none focus:border-green-500"
+                  />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block text-md pr-[60px] font-medium text-gray-200">{tr('control.vat', 'VAT')} : </label>
+                  <Dropdown
+                    options={VAT_OPTIONS.map((o) => ({ ...o, label: tr(`vatOption.${o.value}`, o.label) }))}
+                    value={priceGroupTax}
+                    onChange={setPriceGroupTax}
+                    placeholder={tr('control.selectVat', 'Select VAT')}
+                    className="text-md min-w-[200px]"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center py-10">
+              <button
+                type="button"
+                className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                disabled={savingPriceGroup}
+                onClick={handleSavePriceGroup}
+              >
+                <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" id="save-16px" xmlns="http://www.w3.org/2000/svg">
+                  <path id="Path_42" data-name="Path 42" d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
+                </svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+            <KeyboardWithNumpad value={priceGroupName} onChange={setPriceGroupName} />
+          </div>
+        </div>
+      )}
+
+      {/* New / Edit kitchen modal */}
+      {showKitchenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeKitchenModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-6 flex flex-col space-y-6 w-full justify-center items-center pt-20">
+              <div className="w-full flex flex-col justify-center items-center gap-10">
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block text-md min-w-[100px] font-medium text-gray-200">{tr('name', 'Name')} : </label>
+                  <input
+                    type="text"
+                    value={kitchenModalName}
+                    onChange={(e) => setKitchenModalName(e.target.value)}
+                    placeholder={tr('control.enterName', 'Enter name')}
+                    className="px-4 w-[200px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200 focus:outline-none focus:border-green-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center py-10">
+              <button
+                type="button"
+                className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                disabled={savingKitchen}
+                onClick={handleSaveKitchen}
+              >
+                <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
+                </svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+            <KeyboardWithNumpad value={kitchenModalName} onChange={setKitchenModalName} />
+          </div>
+        </div>
+      )}
+
+      {/* Kitchen — assign products (same pattern as Product → Subproducts modal) */}
+      {showKitchenProductsModal && kitchenProductsKitchen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            className="relative bg-pos-bg rounded-xl min-w-[600px] border border-pos-border shadow-2xl p-6 text-sm max-h-[90vh] overflow-auto [scrollbar-width:none]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute top-2 right-4 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500"
+              onClick={closeKitchenProductsModal}
+              aria-label="Close"
+            >
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="space-y-4 mt-6">
+              {loadingKitchenProductsCatalog && (
+                <div className="w-full flex items-center justify-center py-8">
+                  <div className="flex items-center gap-3 text-pos-text">
+                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
+                      <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                    <span className="text-sm">{tr('control.productSubproducts.loading', 'Loading...')}</span>
+                  </div>
+                </div>
+              )}
+              <Dropdown
+                options={[
+                  { value: '', label: tr('control.kitchen.allCategories', 'All categories') },
+                  ...kitchenProductsModalCategories.map((c) => ({ value: c.id, label: c.name }))
+                ]}
+                value={kitchenProductsCategoryFilter}
+                onChange={setKitchenProductsCategoryFilter}
+                className="w-full max-w-[200px]"
+              />
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-stretch min-h-[280px]">
+                <div className="flex flex-col rounded-lg border border-pos-border bg-pos-panel/30 overflow-hidden min-w-0">
+                  <div className="px-3 py-2 border-b border-pos-border bg-pos-panel/50 font-medium text-pos-text shrink-0">
+                    {tr('control.kitchen.availableProducts', 'Available products')}
+                  </div>
+                  <label
+                    className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500 ${!kitchenProductsAvailable.length ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={
+                        kitchenProductsAvailable.length > 0 &&
+                        kitchenProductsAvailable.every((p) => kitchenProductsLeftSelectedIds.has(p.id))
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setKitchenProductsLeftSelectedIds(new Set(kitchenProductsAvailable.map((p) => p.id)));
+                        } else {
+                          setKitchenProductsLeftSelectedIds(new Set());
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span>{tr('control.productSubproducts.selectAll', 'Select all')}</span>
+                  </label>
+                  <div
+                    ref={kitchenProductsLeftListRef}
+                    className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {loadingKitchenProductsCatalog ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
+                    ) : kitchenProductsCatalog.length === 0 ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.kitchen.productsEmpty', 'No products yet.')}</div>
+                    ) : kitchenProductsAvailable.length === 0 ? (
+                      <div className="text-pos-muted px-2 py-4">
+                        {kitchenProductsCategoryFilter
+                          ? tr('control.kitchen.noProductsInCategory', 'No products in this category.')
+                          : tr('control.kitchen.allLinkedOrEmpty', 'All matching products are linked.')}
+                      </div>
+                    ) : (
+                      <ul className="space-y-1">
+                        {kitchenProductsAvailable.map((p) => (
+                          <li key={p.id}>
+                            <label className="flex items-center gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text">
+                              <input
+                                type="checkbox"
+                                checked={kitchenProductsLeftSelectedIds.has(p.id)}
+                                onChange={(e) => {
+                                  setKitchenProductsLeftSelectedIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(p.id);
+                                    else next.delete(p.id);
+                                    return next;
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="truncate">{p.name || p.id}</span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="px-3 py-2 border-t border-pos-border shrink-0">
+                    <button
+                      type="button"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-green-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleAddKitchenProductLinks}
+                      disabled={!kitchenProductsLeftSelectedIds.size || loadingKitchenProductsCatalog}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      {tr('control.productSubproducts.add', 'Add')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="hidden md:flex items-center justify-center text-pos-muted shrink-0">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                </div>
+
+                <div className="flex flex-col rounded-lg border border-pos-border bg-pos-panel/30 overflow-hidden min-w-0">
+                  <div className="px-3 py-2 border-b border-pos-border bg-pos-panel/50 font-medium text-pos-text shrink-0">
+                    {tr('control.kitchen.linkedProducts', 'Linked to kitchen')}
+                  </div>
+                  <label
+                    className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500 ${!kitchenProductsLinked.length ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={
+                        kitchenProductsLinked.length > 0 &&
+                        kitchenProductsLinked.every((l) => kitchenProductsRightSelectedIds.has(l.productId))
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setKitchenProductsRightSelectedIds(new Set(kitchenProductsLinked.map((l) => l.productId)));
+                        } else {
+                          setKitchenProductsRightSelectedIds(new Set());
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span>{tr('control.productSubproducts.selectAll', 'Select all')}</span>
+                  </label>
+                  <div
+                    ref={kitchenProductsRightListRef}
+                    className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {loadingKitchenProductsCatalog ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
+                    ) : kitchenProductsLinked.length === 0 ? (
+                      <div className="text-pos-muted px-2 py-4">
+                        {tr('control.kitchen.noLinkedProducts', 'No products linked yet.')}
+                      </div>
+                    ) : (
+                      <ul className="space-y-1">
+                        {kitchenProductsLinked.map((link) => (
+                          <li key={link.productId}>
+                            <label className="flex items-center justify-between gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text group">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={kitchenProductsRightSelectedIds.has(link.productId)}
+                                  onChange={(e) => {
+                                    setKitchenProductsRightSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (e.target.checked) next.add(link.productId);
+                                      else next.delete(link.productId);
+                                      return next;
+                                    });
+                                  }}
+                                  className="rounded shrink-0"
+                                  onClick={(ev) => ev.stopPropagation()}
+                                />
+                                <span className="truncate">{link.productName}</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="p-1 rounded active:bg-green-500 text-pos-muted active:text-red-400 shrink-0 opacity-0 group-active:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  removeKitchenProductLink(link.productId);
+                                }}
+                                aria-label={tr('delete', 'Delete')}
+                              >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="px-3 py-2 border-t border-pos-border shrink-0">
+                    <button
+                      type="button"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-red-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleRemoveKitchenProductLinks}
+                      disabled={!kitchenProductsRightSelectedIds.size || loadingKitchenProductsCatalog}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      {tr('control.productSubproducts.remove', 'Remove')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center shrink-0">
+              <button
+                type="button"
+                className="px-6 py-3 rounded-lg bg-green-600 text-white text-sm font-medium active:bg-green-500 disabled:opacity-50"
+                onClick={handleSaveKitchenProducts}
+                disabled={savingKitchenProducts || loadingKitchenProductsCatalog || !kitchenProductsKitchen}
+              >
+                {savingKitchenProducts ? tr('control.saving', 'Saving...') : tr('control.save', 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit category modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeCategoryModal} aria-label="Close">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-6 flex flex-col space-y-6 w-full justify-center text-sm items-center pt-20">
+              <div className="w-full flex flex-col justify-center items-center gap-5">
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[150px] max-w-[150px] font-medium text-gray-200">{tr('name', 'Name')} : </label>
+                  <input
+                    type="text"
+                    value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                    className="px-4 w-[200px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200"
+                    onFocus={() => setCategoryActiveField('name')}
+                    onClick={() => setCategoryActiveField('name')}
+                  />
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[150px] max-w-[150px] font-medium text-gray-200">{tr('control.inWebshop', 'In webshop')} : </label>
+                  <div className="w-[200px] flex items-center justify-start">
+                    <input
+                      type="checkbox"
+                      checked={categoryInWebshop}
+                      onChange={(e) => setCategoryInWebshop(e.target.checked)}
+                      className="w-5 h-5 rounded border-gray-300"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block  min-w-[150px] max-w-[150px] font-medium text-gray-200">{tr('control.displayOnThisCashRegister', 'Display on this cash register')} : </label>
+                  <div className="w-[200px] flex items-center justify-start">
+                    <input
+                      type="checkbox"
+                      checked={categoryDisplayOnCashRegister}
+                      onChange={(e) => setCategoryDisplayOnCashRegister(e.target.checked)}
+                      className="w-5 h-5 rounded border-gray-300"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full items-center justify-center">
+                  <label className="block min-w-[150px] max-w-[150px] font-medium text-gray-200">{tr('nextCourse', 'Next course')} : </label>
+                  <input
+                    type="text"
+                    value={categoryNextCourse}
+                    onChange={(e) => setCategoryNextCourse(e.target.value)}
+                    className="px-4 w-[200px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200"
+                    onFocus={() => setCategoryActiveField('nextCourse')}
+                    onClick={() => setCategoryActiveField('nextCourse')}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center pt-5 pb-5">
+              <button
+                type="button"
+                className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                disabled={savingCategory}
+                onClick={handleSaveCategory}
+              >
+                <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" id="save-16px" xmlns="http://www.w3.org/2000/svg">
+                  <path id="Path_42" data-name="Path 42" d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
+                </svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+            <KeyboardWithNumpad
+              value={categoryActiveField === 'name' ? categoryName : categoryNextCourse}
+              onChange={categoryActiveField === 'name' ? setCategoryName : setCategoryNextCourse}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* New / Edit product modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeProductModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex gap-1 w-full justify-around px-10 pt-5 shrink-0 pr-14">
+              {[
+                { id: 'general', label: tr('control.productModal.tab.general', 'General') },
+                { id: 'advanced', label: tr('control.productModal.tab.advanced', 'Advanced') },
+                { id: 'extra_prices', label: tr('control.productModal.tab.extraPrices', 'Extra prices') },
+                { id: 'purchase_stock', label: tr('control.productModal.tab.purchaseStock', 'Purchase and stock') },
+                { id: 'webshop', label: tr('control.productModal.tab.webshop', 'Webshop') },
+                { id: 'kiosk', label: tr('control.productModal.tab.kiosk', 'Kiosk') },
+              ].map((tab) => {
+                const isLocked = tab.id !== 'general' && !productTabsUnlocked;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    disabled={isLocked}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${productTab === tab.id ? 'bg-green-600 text-white border border-b-0 border-pos-border' : isLocked ? 'text-pos-muted opacity-50 cursor-not-allowed' : 'text-white active:text-pos-text'} active:bg-green-500`}
+                    onClick={() => !isLocked && setProductTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Single scrollable area for all tabs so keyboard stays fixed at bottom */}
+            <div className="flex-1 min-h-0 w-full overflow-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {productTab === 'general' && (
+                <div className="p-6 pb-0">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="flex text-md flex-col gap-3">
+                      <div className="flex w-full items-center gap-1">
+                        <label className="text-md min-w-[125px] font-medium text-gray-200">{tr('name', 'Name')}:</label>
+                        <input type="text" value={productName} onChange={(e) => setProductName(e.target.value)} className={`h-[40px] min-w-[150px] max-w-[150px] px-4 py-3 border rounded-lg text-pos-text text-md caret-white ${productFieldErrors.name ? 'bg-rose-500/40 border-rose-400' : 'bg-pos-panel border-pos-border'}`} onFocus={() => setProductActiveField('name')} onClick={() => setProductActiveField('name')} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.testName', 'Test name')}:</label>
+                        <input type="text" value={productKeyName} onChange={(e) => setProductKeyName(e.target.value)} className={`min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border rounded-lg text-pos-text text-md ${productFieldErrors.keyName ? 'bg-rose-500/40 border-rose-400' : 'bg-pos-panel border-pos-border'}`} onFocus={() => setProductActiveField('keyName')} onClick={() => setProductActiveField('keyName')} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.productionName', 'Production name')}:</label>
+                        <input type="text" value={productProductionName} onChange={(e) => setProductProductionName(e.target.value)} className={`min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border rounded-lg text-pos-text text-md ${productFieldErrors.productionName ? 'bg-rose-500/40 border-rose-400' : 'bg-pos-panel border-pos-border'}`} onFocus={() => setProductActiveField('productionName')} onClick={() => setProductActiveField('productionName')} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.price', 'Price')}:</label>
+                        <input type="text" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} className="min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 bg-pos-panel border border-pos-border rounded-lg text-pos-text text-md max-w-[150px]" onFocus={() => setProductActiveField('price')} onClick={() => setProductActiveField('price')} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.vatTakeOut', 'VAT Take out')}:</label>
+                        <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatTakeOut} onChange={(v) => { setProductVatTakeOut(v); setProductFieldErrors((e) => ({ ...e, vatTakeOut: false })); }} placeholder="--" className={`text-md min-w-[150px] ${productFieldErrors.vatTakeOut ? '!bg-rose-500/40 !border-rose-400' : ''}`} />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.vatEatIn', 'VAT Eat in')}:</label>
+                        <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatEatIn} onChange={(v) => { setProductVatEatIn(v); setProductFieldErrors((e) => ({ ...e, vatEatIn: false })); }} placeholder="--" className={`text-md min-w-[150px] ${productFieldErrors.vatEatIn ? '!bg-rose-500/40 !border-rose-400' : ''}`} />
+                      </div>
+                      {productTabsUnlocked ? (
+                        <div className="flex items-center gap-1 h-[40px]">
+                          <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.id', 'Id')}:</label>
+                          <span className="text-pos-text text-md">{productDisplayNumber != null ? productDisplayNumber : '—'}</span>
+                        </div>
+                      )
+                        : (
+                          <div className="flex items-center gap-1 h-[40px]">
+                          </div>
+                        )
+                      }
+                    </div>
+                    <div className='flex flex-col w-full gap-4 max-h-[340px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'>
+                      {(() => {
+                        const ids = [...productCategoryIds];
+                        let numVisible = 1;
+                        if (productTabsUnlocked && categories.length > 0) {
+                          for (let i = 0; i < categories.length; i++) {
+                            const prevId = i > 0 ? ids[i - 1] : '';
+                            if (i > 0 && !prevId) break;
+                            const selectedIds = ids.slice(0, i + 1);
+                            const optionsForNext = categories.filter((c) => !selectedIds.includes(c.id));
+                            if (!ids[i]) {
+                              numVisible = i + 1;
+                              break;
+                            }
+                            if (optionsForNext.length < 1) {
+                              numVisible = i + 1;
+                              break;
+                            }
+                            numVisible = i + 2;
+                          }
+                        }
+                        while (ids.length < numVisible) ids.push('');
+                        return Array.from({ length: numVisible }, (_, i) => {
+                          const prevIds = ids.slice(0, i);
+                          const optionsForI = i === 0 ? categories : categories.filter((c) => !prevIds.includes(c.id));
+                          return (
+                            <div key={i} className="flex gap-1 w-full h-[40px]">
+                              <label className="pr-5 font-medium text-md items-center justify-center flex h-[40px] text-gray-200">{tr('control.productModal.category', 'Category')}:</label>
+                              <Dropdown
+                                options={optionsForI.map((c) => ({ value: c.id, label: c.name }))}
+                                value={ids[i] || ''}
+                                onChange={(v) => {
+                                  setProductCategoryIds((prev) => {
+                                    const next = [...prev];
+                                    while (next.length <= i) next.push('');
+                                    next[i] = v;
+                                    for (let j = i + 1; j < next.length; j++) next[j] = '';
+                                    return next;
+                                  });
+                                }}
+                                placeholder="--"
+                                className="text-md w-full min-w-[150px]"
+                              />
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex gap-1 items-center w-full">
+                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.addition', 'Addition')}:</label>
+                        <Dropdown options={[{ value: 'Subproducts', label: tr('control.productModal.subproducts', 'Subproducts') }]} value={productAddition} onChange={setProductAddition} placeholder="--" className="text-md w-full min-w-[150px]" />
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.barcode', 'Barcode')}:</label>
+                        <div className="flex gap-2 items-center w-full">
+                          <input type="text" value={productBarcode} onChange={(e) => setProductBarcode(e.target.value)} className="min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 bg-pos-panel border border-pos-border rounded-lg text-pos-text text-md" onFocus={() => setProductActiveField('barcode')} onClick={() => setProductActiveField('barcode')} />
+                          <button type="button" className="p-2 rounded-full bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 disabled:opacity-70" aria-label="Generate barcode" onClick={handleGenerateBarcode}>
+                            <svg className={`w-5 h-5 ${barcodeButtonSpinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.printer1', 'Printer 1')}:</label>
+                        <Dropdown
+                          options={getUniqueProductPrinterOptions(productPrinter1, [productPrinter2, productPrinter3])}
+                          value={productPrinter1}
+                          onChange={setProductPrinter1}
+                          className="text-md w-full min-w-[150px]"
+                        />
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.printer2', 'Printer 2')}:</label>
+                        <Dropdown
+                          options={getUniqueProductPrinterOptions(productPrinter2, [productPrinter1, productPrinter3])}
+                          value={productPrinter2}
+                          onChange={setProductPrinter2}
+                          className="text-md w-full min-w-[150px]"
+                        />
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.printer3', 'Printer 3')}:</label>
+                        <Dropdown
+                          options={getUniqueProductPrinterOptions(productPrinter3, [productPrinter1, productPrinter2])}
+                          value={productPrinter3}
+                          onChange={setProductPrinter3}
+                          className="text-md w-full min-w-[150px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex w-full justify-center gap-4">
+                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingProduct} onClick={handleSaveProduct}>
+                      <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.productModal.addAndClose', 'Add and close')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {productTab === 'advanced' && (
+                <div className="p-6 pb-0 flex w-full flex-col px-10 text-sm">
+                  <div className="flex w-full gap-10">
+                    <div className="flex flex-col gap-3">
+                      <div className='flex items-center'>
+                        <label className="flex items-center gap-2 min-w-[170px] text-pos-text">{tr('control.productModal.advanced.openPrice', 'Open price')}:</label>
+                        <input type="checkbox" checked={advancedOpenPrice} onChange={(e) => setAdvancedOpenPrice(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex items-center min-w-[170px] gap-2 text-pos-text">{tr('control.productModal.advanced.libra', 'Libra')}:</label>
+                        <input type="checkbox" checked={advancedWeegschaal} onChange={(e) => setAdvancedWeegschaal(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex items-center min-w-[170px] gap-2 text-pos-text">{tr('control.productModal.advanced.subproductRequires', 'Subproduct requires')} :</label>
+                        <input type="checkbox" checked={advancedSubproductRequires} onChange={(e) => setAdvancedSubproductRequires(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <label className="block text-pos-text mb-1 min-w-[170px] text-md">{tr('control.productModal.advanced.emptyPrice', 'Empty price')}:</label>
+                        <input type="text" value={advancedLeeggoedPrijs} onChange={(e) => setAdvancedLeeggoedPrijs(e.target.value)} onFocus={() => setProductActiveField('leeggoedPrijs')} className="w-full h-[40px] border border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text max-w-[100px]" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className='flex items-center'>
+                        <label className="flex min-w-[140px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.pagerRequired', 'Pager required')}:</label>
+                        <input type="checkbox" checked={advancedPagerVerplicht} onChange={(e) => setAdvancedPagerVerplicht(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex min-w-[140px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.boldPrint', 'Bold print')}:</label>
+                        <input type="checkbox" checked={advancedBoldPrint} onChange={(e) => setAdvancedBoldPrint(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex min-w-[140px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.groupingReceipt', 'Grouping receipt')}:</label>
+                        <input type="checkbox" checked={advancedGroupingReceipt} onChange={(e) => setAdvancedGroupingReceipt(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3 ml-10">
+                      <div className="flex items-center">
+                        <label className="block min-w-[150px] text-pos-text mb-1">{tr('control.productModal.advanced.labelExtraInfo', 'Label extra info')}:</label>
+                        <input type="text" value={advancedLabelExtraInfo} onChange={(e) => setAdvancedLabelExtraInfo(e.target.value)} onFocus={() => setProductActiveField('labelExtraInfo')} className="w-full h-[40px] border border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text max-w-[160px]" />
+                      </div>
+                      <div className="flex items-center">
+                        <label className="block min-w-[150px] text-pos-text mb-1">{tr('control.productModal.advanced.cashRegisterPhoto', 'Cash register photo')}:</label>
+                        <div className="flex items-center gap-3">
+                          {!advancedKassaPhotoPreview ? (
+                            <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0 text-md">
+                              {tr('control.productModal.chooseFileSimple', 'Select')}
+                              <input
+                                type="file"
+                                className="hidden focus:border-green-500 focus:outline-none"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file && file.type.startsWith('image/')) {
+                                    const dataUrl = await new Promise((resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.onload = () => resolve(String(reader.result || ''));
+                                      reader.onerror = () => reject(reader.error);
+                                      reader.readAsDataURL(file);
+                                    }).catch(() => '');
+                                    if (dataUrl) setAdvancedKassaPhotoPreview(dataUrl);
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          ) : (
+                            <>
+                              <img src={advancedKassaPhotoPreview} alt="Cash register" className="w-16 h-16 object-cover rounded-lg border border-pos-border shrink-0" />
+                              <button
+                                type="button"
+                                className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 shrink-0"
+                                onClick={() => {
+                                  setAdvancedKassaPhotoPreview(null);
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <label className="block min-w-[150px] text-pos-text">{tr('control.productModal.advanced.prepackExpiryType', 'Pre-pack expiry type')}:</label>
+                        <Dropdown options={VERVALTYPE_OPTIONS} value={advancedVoorverpakVervaltype} onChange={setAdvancedVoorverpakVervaltype} placeholder={tr('control.productModal.select', 'Select…')} className="bg-pos-bg text-pos-text min-w-[160px]" />
+                      </div>
+                      <div className="flex items-center">
+                        <label className="block min-w-[150px] text-pos-text">{tr('control.productModal.advanced.shelfLife', 'Shelf life')}:</label>
+                        <input type="text" value={advancedHoudbareDagen} onChange={(e) => setAdvancedHoudbareDagen(e.target.value)} onFocus={() => setProductActiveField('houdbareDagen')} className="w-full h-[40px] border border-pos-border max-w-[160px] rounded-lg px-3 py-2 bg-pos-bg text-pos-text text-md" />
+                      </div>
+                      <div className="flex text-md">
+                        <label className="block min-w-[150px] text-pos-text">{tr('control.productModal.advanced.storageUse', 'Storage, use')}:</label>
+                        <textarea value={advancedBewarenGebruik} onChange={(e) => setAdvancedBewarenGebruik(e.target.value)} onFocus={() => setProductActiveField('bewarenGebruik')} rows={4} className="w-full border border-pos-border max-w-[160px] rounded-lg px-3 py-2 bg-pos-bg text-pos-text resize-none" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                      <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {productTab === 'extra_prices' && (
+                <div className="p-6 flex flex-col gap-3 pb-0">
+                  <div className="flex gap-4 w-full justify-around text-sm text-pos-text">
+                    <div className="font-medium">{tr('control.productModal.extraPrices.pricegroup', 'Pricegroup')}</div>
+                    <div className="font-medium">{tr('control.productModal.extraPrices.otherName', 'Other name')}</div>
+                    <div className="font-medium">{tr('control.productModal.extraPrices.otherPrinter', 'Other printer')}</div>
+                    <div className="font-medium">{tr('control.productModal.extraPrices.otherPrice', 'Other price')}</div>
+                  </div>
+                  <div
+                    ref={extraPricesScrollRef}
+                    onScroll={syncExtraPricesScrollEdges}
+                    className="max-h-[200px] overflow-x-auto overflow-y-auto text-sm border-collapse border border-pos-border scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden]"
+                  >
+                    <table className="w-full h-full rounded-lg text-pos-text">
+                      <tbody className="w-full">
+                        {extraPricesRows.map((row, idx) => (
+                          <tr key={idx} className="bg-pos-bg">
+                            <td className="min-w-[200px] px-4 py-1">
+                              <span className="px-3 max-w-[200px] min-h-[40px] max-h-[40px] py-2 block flex justify-center rounded-lg text-pos-text">{row.priceGroupLabel}</span>
+                            </td>
+                            <td className=" min-w-[250px] min-h-[40px] max-h-[40px] px-4 py-1">
+                              <div className='w-full flex justify-center items-center'>
+                                <input
+                                  type="text"
+                                  value={row.otherName}
+                                  onChange={(e) => setExtraPricesRows((prev) => prev.map((r, i) => i === idx ? { ...r, otherName: e.target.value } : r))}
+                                  onFocus={() => { setExtraPricesSelectedIndex(idx); setProductActiveField('extraOtherName'); }}
+                                  className="w-full max-w-[150px] min-h-[40px] max-h-[40px] rounded-lg px-3 py-2 border border-pos-border flex justify-center bg-pos-panel text-pos-text"
+                                />
+                              </div>
+                            </td>
+                            <td className="min-w-[200px] min-h-[40px] max-h-[40px] px-4 py-1">
+                              <div className="w-full flex justify-center items-center">
+                                <div className="w-full max-w-[150px] min-w-0">
+                                  <Dropdown
+                                    options={EXTRA_PRICE_PRINTER_OPTIONS}
+                                    value={row.otherPrinter}
+                                    onChange={(v) => setExtraPricesRows((prev) => prev.map((r, i) => i === idx ? { ...r, otherPrinter: v } : r))}
+                                    placeholder="--"
+                                    className="w-full min-h-[40px] max-h-[40px] bg-pos-bg text-pos-text"
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                              <td className="min-w-[200px] min-h-[40px] max-h-[40px] px-4 py-1">
+                              <input
+                                type="text"
+                                value={row.otherPrice}
+                                onChange={(e) => setExtraPricesRows((prev) => prev.map((r, i) => i === idx ? { ...r, otherPrice: e.target.value } : r))}
+                                onFocus={() => { setExtraPricesSelectedIndex(idx); setProductActiveField('extraOtherPrice'); }}
+                                className="w-full min-h-[40px] max-h-[40px] rounded-lg ml-[50px] max-w-[120px] px-3 py-2 border border-pos-border bg-pos-panel text-pos-text"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-around px-[200px]">
+                    <button
+                      type="button"
+                      className="p-2 px-4 bg-pos-panel rounded-lg text-white active:bg-green-500 disabled:opacity-50 text-lg font-medium"
+                      disabled={extraPricesScrollEdges.atTop}
+                      onClick={() => {
+                        const el = extraPricesScrollRef.current;
+                        if (!el) return;
+                        const step = Math.min(56, Math.max(40, Math.round(el.clientHeight * 0.45)));
+                        el.scrollBy({ top: -step, behavior: 'smooth' });
+                      }}
+                      aria-label={tr('control.productModal.extraPrices.scrollUp', 'Scroll up')}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="p-2 px-4 rounded-lg bg-pos-panel text-white active:bg-green-500 disabled:opacity-50 text-lg font-medium"
+                      disabled={extraPricesScrollEdges.atBottom}
+                      onClick={() => {
+                        const el = extraPricesScrollRef.current;
+                        if (!el) return;
+                        const step = Math.min(56, Math.max(40, Math.round(el.clientHeight * 0.45)));
+                        el.scrollBy({ top: step, behavior: 'smooth' });
+                      }}
+                      aria-label={tr('control.productModal.extraPrices.scrollDown', 'Scroll down')}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  <div className="flex justify-center text-md">
+                    <button type="button" className="flex text-md items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                      <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {productTab === 'purchase_stock' && (
+                <div className="p-6 flex flex-col gap-6 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="flex flex-col gap-3">
+                      <div className='flex items-center'>
+                        <label className="block min-w-[150px] text-pos-text text-md">{tr('control.productModal.purchase.purchaseVat', 'Purchase VAT')}:</label>
+                        <Dropdown options={VAT_PERCENT_OPTIONS} value={purchaseVat} onChange={setPurchaseVat} placeholder="--" className="min-w-[120px] bg-pos-bg text-pos-text text-md" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px] text-md">{tr('control.productModal.purchase.purchasePriceExcl', 'Purchase price excl')}:</label>
+                        <input type="text" value={purchasePriceExcl} onChange={(e) => setPurchasePriceExcl(e.target.value)} onFocus={() => setProductActiveField('purchasePriceExcl')} className="border max-w-[120px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text text-md" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px] text-md">{tr('control.productModal.purchase.purchasePriceIncl', 'Purchase price incl.')}:</label>
+                        <input type="text" value={purchasePriceIncl} onChange={(e) => setPurchasePriceIncl(e.target.value)} onFocus={() => setProductActiveField('purchasePriceIncl')} className="border max-w-[120px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text text-md" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px] text-md">{tr('control.productModal.purchase.profitPercentage', 'Profit percentage')}:</label>
+                        <input type="text" value={profitPct} onChange={(e) => setProfitPct(e.target.value)} onFocus={() => setProductActiveField('profitPct')} className="border border-pos-border rounded-lg px-3 max-w-[120px] h-[40px] py-2 bg-pos-bg text-pos-text text-md" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div className='flex items-center'>
+                        <label className="block min-w-[110px] text-pos-text text-md">{tr('control.productModal.purchase.unit', 'Unit')}:</label>
+                        <Dropdown options={PURCHASE_UNIT_OPTIONS} value={purchaseUnit} onChange={setPurchaseUnit} placeholder="--" className="min-w-[150px] bg-pos-bg text-pos-text text-md" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block min-w-[110px] text-pos-text text-md">{tr('control.productModal.purchase.unitContent', 'Unit content')}:</label>
+                        <input type="text" value={unitContent} onChange={(e) => setUnitContent(e.target.value)} onFocus={() => setProductActiveField('unitContent')} className="border min-w-[150px] max-w-[150px] border-pos-border rounded-lg px-3 py-2 h-[40px] bg-pos-bg text-pos-text text-md" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block min-w-[110px] text-pos-text text-md">{tr('control.productModal.purchase.stock', 'Stock')}:</label>
+                        <input type="text" value={stock} onChange={(e) => setStock(e.target.value)} onFocus={() => setProductActiveField('stock')} className="border border-pos-border rounded-lg min-w-[150px] max-w-[150px] px-3 py-2 h-[40px] bg-pos-bg text-pos-text text-md" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[105px]">{tr('control.productModal.purchase.supplier', 'Supplier')}:</label>
+                        <Dropdown options={PURCHASE_SUPPLIER_OPTIONS} value={purchaseSupplier} onChange={setPurchaseSupplier} placeholder="--" className="min-w-[150px] bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[105px]">{tr('control.productModal.purchase.supplierCode', 'Supplier code')}:</label>
+                        <input type="text" value={supplierCode} onChange={(e) => setSupplierCode(e.target.value)} onFocus={() => setProductActiveField('supplierCode')} className="border max-w-[150px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex min-w-[105px] items-centertext-pos-text">
+                          {tr('control.productModal.purchase.stockNotification', 'Stock notification')}
+                        </label>
+                        <input type="checkbox" checked={stockNotification} onChange={(e) => setStockNotification(e.target.checked)} className="rounded w-5 h-5 border-pos-border" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="blockflex min-w-[105px] text-pos-text">{tr('control.productModal.purchase.expirationDate', 'Expiration date')}:</label>
+                        <input type="text" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} onFocus={() => setProductActiveField('expirationDate')} className="border border-pos-border max-w-[150px] h-[40px] rounded-lg px-3 py-2 bg-pos-bg text-pos-text" placeholder="" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="blockflex min-w-[105px] max-w-[105px] text-pos-text">{tr('control.productModal.purchase.declarationOfExpiry', 'Declaration of expiry')}:</label>
+                        <div className="flex items-center gap-2">
+                          <input type="text" value={declarationExpiryDays} onChange={(e) => setDeclarationExpiryDays(e.target.value)} onFocus={() => setProductActiveField('declarationExpiryDays')} className="border max-w-[50px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                          <span className="text-pos-text">{tr('control.productModal.purchase.daysInAdvance', 'days in advance')}</span>
+                        </div>
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="blockflex min-w-[105px] max-w-[105px] text-pos-text">{tr('control.productModal.purchase.notificationSoldOut', 'Notification sold out')}:</label>
+                        <div className="flex items-center gap-2">
+                          <input type="text" value={notificationSoldOutPieces} onChange={(e) => setNotificationSoldOutPieces(e.target.value)} onFocus={() => setProductActiveField('notificationSoldOutPieces')} className="border max-w-[50px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                          <span className="text-pos-text">{tr('control.productModal.purchase.piecesInAdvance', 'pieces in advance')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                      <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {productTab === 'webshop' && (
+                <div className="p-6 flex flex-col gap-6">
+                  <div className="grid text-sm grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-3">
+                      <div className='flex items-center'>
+                        <label className="flex min-w-[150px] items-center text-pos-text">{tr('control.productModal.webshop.inWebshop', 'In webshop')}:</label>
+                        <input type="checkbox" checked={productInWebshop} onChange={(e) => setProductInWebshop(e.target.checked)} className="w-5 h-5 rounded border-pos-border" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex items-center min-w-[150px] text-pos-text">{tr('control.productModal.webshop.onlineOrderable', 'Online orderable')}:</label>
+                        <input type="checkbox" checked={webshopOnlineOrderable} onChange={(e) => setWebshopOnlineOrderable(e.target.checked)} className="w-5 h-5 rounded border-pos-border" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px]">{tr('control.productModal.webshop.websiteRemark', 'Website remark')}:</label>
+                        <input type="text" value={websiteRemark} onChange={(e) => setWebsiteRemark(e.target.value)} onFocus={() => setProductActiveField('websiteRemark')} className="border max-w-[150px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px]">{tr('control.productModal.webshop.websiteOrder', 'Website order')}:</label>
+                        <input type="text" value={websiteOrder} onChange={(e) => setWebsiteOrder(e.target.value)} onFocus={() => setProductActiveField('websiteOrder')} className="border max-w-[150px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px]">{tr('control.productModal.webshop.shortWebText', 'Short web text')}:</label>
+                        <input type="text" value={shortWebText} onChange={(e) => setShortWebText(e.target.value)} onFocus={() => setProductActiveField('shortWebText')} className="border max-w-[150px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text min-w-[150px]">{tr('control.productModal.webshop.websitePhoto', 'Website photo')}:</label>
+                        <div className="flex gap-3 items-center">
+                          <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0">
+                            {tr('control.productModal.chooseFile', 'Choose File')}
+                            <input type="file" className="hidden focus:border-green-500 focus:outline-none" accept="image/*" onChange={(e) => setWebsitePhotoFileName(e.target.files?.[0]?.name ?? '')} />
+                          </label>
+                          <span className="text-pos-muted">{websitePhotoFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center pt-20">
+                    <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                      <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {productTab === 'kiosk' && (
+                <div className="p-6 flex flex-col gap-6">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className='flex flex-col gap-5'>
+                      <div className='flex items-center'>
+                        <label className="block w-[150px] text-pos-text">{tr('control.productModal.kiosk.kioskInfo', 'Kiosk info')}:</label>
+                        <input type="text" value={kioskInfo} onChange={(e) => setKioskInfo(e.target.value)} onFocus={() => setProductActiveField('kioskInfo')} className="border border-pos-border rounded-lg px-3 py-2 h-[40px] bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="flex min-w-[150px] items-center text-pos-text">
+                          {tr('control.productModal.kiosk.kioskTakeAway', 'Kiosk take away')}:
+                        </label>
+                        <input type="checkbox" checked={kioskTakeAway} onChange={(e) => setKioskTakeAway(e.target.checked)} className="w-5 h-5 rounded border-pos-border" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block w-[150px] text-pos-text">{tr('control.productModal.kiosk.kioskEatIn', 'Kiosk eat in')}:</label>
+                        <input type="text" value={kioskEatIn} onChange={(e) => setKioskEatIn(e.target.value)} onFocus={() => setProductActiveField('kioskEatIn')} className="border border-pos-border rounded-lg px-3 py-2 h-[40px] bg-pos-bg text-pos-text max-w-md" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block w-[150px] text-pos-text">{tr('control.productModal.kiosk.kioskSubtitle', 'Kiosk subtitle')}:</label>
+                        <input type="text" value={kioskSubtitle} onChange={(e) => setKioskSubtitle(e.target.value)} onFocus={() => setProductActiveField('kioskSubtitle')} className="border border-pos-border rounded-lg px-3 py-2 h-[40px] bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text w-[150px]">{tr('control.productModal.kiosk.kioskMinSubs', 'Kiosk min. subs')}:</label>
+                        <Dropdown options={KIOSK_SUBS_OPTIONS} value={kioskMinSubs} onChange={setKioskMinSubs} className="min-w-[200px] bg-pos-bg text-pos-text" />
+                      </div>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text w-[150px]">{tr('control.productModal.kiosk.kioskMaxSubs', 'Kiosk max. subs')}:</label>
+                        <Dropdown options={KIOSK_SUBS_OPTIONS} value={kioskMaxSubs} onChange={setKioskMaxSubs} className="min-w-[200px] bg-pos-bg text-pos-text" />
+                      </div>
+                    </div>
+                    <div className='flex items-start gap-2'>
+                      <div className='flex items-center'>
+                        <label className="block text-pos-text pr-10">{tr('control.productModal.kiosk.kioskPicture', 'Kiosk picture')}:</label>
+                        <div className="flex items-center gap-2">
+                          <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0">
+                            {tr('control.productModal.chooseFile', 'Choose File')}
+                            <input type="file" className="hidden focus:border-green-500 focus:outline-none" accept="image/*" onChange={(e) => setKioskPictureFileName(e.target.files?.[0]?.name ?? '')} />
+                          </label>
+                          <span className="text-pos-muted pl-5">{kioskPictureFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                      <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                      {tr('control.save', 'Save')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Keyboard fixed at bottom in every tab */}
+            <div className="shrink-0">
+              <KeyboardWithNumpad value={productKeyboardValue} onChange={productKeyboardOnChange} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product positioning modal */}
+      {showProductPositioningModal && (() => {
+        const GRID_COLUMNS = 6;
+        const GRID_ROWS = 8;
+        const PAGE_SIZE = GRID_COLUMNS * GRID_ROWS;
+        const positionCategoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
+        const positioningProducts = products
+          .filter((p) => p.categoryId === positionCategoryId)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+          .map((p) => ({ ...p, type: 'product', _positioningId: `p:${p.id}` }));
+        const allItems = [...positioningProducts, ...positioningSubproducts];
+        const itemMap = new Map(allItems.map((it) => [it._positioningId, it]));
+        const hasStoredLayout = Array.isArray(positioningLayoutByCategory[positionCategoryId]);
+        let cells = [];
+        if (hasStoredLayout) {
+          const existingLayout = positioningLayoutByCategory[positionCategoryId].slice(0, PAGE_SIZE);
+          while (existingLayout.length < PAGE_SIZE) existingLayout.push(null);
+          cells = existingLayout.map((id) => (id && itemMap.has(id) ? id : null));
+        } else {
+          // No auto-placement: keep grid empty until user drags items from sidebar.
+          cells = Array.from({ length: PAGE_SIZE }, () => null);
+        }
+        const pages = 1;
+        const categoryColors = positioningColorByCategory[positionCategoryId] || {};
+        const categoryIndex = categories.findIndex((c) => c.id === positionCategoryId);
+        const canPrevCategory = categoryIndex > 0;
+        const canNextCategory = categoryIndex >= 0 && categoryIndex < categories.length - 1;
+        const COLOR_OPTIONS = [
+          { id: 'green', className: 'bg-[#83c664] text-white' },
+          { id: 'blue', className: 'bg-[#0000ff] text-white' },
+          { id: 'pink', className: 'bg-[#e97c64] text-white' },
+          { id: 'orange', className: 'bg-[#f0961c] text-white' },
+          { id: 'yellow', className: 'bg-[#ff2d3d] text-white' },
+          { id: 'gray', className: 'bg-[#4ab3ff] text-white' },
+        ];
+        const tileClassByColorId = (colorId, fallbackType) => {
+          const found = COLOR_OPTIONS.find((c) => c.id === colorId);
+          if (found) return found.className;
+          return fallbackType === 'subproduct' ? 'bg-amber-500 text-white' : 'bg-[#83c664] text-white';
+        };
+        const updateLayout = (nextCells) => {
+          if (!positionCategoryId) return;
+          const normalized = Array.from({ length: PAGE_SIZE }, (_, i) => nextCells[i] || null);
+          setPositioningLayoutByCategory((prev) => ({ ...prev, [positionCategoryId]: normalized }));
+        };
+        const removeFromPlace = () => {
+          let idx = Number.isInteger(positioningSelectedCellIndex) ? positioningSelectedCellIndex : -1;
+          if (idx < 0 || idx >= PAGE_SIZE) {
+            if (positioningSelectedProductId) {
+              idx = cells.findIndex((id) => {
+                const item = id ? itemMap.get(id) : null;
+                return item?.id === positioningSelectedProductId;
+              });
+            }
+          }
+          if (idx < 0 || idx >= PAGE_SIZE) return;
+          const next = [...cells];
+          next[idx] = null;
+          updateLayout(next);
+          if (positionCategoryId) {
+            setPositioningColorByCategory((prev) => {
+              const byCategory = { ...(prev[positionCategoryId] || {}) };
+              delete byCategory[String(idx)];
+              return { ...prev, [positionCategoryId]: byCategory };
+            });
+          }
+          setPositioningSelectedProductId(null);
+          setPositioningSelectedCellIndex(null);
+          setPositioningSelectedPoolItemId(null);
+        };
+        const applyColorToSelectedCell = (colorId) => {
+          if (!positionCategoryId) return;
+          if (!Number.isInteger(positioningSelectedCellIndex) || positioningSelectedCellIndex < 0 || positioningSelectedCellIndex >= PAGE_SIZE) return;
+          setPositioningColorByCategory((prev) => {
+            const byCategory = { ...(prev[positionCategoryId] || {}) };
+            byCategory[String(positioningSelectedCellIndex)] = colorId;
+            return { ...prev, [positionCategoryId]: byCategory };
+          });
+          // After applying a color, require explicit re-selection for another change.
+          setPositioningSelectedProductId(null);
+          setPositioningSelectedCellIndex(null);
+        };
+        const handleDragStartFromPool = (event, itemId) => {
+          event.dataTransfer.setData('text/plain', JSON.stringify({ itemId, source: 'pool' }));
+          event.dataTransfer.effectAllowed = 'move';
+        };
+        const handleDragStartFromCell = (event, index, itemId) => {
+          event.dataTransfer.setData('text/plain', JSON.stringify({ itemId, source: 'cell', index }));
+          event.dataTransfer.effectAllowed = 'move';
+        };
+        const handleDropOnCell = (event, targetIndex) => {
+          event.preventDefault();
+          let payload = null;
+          try {
+            payload = JSON.parse(event.dataTransfer.getData('text/plain') || '{}');
+          } catch {
+            return;
+          }
+          const itemId = payload?.itemId;
+          if (!itemId || !itemMap.has(itemId)) return;
+          const next = [...cells];
+          const sourceIndex = next.findIndex((id) => id === itemId);
+          const movingFromCell = sourceIndex >= 0;
+          const targetItemBeforeMove = next[targetIndex];
+          if (sourceIndex >= 0) next[sourceIndex] = null;
+          if (payload?.source === 'cell' && Number.isInteger(payload?.index) && payload.index >= 0 && payload.index < PAGE_SIZE && payload.index !== targetIndex) {
+            const targetItem = next[targetIndex];
+            if (targetItem) next[payload.index] = targetItem;
+          }
+          next[targetIndex] = itemId;
+          updateLayout(next);
+          if (positionCategoryId) {
+            setPositioningColorByCategory((prev) => {
+              const byCategory = { ...(prev[positionCategoryId] || {}) };
+              const sourceKey = String(sourceIndex);
+              const targetKey = String(targetIndex);
+              const sourceColor = movingFromCell ? byCategory[sourceKey] : undefined;
+              const targetColor = byCategory[targetKey];
+
+              if (movingFromCell && sourceIndex !== targetIndex) {
+                if (sourceColor) byCategory[targetKey] = sourceColor; else delete byCategory[targetKey];
+                if (targetItemBeforeMove && targetColor) byCategory[sourceKey] = targetColor; else delete byCategory[sourceKey];
+              } else if (!movingFromCell) {
+                // Item comes from pool: target cell gets item without inheriting previous tile color.
+                delete byCategory[targetKey];
+              }
+              return { ...prev, [positionCategoryId]: byCategory };
+            });
+          }
+        };
+        const handleDropOnPool = (event) => {
+          event.preventDefault();
+          let payload = null;
+          try {
+            payload = JSON.parse(event.dataTransfer.getData('text/plain') || '{}');
+          } catch {
+            return;
+          }
+          const itemId = payload?.itemId;
+          if (!itemId || !itemMap.has(itemId)) return;
+          const next = cells.map((id) => (id === itemId ? null : id));
+          updateLayout(next);
+        };
+        const handleCellClick = (idx) => {
+          const itemIdAtCell = cells[idx];
+          const itemAtCell = itemIdAtCell ? itemMap.get(itemIdAtCell) : null;
+          const hasPoolSelection = positioningSelectedPoolItemId && itemMap.has(positioningSelectedPoolItemId);
+          const hasGridSelection = Number.isInteger(positioningSelectedCellIndex) && positioningSelectedCellIndex >= 0 && positioningSelectedCellIndex < PAGE_SIZE;
+          const selectedItemId = hasGridSelection ? cells[positioningSelectedCellIndex] : null;
+
+          if (hasPoolSelection && !itemIdAtCell) {
+            const next = [...cells];
+            next[idx] = positioningSelectedPoolItemId;
+            updateLayout(next);
+            setPositioningSelectedPoolItemId(null);
+            return;
+          }
+          if (hasGridSelection && selectedItemId && itemMap.has(selectedItemId) && idx !== positioningSelectedCellIndex) {
+            const sourceIndex = positioningSelectedCellIndex;
+            const targetIndex = idx;
+            const next = [...cells];
+            const targetItemBeforeMove = next[targetIndex];
+            next[sourceIndex] = targetItemBeforeMove;
+            next[targetIndex] = selectedItemId;
+            updateLayout(next);
+            if (positionCategoryId) {
+              setPositioningColorByCategory((prev) => {
+                const byCategory = { ...(prev[positionCategoryId] || {}) };
+                const sourceKey = String(sourceIndex);
+                const targetKey = String(targetIndex);
+                const sourceColor = byCategory[sourceKey];
+                const targetColor = byCategory[targetKey];
+                if (sourceColor) byCategory[targetKey] = sourceColor; else delete byCategory[targetKey];
+                if (targetColor) byCategory[sourceKey] = targetColor; else delete byCategory[sourceKey];
+                return { ...prev, [positionCategoryId]: byCategory };
+              });
+            }
+            setPositioningSelectedProductId(null);
+            setPositioningSelectedCellIndex(null);
+            return;
+          }
+          if (itemAtCell) {
+            if (positioningSelectedCellIndex === idx && positioningSelectedProductId === itemAtCell.id) {
+              setPositioningSelectedProductId(null);
+              setPositioningSelectedCellIndex(null);
+              setPositioningSelectedPoolItemId(null);
+              return;
+            }
+            setPositioningSelectedProductId(itemAtCell.id);
+            setPositioningSelectedCellIndex(idx);
+            setPositioningSelectedPoolItemId(null);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="absolute top-4 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500"
+                onClick={closeProductPositioningModal}
+                aria-label="Close positioning modal"
+              >
+                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+
+              <div className="flex-1 min-h-0 w-full p-6 flex flex-col pt-20">
+                <div className="flex items-center gap-2 mb-4 shrink-0">
+                  <button
+                    type="button"
+                    className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 disabled:opacity-40 shrink-0"
+                    disabled={!canPrevCategory}
+                    onClick={() => {
+                      if (!canPrevCategory) return;
+                      setPositioningCategoryId(categories[categoryIndex - 1].id);
+                      setPositioningSelectedProductId(null);
+                      setPositioningSelectedCellIndex(null);
+                    }}
+                    aria-label="Previous category"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  </button>
+                  <div ref={positioningCategoryTabsRef} className="flex-1 overflow-x-auto min-w-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="flex min-w-max border-b border-gray-300">
+                      {categories.map((c) => (
+                        <button
+                          key={c.id}
+                          data-category-id={String(c.id)}
+                          type="button"
+                          onClick={() => { setPositioningCategoryId(c.id); setPositioningSelectedProductId(null); setPositioningSelectedCellIndex(null); setPositioningSelectedPoolItemId(null); }}
+                          className={`px-4 py-2 text-sm font-medium border-r border-gray-300 ${c.id === positionCategoryId ? 'bg-green-600 text-white' : 'bg-pos-panel text-gray-200 active:bg-green-500'
+                            }`}
+                        >
+                          {(c.name || '').toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 disabled:opacity-40 shrink-0"
+                    disabled={!canNextCategory}
+                    onClick={() => {
+                      if (!canNextCategory) return;
+                      setPositioningCategoryId(categories[categoryIndex + 1].id);
+                      setPositioningSelectedProductId(null);
+                      setPositioningSelectedCellIndex(null);
+                    }}
+                    aria-label="Next category"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </div>
+
+                <div className="flex justify-center gap-4 mb-4 shrink-0">
+                  {Array.from({ length: pages }, (_, i) => (
+                    <span key={i} className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-gray-300' : 'bg-gray-600'}`} />
+                  ))}
+                </div>
+
+                <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr] gap-4">
+                  <div
+                    className="border border-gray-300 bg-pos-panel/50 p-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden rounded-lg"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDropOnPool}
+                  >
+                    <div className="grid grid-cols-1 gap-2">
+                      {allItems
+                        .filter((it) => !cells.includes(it._positioningId))
+                        .map((item) => (
+                          <button
+                            key={item._positioningId}
+                            type="button"
+                            draggable
+                            onDragStart={(e) => handleDragStartFromPool(e, item._positioningId)}
+                            onClick={() => {
+                              setPositioningSelectedPoolItemId(item._positioningId);
+                              setPositioningSelectedProductId(null);
+                              setPositioningSelectedCellIndex(null);
+                            }}
+                            className={`text-left px-3 py-2 rounded border text-md ${item.type === 'product' ? 'bg-green-500/90 text-white border-green-600' : 'bg-amber-500/90 text-white border-amber-600'
+                              } ${positioningSelectedPoolItemId === item._positioningId ? 'ring-2 ring-white' : ''}`}
+                          >
+                            <div className="truncate">{item.name}</div>
+                            <div className="text-xs opacity-90">€{Number(item._positioningPrice ?? item.price ?? 0).toFixed(2)} · {item.type}</div>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                  <div className="grid gap-0 flex h-full justify-center items-center bg-pos-panel/30 rounded-lg overflow-hidden" style={{ gridTemplateColumns: `repeat(${GRID_COLUMNS}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${GRID_ROWS}, minmax(0, 1fr))` }}>
+                    {cells.map((itemId, idx) => {
+                      const item = itemId ? itemMap.get(itemId) : null;
+                      const selected = item && positioningSelectedProductId === item.id && positioningSelectedCellIndex === idx;
+                      const selectedColorId = categoryColors[String(idx)];
+                      const tileClass = item
+                        ? tileClassByColorId(selectedColorId, item.type)
+                        : 'bg-pos-panel/50';
+                      return (
+                        <div
+                          key={item?.id || `empty-${idx}`}
+                          role="button"
+                          tabIndex={0}
+                          className={`h-[55px] border border-gray-300 px-2 text-center text-md cursor-pointer ${tileClass} ${selected ? 'ring-2 ring-gray-300' : ''}`}
+                          style={selected ? { boxShadow: 'inset 0 0 0 2px #000000' } : undefined}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => handleDropOnCell(e, idx)}
+                          onClick={() => handleCellClick(idx)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCellClick(idx)}
+                        >
+                          {item ? (
+                            <div
+                              draggable
+                              onDragStart={(e) => handleDragStartFromCell(e, idx, item._positioningId)}
+                              className="w-full h-full"
+                            >
+                              <div className="truncate text-md">{item.name}</div>
+                              <div className="text-md">€{Number(item._positioningPrice ?? item.price ?? 0).toFixed(2)}</div>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-center gap-6 shrink-0 pt-5 pb-5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="px-6 py-2 rounded-lg border border-gray-300 text-md font-medium text-gray-200 bg-pos-panel active:bg-green-500 disabled:opacity-50 disabled:pointer-events-none"
+                      disabled={!Number.isInteger(positioningSelectedCellIndex)}
+                      onClick={removeFromPlace}
+                    >
+                      {tr('control.functionButtons.removeFromPlace', 'Remove from place')}
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    {COLOR_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        disabled={!Number.isInteger(positioningSelectedCellIndex)}
+                        onClick={() => applyColorToSelectedCell(option.id)}
+                        className={`w-14 h-8 rounded border border-gray-300 text-md ${option.className} ${Number.isInteger(positioningSelectedCellIndex) &&
+                          categoryColors[String(positioningSelectedCellIndex)] === option.id
+                          ? 'ring-2 ring-gray-300'
+                          : ''
+                          }`}
+                        aria-label={`Set tile color ${option.id}`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                    disabled={savingPositioningLayout}
+                    onClick={saveProductPositioningLayout}
+                  >
+                    <svg fill="#ffffff" width="16px" height="16px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
+                    {savingPositioningLayout ? tr('control.saving', 'Saving...') : tr('control.save', 'Save')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Product search keyboard modal */}
+      {showProductSearchKeyboard && subNavId === 'Products' && (
+        <div className="fixed inset-0 z-10 flex items-end justify-center">
+          <div className="relative bg-pos-bg rounded-t-xl shadow-2xl w-[90%] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-1 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={() => setShowProductSearchKeyboard(false)} aria-label="Close">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="p-2 shrink-0 pt-10 flex w-full justify-center">
+              <KeyboardWithNumpad value={productSearch} onChange={setProductSearch} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product row -> Subproducts modal */}
+      {showProductSubproductsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative bg-pos-bg rounded-xl min-w-[600px] border border-pos-border shadow-2xl p-6 text-sm max-h-[90vh] overflow-auto [scrollbar-width:none]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeProductSubproductsModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
+            <div className="space-y-4 mt-6">
+              {loadingProductSubproductsLinked && (
+                <div className="w-full flex items-center justify-center py-8">
+                  <div className="flex items-center gap-3 text-pos-text">
+                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
+                      <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                    <span className="text-sm">{tr('control.productSubproducts.loading', 'Loading...')}</span>
+                  </div>
+                </div>
+              )}
+              <Dropdown
+                options={[
+                  { value: '', label: tr('control.productSubproducts.withoutGroup', 'Without group') },
+                  ...subproductGroups.map((g) => ({ value: g.id, label: g.name }))
+                ]}
+                value={productSubproductsGroupId}
+                onChange={setProductSubproductsGroupId}
+                className="w-full max-w-[200px]"
+              />
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-stretch min-h-[280px]">
+                {/* Left: Available in group */}
+                <div className="flex flex-col rounded-lg border border-pos-border bg-pos-panel/30 overflow-hidden min-w-0">
+                  <div className="px-3 py-2 border-b border-pos-border bg-pos-panel/50 font-medium text-pos-text shrink-0">
+                    {tr('control.productSubproducts.available', 'Available in group')}
+                  </div>
+                  <label className="flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500">
+                    <input
+                      type="checkbox"
+                      checked={productSubproductsAvailable.length > 0 && productSubproductsAvailable.every((sp) => productSubproductsLeftSelectedIds.has(sp.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setProductSubproductsLeftSelectedIds(new Set(productSubproductsAvailable.map((sp) => sp.id)));
+                        } else {
+                          setProductSubproductsLeftSelectedIds(new Set());
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span>{tr('control.productSubproducts.selectAll', 'Select all')}</span>
+                  </label>
+                  <div
+                    ref={productSubproductsLeftListRef}
+                    className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {!productSubproductsGroupId ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.selectGroupFirst', 'Select a group above')}</div>
+                    ) : productSubproductsAvailable.length === 0 ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.allLinked', 'All subproducts in this group are linked')}</div>
+                    ) : (
+                      <ul className="space-y-1">
+                        {productSubproductsAvailable.map((sp) => (
+                          <li key={sp.id}>
+                            <label className="flex items-center gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text">
+                              <input
+                                type="checkbox"
+                                checked={productSubproductsLeftSelectedIds.has(sp.id)}
+                                onChange={(e) => {
+                                  setProductSubproductsLeftSelectedIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(sp.id);
+                                    else next.delete(sp.id);
+                                    return next;
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="truncate">{sp.name}</span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="px-3 py-2 border-t border-pos-border shrink-0">
+                    <button
+                      type="button"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-green-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleAddProductSubproductLinks}
+                      disabled={!productSubproductsLeftSelectedIds.size}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      {tr('control.productSubproducts.add', 'Add')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Center: transfer hint (optional visual spacer on desktop) */}
+                <div className="hidden md:flex items-center justify-center text-pos-muted shrink-0">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                </div>
+
+                {/* Right: Linked to product */}
+                <div className="flex flex-col rounded-lg border border-pos-border bg-pos-panel/30 overflow-hidden min-w-0">
+                  <div className="px-3 py-2 border-b border-pos-border bg-pos-panel/50 font-medium text-pos-text shrink-0">
+                    {tr('control.productSubproducts.linked', 'Linked to product')}
+                  </div>
+                  <label className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500 ${!productSubproductsLinked.length ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={productSubproductsLinked.length > 0 && productSubproductsLinked.every((l) => productSubproductsRightSelectedIds.has(l.subproductId))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setProductSubproductsRightSelectedIds(new Set(productSubproductsLinked.map((l) => l.subproductId)));
+                        } else {
+                          setProductSubproductsRightSelectedIds(new Set());
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span>{tr('control.productSubproducts.selectAll', 'Select all')}</span>
+                  </label>
+                  <div
+                    ref={productSubproductsListRef}
+                    className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {loadingProductSubproductsLinked ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
+                    ) : productSubproductsLinked.length === 0 ? (
+                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.noLinkedYet', 'No subproducts linked yet.')}</div>
+                    ) : (
+                      <ul className="space-y-1">
+                        {productSubproductsLinked.map((link) => (
+                          <li key={link.subproductId}>
+                            <label className="flex items-center justify-between gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text group">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={productSubproductsRightSelectedIds.has(link.subproductId)}
+                                  onChange={(e) => {
+                                    setProductSubproductsRightSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (e.target.checked) next.add(link.subproductId);
+                                      else next.delete(link.subproductId);
+                                      return next;
+                                    });
+                                  }}
+                                  className="rounded shrink-0"
+                                  onClick={(ev) => ev.stopPropagation()}
+                                />
+                                <span className="truncate">{link.subproductName}</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="p-1 rounded active:bg-green-500 text-pos-muted active:text-red-400 shrink-0 opacity-0 group-active:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  removeProductSubproductLink(link.subproductId);
+                                }}
+                                aria-label={tr('delete', 'Delete')}
+                              >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="px-3 py-2 border-t border-pos-border shrink-0">
+                    <button
+                      type="button"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-red-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleRemoveProductSubproductLinks}
+                      disabled={!productSubproductsRightSelectedIds.size}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      {tr('control.productSubproducts.remove', 'Remove')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center shrink-0">
+              <button
+                type="button"
+                className="px-6 py-3 rounded-lg bg-green-600 text-white text-sm font-medium active:bg-green-500 disabled:opacity-50"
+                onClick={handleSaveProductSubproducts}
+                disabled={savingProductSubproducts || !productSubproductsProduct}
+              >
+                {savingProductSubproducts ? tr('control.saving', 'Saving...') : tr('control.save', 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New / Edit subproduct modal */}
+      {showSubproductModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative bg-pos-bg rounded-xl border border-pos-border shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh] text-sm" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeSubproductModal} aria-label="Close">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="flex-1 min-h-0 overflow-auto w-full">
+              <div className="p-6 flex w-full text-sm pt-14">
+                <div className='flex flex-col gap-3 w-1/3'>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.name', 'Name :')} </label>
+                    <input
+                      type="text"
+                      value={subproductName}
+                      onChange={(e) => handleSubproductNameChange(e.target.value)}
+                      onFocus={() => setSubproductActiveField('name')}
+                      placeholder=""
+                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.keyName', 'Key name :')} </label>
+                    <input
+                      type="text"
+                      value={subproductKeyName}
+                      onChange={(e) => setSubproductKeyName(e.target.value)}
+                      onFocus={() => setSubproductActiveField('keyName')}
+                      placeholder=""
+                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.productionName', 'Production name :')} </label>
+                    <input
+                      type="text"
+                      value={subproductProductionName}
+                      onChange={(e) => setSubproductProductionName(e.target.value)}
+                      onFocus={() => setSubproductActiveField('productionName')}
+                      placeholder=""
+                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.price', 'Price :')} </label>
+                    <input
+                      type="text"
+                      value={subproductPrice}
+                      onChange={(e) => setSubproductPrice(e.target.value)}
+                      onFocus={() => setSubproductActiveField('price')}
+                      placeholder=""
+                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.vatTakeOut', 'VAT Take out :')} </label>
+                    <Dropdown options={SUBPRODUCT_VAT_OPTIONS} value={subproductVatTakeOut} onChange={setSubproductVatTakeOut} placeholder="--" className="text-md min-w-[150px]" />
+                  </div>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.vatEatIn', 'VAT Eat in :')} </label>
+                    <Dropdown options={SUBPRODUCT_VAT_OPTIONS} value={subproductVatEatIn} onChange={setSubproductVatEatIn} placeholder="--" className="text-md min-w-[150px]" />
+                  </div>
+                </div>
+                <div className='flex flex-col gap-3 w-1/3'>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[100px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.group', 'Group :')} </label>
+                    <Dropdown
+                      options={subproductGroups.map((g) => ({ value: g.id, label: g.name }))}
+                      value={subproductModalGroupId}
+                      onChange={setSubproductModalGroupId}
+                      placeholder="--"
+                      className="text-md min-w-[150px]"
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full items-center">
+                    <label className="block min-w-[100px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.kioskPicture', 'Kiosk picture :')} </label>
+                    <div className="w-[200px] flex items-center justify-start flex-wrap gap-2">
+                      {!subproductKioskPicture ? (
+                        <label className="px-4 py-2 border border-gray-300 rounded-lg text-gray-200 active:bg-green-500 cursor-pointer shrink-0 text-md">
+                          {tr('control.subproductModal.select', 'Select')}
+                          <input
+                            type="file"
+                            className="hidden focus:border-green-500 focus:outline-none"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file && file.type.startsWith('image/')) {
+                                const dataUrl = await new Promise((resolve, reject) => {
+                                  const reader = new FileReader();
+                                  reader.onload = () => resolve(String(reader.result || ''));
+                                  reader.onerror = () => reject(reader.error);
+                                  reader.readAsDataURL(file);
+                                }).catch(() => '');
+                                if (dataUrl) setSubproductKioskPicture(dataUrl);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      ) : (
+                        <>
+                          <img src={subproductKioskPicture} alt="Kiosk" className="w-16 h-16 object-cover rounded-lg border border-gray-300 shrink-0" />
+                          <button
+                            type="button"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-200 active:bg-green-500 text-md shrink-0"
+                            onClick={() => setSubproductKioskPicture('')}
+                          >
+                            {tr('control.subproductModal.remove', 'Remove')}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col w-1/3 items-center gap-3">
+                  <label className="block text-md font-medium text-gray-200">{tr('control.subproductModal.attachTo', 'Attach To')}</label>
+                  <div ref={subproductAttachToListRef} className="border border-gray-300 rounded-lg bg-pos-panel/30 w-full h-[220px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    <ul className="p-2">
+                      {categories.length === 0 ? (
+                        <li className="text-pos-muted text-md py-2 px-2">{tr('control.subproductModal.noCategoriesAvailable', 'No categories available')}</li>
+                      ) : (
+                        categories.map((c) => {
+                          const attached = subproductAttachToCategoryIds.includes(c.id);
+                          const toggle = () => setSubproductAttachToCategoryIds((prev) => attached ? prev.filter((id) => id !== c.id) : [...prev, c.id]);
+                          return (
+                            <li
+                              key={c.id}
+                              role="button"
+                              tabIndex={0}
+                              className={`text-md py-1.5 px-2 flex items-center gap-2 cursor-pointer rounded select-none ${attached ? 'text-gray-200 font-medium bg-pos-panel' : 'text-pos-muted'} active:bg-green-500`}
+                              onClick={toggle}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+                              aria-label={attached ? tr('control.subproductModal.attachedToHint', 'Attached to {name}. Click to detach.').replace('{name}', c.name || '') : tr('control.subproductModal.attachToHint', 'Click to attach to {name}').replace('{name}', c.name || '')}
+                            >
+                              <span className="uppercase font-medium truncate flex-1 min-w-0">{(c.name || '').toUpperCase()}</span>
+                              <input
+                                type="checkbox"
+                                checked={attached}
+                                onChange={() => { }}
+                                onClick={(e) => { e.stopPropagation(); toggle(); }}
+                                className="w-5 h-5 rounded border-gray-300 cursor-pointer shrink-0"
+                                aria-label={attached ? tr('control.subproductModal.detachFromHint', 'Detach from {name}').replace('{name}', c.name || '') : tr('control.subproductModal.attachToCategoryHint', 'Attach to {name}').replace('{name}', c.name || '')}
+                              />
+                            </li>
+                          );
+                        })
+                      )}
+                    </ul>
+                  </div>
+                  <div className="flex w-full justify-around gap-2 items-center pt-2">
+                    <button type="button" className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300" aria-label="Scroll attach list up" onClick={() => scrollSubproductAttachToByPage('up')}>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    </button>
+                    <button type="button" className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300" aria-label="Scroll attach list down" onClick={() => scrollSubproductAttachToByPage('down')}>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-center shrink-0">
+              <button
+                type="button"
+                className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+                disabled={savingSubproduct}
+                onClick={handleSaveSubproduct}
+              >
+                <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
+                </svg>
+                {tr('control.save', 'Save')}
+              </button>
+            </div>
+            <div className="shrink-0">
+              <KeyboardWithNumpad value={subproductKeyboardValue} onChange={subproductKeyboardOnChange} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Groups modal */}
+      {showManageGroupsModal && (() => {
+        const sortedGroups = [...subproductGroups].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={() => { setShowManageGroupsModal(false); setSelectedManageGroupId(null); }} aria-label="Close">
+                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              <div className="flex-1 min-h-0 overflow-auto w-full">
+                <div className="p-6 flex flex-col space-y-6 w-full justify-center items-center pt-14">
+                  <div className="w-full flex flex-col justify-center items-center gap-5 max-w-xl">
+                    <div className="flex gap-2 w-full items-center justify-center flex-wrap">
+                      <label className="block text-md pr-[20px] font-medium text-gray-200 mb-2">{tr('control.subproducts.manageGroups.newGroup', 'New group :')} </label>
+                      <input
+                        type="text"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder={tr('control.subproducts.manageGroups.newGroupPlaceholder', 'New group name')}
+                        className="px-4 w-[200px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200 placeholder:text-gray-500"
+                      />
+                      <button type="button" className="flex ml-20 items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 shrink-0" disabled={savingGroup} onClick={handleAddGroup}>
+                        {tr('control.subproducts.manageGroups.add', 'Add')}
+                      </button>
+                    </div>
+                    <div
+                      ref={manageGroupsListRef}
+                      className="w-full border border-gray-300 max-h-[250px] overflow-y-auto rounded-lg overflow-hidden bg-pos-panel/30 cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      onScroll={updateManageGroupsPaginationState}
+                      onPointerDown={(e) => {
+                        if (e.pointerType === 'mouse' && e.button !== 0) return;
+                        const el = manageGroupsListRef.current;
+                        if (!el) return;
+                        manageGroupsDragRef.current = {
+                          active: true,
+                          startY: e.clientY,
+                          startScrollTop: el.scrollTop,
+                          pointerId: e.pointerId,
+                        };
+                        e.currentTarget.setPointerCapture?.(e.pointerId);
+                      }}
+                      onPointerMove={(e) => {
+                        const drag = manageGroupsDragRef.current;
+                        if (!drag.active) return;
+                        const el = manageGroupsListRef.current;
+                        if (!el) return;
+                        const deltaY = e.clientY - drag.startY;
+                        el.scrollTop = drag.startScrollTop - deltaY;
+                      }}
+                      onPointerUp={(e) => {
+                        const drag = manageGroupsDragRef.current;
+                        if (!drag.active) return;
+                        manageGroupsDragRef.current = { active: false, startY: 0, startScrollTop: 0, pointerId: null };
+                        e.currentTarget.releasePointerCapture?.(e.pointerId);
+                        updateManageGroupsPaginationState();
+                      }}
+                      onPointerCancel={(e) => {
+                        const drag = manageGroupsDragRef.current;
+                        if (!drag.active) return;
+                        manageGroupsDragRef.current = { active: false, startY: 0, startScrollTop: 0, pointerId: null };
+                        e.currentTarget.releasePointerCapture?.(e.pointerId);
+                        updateManageGroupsPaginationState();
+                      }}
+                    >
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          {sortedGroups.map((grp) => (
+                            <tr
+                              key={grp.id}
+                              className={`border-b border-gray-300 w-full items-center min-h-[40px] flex justify-between ${selectedManageGroupId === grp.id ? 'bg-pos-panel/70' : ''} active:bg-green-500`}
+                              onClick={(e) => { if (!e.target.closest('button')) setSelectedManageGroupId(grp.id); }}
+                            >
+                              <td className="w-full py-2 px-3">
+                                {editingGroupId === grp.id ? (
+                                  <div className="flex items-center w-full justify-between gap-2 flex-wrap">
+                                    <input
+                                      type="text"
+                                      value={editingGroupName}
+                                      onChange={(e) => setEditingGroupName(e.target.value)}
+                                      className="flex min-w-[200px] max-w-[200px] px-4 h-[40px] py-3 bg-pos-panel border border-gray-300 rounded-lg text-gray-200 text-md"
+                                      autoFocus
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button type="button" className="flex items-center text-md gap-2 px-4 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 shrink-0" disabled={savingGroup} onClick={(e) => { e.stopPropagation(); handleSaveEditGroup(); }}>{tr('control.save', 'Save')}</button>
+                                      <button type="button" className="flex items-center text-md gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-gray-300 text-gray-200 font-medium active:bg-green-500 shrink-0" onClick={(e) => { e.stopPropagation(); setEditingGroupId(null); setEditingGroupName(''); }}>{tr('cancel', 'Cancel')}</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="font-medium text-md text-gray-200">{grp.name}</span>
+                                )}
+                              </td>
+                              {editingGroupId !== grp.id && (
+                                <td className="py-2 px-3 text-right flex items-center gap-1 shrink-0">
+                                  <button type="button" className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 inline-flex align-middle" onClick={(e) => { e.stopPropagation(); setEditingGroupId(grp.id); setEditingGroupName(grp.name || ''); }} aria-label={tr('control.edit', 'Edit')}>
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                  </button>
+                                  <button type="button" className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 inline-flex align-middle" onClick={(e) => { e.stopPropagation(); setDeleteConfirmGroupId(grp.id); }} aria-label={tr('delete', 'Delete')}>
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex w-full justify-around gap-4 items-center pt-2">
+                      <button
+                        type="button"
+                        className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300 disabled:opacity-40 disabled:pointer-events-none"
+                        disabled={savingGroup || !canManageGroupsPageUp}
+                        onClick={() => pageManageGroups('up')}
+                        aria-label="Previous page"
+                      >
+                        <img src="/arrow-up.svg" alt="" className="w-5 h-5 invert opacity-90" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300 disabled:opacity-40 disabled:pointer-events-none"
+                        disabled={savingGroup || !canManageGroupsPageDown}
+                        onClick={() => pageManageGroups('down')}
+                        aria-label="Next page"
+                      >
+                        <img src="/arrow-down.svg" alt="" className="w-5 h-5 invert opacity-90" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="shrink-0">
+                <KeyboardWithNumpad
+                  value={editingGroupId ? editingGroupName : newGroupName}
+                  onChange={editingGroupId ? setEditingGroupName : setNewGroupName}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Logout confirmation modal — same style as delete modal */}
+      <DeleteConfirmModal
+        open={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogoutConfirm}
+        message={tr('logoutConfirm', 'Are you sure you want to log out?')}
+      />
+    </div>
+  );
+}
+
+
+

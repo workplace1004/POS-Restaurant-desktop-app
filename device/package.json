@@ -1,0 +1,16 @@
+{
+  "name": "pos-device-agent",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Localhost service: baseboard/system hardware fingerprint for POS licensing (same PC as the browser).",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "systeminformation": "^5.23.5"
+  }
+}
