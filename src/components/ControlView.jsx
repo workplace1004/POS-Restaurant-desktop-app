@@ -93,6 +93,13 @@ import {
   normalizeFlowerPotToItem
 } from './controlView/controlViewUtils.js';
 import { ControlViewSidebar, ControlViewMainNav } from './controlView/ControlViewChrome.jsx';
+import { ControlViewPriceGroups } from './controlView/ControlViewPriceGroups.jsx';
+import { ControlViewCategories } from './controlView/ControlViewCategories.jsx';
+import { ControlViewProducts } from './controlView/ControlViewProducts.jsx';
+import { ControlViewSubproducts } from './controlView/ControlViewSubproducts.jsx';
+import { ControlViewKitchen } from './controlView/ControlViewKitchen.jsx';
+import { ControlViewDiscounts } from './controlView/ControlViewDiscounts.jsx';
+import { ControlViewCashRegisterContent } from './controlView/ControlViewCashRegisterContent.jsx';
 
 /** Prisma `categoryId`: deepest selected category in the chain (not only index 0). */
 function resolveProductPrimaryCategoryId(productCategoryIds, selectedCategoryId) {
@@ -5114,1031 +5121,174 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         {/* Content area */}
         <main className="flex-1 overflow-hidden px-4 pt-2">
           {controlSidebarId === 'reports' ? (
-            <div className="flex flex-col h-full gap-4">
-              {reportTabId === 'financial' && (
-                <div className="flex gap-4 flex-col min-h-0 flex-1 w-full">
-                  <div className="shrink-0 flex justify-around gap-2 h-[46px] w-full items-center">
-                    <span className="text-pos-text text-sm font-medium">Z</span>
-                    <span className="text-pos-text text-sm font-medium">X</span>
-                    <button type="button" className="text-pos-text active:underline text-sm active:bg-green-500">{tr('control.reports.history', 'History')}</button>
-                  </div>
-                  <div className="relative grid grid-cols-2 flex-1 px-4 min-h-0 gap-4">
-                    <div className="flex flex-col min-h-0 gap-3">
-                      <div id="financial-report-pospoint-scroll" className="flex-1 overflow-auto rounded-xl border border-pos-border bg-white text-gray-800 p-4 min-h-[400px]">
-                        <div className="text-sm font-mono space-y-1 whitespace-pre-wrap text-center">
-                          <div className="text-base font-medium mb-2">pospoint demo</div>
-                          <div className="mb-2">BE.0.0.0</div>
-                          <div className="flex justify-between border-b border-dotted border-gray-400 pb-1 mb-2">
-                            <span>Date : {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')}</span>
-                            <span>Tijd: {new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-                          </div>
-                          <div className="border-b border-dotted border-gray-400 pb-2 mb-4 font-semibold text-sm">Z FINANCIEEL #2</div>
-                          <div className="text-left space-y-1">
-                            <div className="font-medium">Terminals:</div>
-                            <div>Kassa 2 — 16/01-08:26 =&gt; 25/01-11:04</div>
-                            <div>Kassa 4 — 13/01-19:07 =&gt; 25/02-14:27</div>
-                            <div className="mt-4 font-medium">BTW per tarief</div>
-                            <table className="w-full border-collapse text-sm mt-1 text-left">
-                              <thead>
-                                <tr className="border-b border-gray-300">
-                                  <th className="py-1">MvH NS</th>
-                                  <th className="py-1">MvH NR</th>
-                                  <th className="py-1">Btw</th>
-                                  <th className="py-1">{tr('total', 'Total')}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="border-b border-gray-200">
-                                  <td className="py-1">333.73</td>
-                                  <td className="py-1">2.83</td>
-                                  <td className="py-1">19.85</td>
-                                  <td className="py-1">350.75</td>
-                                </tr>
-                                <tr className="font-medium">
-                                  <td className="py-1">{tr('total', 'Total')}</td>
-                                  <td className="py-1">333.73</td>
-                                  <td className="py-1">2.83</td>
-                                  <td className="py-1">350.75</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                            <div className="mt-4 font-medium">Betalingen</div>
-                            <div>Cash — 174.75</div>
-                            <div>Credit Card — 117.00</div>
-                            <div>Visa — 59.00</div>
-                            <div className="font-medium">{tr('total', 'Total')} 350.75</div>
-                            <div className="mt-4 font-medium">Eat-in / Take-out</div>
-                            <div>10 Take-Out — 350.75</div>
-                            <div className="font-medium">{tr('total', 'Total')} 350.75</div>
-                            <div className="mt-4 font-medium">Ticket types</div>
-                            <div>11 Counter Sales — 350.75</div>
-                            <div className="font-medium">{tr('total', 'Total')} 350.75</div>
-                            <div className="mt-4 font-medium">Issued VAT tickets:</div>
-                            <div>NS: 10</div>
-                            <div>NR: 1</div>
-                            <div className="mt-2">Number of return tickets: 1</div>
-                            <div>Drawer opened without sale: 0</div>
-                            <div>Pro Forma tickets: 7</div>
-                            <div>Pro Forma returns: 0</div>
-                            <div>Pro Forma turnover (incl. VAT): 126.20</div>
-                            <div>Gift vouchers sold: 0</div>
-                            <div>Value of gift vouchers sold: 0.00</div>
-                            <div>Applied discounts: 0</div>
-                            <div>Total discount amount (incl. VAT): 0.00</div>
-                            <div>Total cash rounding amount: 0.00</div>
-                            <div>Credit top-up: 0.00</div>
-                            <div>Staff consumption: 0.00</div>
-                            <div>Online payment cash refunded: 0.00</div>
-                            <div>Number of online orders: 0.00</div>
-                            <div>Database ID: 2</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between px-2 py-2 shrink-0">
-                        <div className="flex-1" />
-                        <PaginationArrows
-                          canPrev={true}
-                          canNext={true}
-                          onPrev={() => {
-                            const el = document.getElementById('financial-report-pospoint-scroll');
-                            if (el) el.scrollBy({ top: -200, behavior: 'smooth' });
-                          }}
-                          onNext={() => {
-                            const el = document.getElementById('financial-report-pospoint-scroll');
-                            if (el) el.scrollBy({ top: 200, behavior: 'smooth' });
-                          }}
-                          className="relative py-0"
-                        />
-                        <div className="flex-1" />
-                      </div>
-                    </div>
-                    <div className="flex flex-col h-full gap-3 shrink-0 justify-center items-center">
-                      <div className="flex items-center gap-4 w-full justify-center">
-                        <label className="text-pos-text text-sm shrink-0">{tr('control.reports.createTo', 'Create to :')}</label>
-                        <Dropdown options={mapTranslatedOptions(REPORT_GENERATE_UNTIL_OPTIONS)} value={reportGenerateUntil} onChange={setReportGenerateUntil} placeholder={tr('control.reports.currentTime', 'Current time')} className="text-sm min-w-[180px] max-w-[180px]" />
-                      </div>
-                      <button type="button" className="flex mt-4 items-center gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm justify-center w-[120px]">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        {tr('control.reports.print', 'Print')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {reportTabId === 'user' && (
-                <div className="flex gap-4 flex-col min-h-[650px] max-h-[650px] w-full">
-                  <div className="shrink-0 flex justify-around gap-2 h-[46px] w-full items-center">
-                    <span className="text-pos-text text-sm font-medium">Z</span>
-                    <span className="text-pos-text text-sm font-medium">X</span>
-                  </div>
-                  <div className="relative grid grid-cols-2 h-full gap-4">
-                    <div className='flex flex-col h-full gap-3'>
-                      <div className="flex-1 overflow-auto rounded-xl border border-pos-border bg-white text-gray-800 p-4 min-h-[400px]">
-                        <div className="">
-
-                        </div>
-
-                      </div>
-                      <div className="flex items-center justify-between px-2 py-2">
-                        <div className="flex-1" />
-                        <PaginationArrows canPrev={true} canNext={true} onPrev={() => { }} onNext={() => { }} className="relative py-0" />
-                        <div className="flex-1" />
-                      </div>
-                    </div>
-                    <div className='flex justify-center items-center'>
-                      <button type="button" className="flex items-center h-[40px] w-[120px] gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        {tr('control.reports.print', 'Print')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {reportTabId === 'periodic' && (
-                <div className="flex flex-col gap-4 flex-1 min-h-0">
-                  {/* Date and time row */}
-                  <div className="flex flex-wrap items-center justify-around gap-3 shrink-0">
-                    <Dropdown options={PERIODIC_REPORT_TIME_OPTIONS} value={periodicReportStartTime} onChange={setPeriodicReportStartTime} placeholder="00:00" className="text-sm min-w-[80px]" />
-                    <input type="text" value={periodicReportStartDate} onChange={(e) => setPeriodicReportStartDate(e.target.value)} placeholder="dd-mm-yyyy" className="w-[120px] px-3 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text text-sm" />
-                    <span className="text-pos-text text-sm">{tr('control.reports.to', 'to')}</span>
-                    <Dropdown options={PERIODIC_REPORT_TIME_OPTIONS} value={periodicReportEndTime} onChange={setPeriodicReportEndTime} placeholder="24:00" className="text-sm min-w-[80px]" />
-                    <input type="text" value={periodicReportEndDate} onChange={(e) => setPeriodicReportEndDate(e.target.value)} placeholder="dd-mm-yyyy" className="w-[120px] px-3 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text text-sm" />
-                    <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm font-medium">
-                      {tr('control.reports.makeReport', 'Make report')}
-                    </button>
-                  </div>
-                  {/* Report area (left) + Info panel (right) */}
-                  <div className="flex gap-4 flex-1 min-h-0">
-                    <div className="relative flex-1 min-w-0 flex flex-col rounded-xl border border-pos-border bg-white min-h-[400px] overflow-hidden">
-                      <div className="flex-1 overflow-auto p-4 text-gray-800 min-h-[300px]">
-                        <p className="text-gray-500 text-sm">{tr('control.reports.selectPeriodHint', 'Select period and click "Make report" to generate the report.')}</p>
-                      </div>
-                      <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 bg-gray-50 shrink-0">
-                        <div className="flex-1" />
-                        <PaginationArrows canPrev={true} canNext={true} onPrev={() => { }} onNext={() => { }} className="relative py-0" />
-                        <div className="flex-1 flex justify-end">
-                          <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                            {tr('control.reports.print', 'Print')}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="shrink-0 w-[280px] rounded-xl border border-pos-border bg-white p-4 text-gray-800 text-sm leading-relaxed">
-                      <p className="font-medium text-gray-900 mb-2 text-sm">{tr('control.reports.periodicInfo1', 'In this new management system we work with 24:00 instead of 00:00 as the end point as in the web panel.')}</p>
-                      <p className="mb-2">{tr('control.reports.periodicExample', 'Example,')}</p>
-                      <p className="mb-2">{tr('control.reports.periodicExample2', 'all turnover of 27-02-2026')}</p>
-                      <p className="font-medium mt-3">{tr('control.reports.periodicEarlier', 'Earlier:')}</p>
-                      <p className="mb-2">{tr('control.reports.periodicEarlierExample', '00:00 27-02-2026 to 00:00 28-02-2026')}</p>
-                      <p className="font-medium mt-3">{tr('control.reports.periodicNot', 'Not:')}</p>
-                      <p>{tr('control.reports.periodicNotExample', '00:00 27-02-2026 to 24:00 27-02-2026')}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {reportTabId === 'settings' && (
-                <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px] min-h-[650px]">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-left">
-                      <thead>
-                        <tr className="border-b border-pos-border">
-                          <th className="text-pos-text text-sm font-medium py-2 pr-4"></th>
-                          <th className="text-pos-text text-sm font-medium py-2 px-3 text-center w-16">Z</th>
-                          <th className="text-pos-text text-sm font-medium py-2 px-3 text-center w-16">X</th>
-                          <th className="text-pos-text text-sm font-medium py-2 px-3 text-center w-20">{tr('control.reports.periodic', 'Periodic')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {REPORT_SETTINGS_ROWS.map((row) => (
-                          <tr key={row.id} className="border-b border-pos-border/70">
-                            <td className="text-pos-text text-sm py-2 pr-4">{tr(row.labelKey, row.fallback)}</td>
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={reportSettings[row.id]?.z ?? false}
-                                onChange={(e) => setReportSetting(row.id, 'z', e.target.checked)}
-                                className="w-5 h-5 rounded border-pos-border bg-pos-bg text-green-600 focus:ring-green-500"
-                              />
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={reportSettings[row.id]?.x ?? false}
-                                onChange={(e) => setReportSetting(row.id, 'x', e.target.checked)}
-                                className="w-5 h-5 rounded border-pos-border bg-pos-bg text-green-600 focus:ring-green-500"
-                              />
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={reportSettings[row.id]?.periodic ?? false}
-                                onChange={(e) => setReportSetting(row.id, 'periodic', e.target.checked)}
-                                className="w-5 h-5 rounded border-pos-border bg-pos-bg text-green-600 focus:ring-green-500"
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex justify-center mt-6">
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-sm"
-                      disabled={savingReportSettings}
-                      onClick={handleSaveReportSettings}
-                    >
-                      <svg fill="currentColor" className="w-4 h-4" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
-                      {tr('control.save', 'Save')}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ControlViewReportsContent
+              tr={tr}
+              mapTranslatedOptions={mapTranslatedOptions}
+              reportTabId={reportTabId}
+              reportGenerateUntil={reportGenerateUntil}
+              setReportGenerateUntil={setReportGenerateUntil}
+              periodicReportStartTime={periodicReportStartTime}
+              setPeriodicReportStartTime={setPeriodicReportStartTime}
+              periodicReportStartDate={periodicReportStartDate}
+              setPeriodicReportStartDate={setPeriodicReportStartDate}
+              periodicReportEndTime={periodicReportEndTime}
+              setPeriodicReportEndTime={setPeriodicReportEndTime}
+              periodicReportEndDate={periodicReportEndDate}
+              setPeriodicReportEndDate={setPeriodicReportEndDate}
+              reportSettings={reportSettings}
+              setReportSetting={setReportSetting}
+              savingReportSettings={savingReportSettings}
+              onSaveReportSettings={handleSaveReportSettings}
+            />
           ) : controlSidebarId === 'users' ? (
-            <div className="relative min-h-[750px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
-              <div className="flex items-center w-full justify-center mb-2">
-                <button
-                  type="button"
-                  className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                  disabled={usersLoading}
-                  onClick={openNewUserModal}
-                >
-                  {tr('control.users.new', 'New user')}
-                </button>
-              </div>
-              {usersLoading ? (
-                <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl py-4">{tr('loginLoadingUsers', 'Loading users...')}</li></ul>
-              ) : users.length === 0 ? (
-                <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.users.empty', 'No users yet.')}</li></ul>
-              ) : (
-                <>
-                  <div
-                    ref={usersListRef}
-                    className="max-h-[610px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                    onScroll={updateUsersScrollState}
-                  >
-                    <ul className="w-full flex flex-col">
-                      {[...users].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((u) => (
-                        <li
-                          key={u.id}
-                          className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
-                        >
-                          <span className="font-medium">{u.name || '—'}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="p-2 rounded text-pos-text mr-5 active:text-green-500"
-                              onClick={() => openEditUserModal(u)}
-                              aria-label={tr('control.edit', 'Edit')}
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              className="p-2 rounded text-pos-text active:text-rose-500"
-                              onClick={() => setDeleteConfirmUserId(u.id)}
-                              aria-label={tr('delete', 'Delete')}
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <PaginationArrows
-                    canPrev={canUsersScrollUp}
-                    canNext={canUsersScrollDown}
-                    onPrev={() => scrollUsersByPage('up')}
-                    onNext={() => scrollUsersByPage('down')}
-                  />
-                </>
-              )}
-            </div>
+            <ControlViewUsersContent
+              tr={tr}
+              users={users}
+              usersLoading={usersLoading}
+              usersListRef={usersListRef}
+              onUsersScroll={updateUsersScrollState}
+              canUsersScrollUp={canUsersScrollUp}
+              canUsersScrollDown={canUsersScrollDown}
+              onScrollUsersByPage={scrollUsersByPage}
+              onNewUser={openNewUserModal}
+              onEditUser={openEditUserModal}
+              onRequestDeleteUser={setDeleteConfirmUserId}
+            />
           ) : controlSidebarId === 'language' ? (
-            <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-8 min-h-[750px]">
-              <h2 className="text-pos-text text-2xl font-medium mb-6">{tr('control.languageTitle', 'Language')}</h2>
-              <p className="text-pos-muted text-xl mb-8">{tr('control.languageDescription', 'Select the language for the application.')}</p>
-              <div className="flex flex-wrap gap-4 w-full flex justify-center min-h-[200px] items-center">
-                {LANGUAGE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setAppLanguage(opt.value)}
-                    className={`px-8 py-4 rounded-xl text-xl font-medium border-2 transition-colors ${appLanguage === opt.value
-                      ? 'bg-pos-panel border-green-500 text-green-400'
-                      : 'bg-pos-bg border-pos-border text-pos-text active:border-pos-muted active:bg-green-500'
-                      }`}
-                  >
-                    {tr(`control.languageOption.${opt.value}`, opt.label)}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-10 flex w-full justify-center">
-                <button
-                  type="button"
-                  className="flex items-center gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-2xl"
-                  disabled={savingAppLanguage || appLanguage === lang}
-                  onClick={handleSaveAppLanguage}
-                >
-                  <svg fill="currentColor" width="24" height="24" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
-                  {tr('control.save', 'Save')}
-                </button>
-              </div>
-              <p className="text-pos-muted text-lg mt-8 text-center">{tr('control.currentLanguage', 'Current language')}: {tr(`control.languageOption.${appLanguage}`, LANGUAGE_OPTIONS.find((o) => o.value === appLanguage)?.label ?? 'English')}</p>
-            </div>
+            <ControlViewLanguageContent
+              tr={tr}
+              lang={lang}
+              appLanguage={appLanguage}
+              setAppLanguage={setAppLanguage}
+              savingAppLanguage={savingAppLanguage}
+              onSaveAppLanguage={handleSaveAppLanguage}
+            />
           ) : topNavId === 'cash-register' ? (
-            <div className="relative min-h-[580px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
-              {subNavId === 'Template Settings' && (
-                <div className="flex flex-col items-center justify-center min-h-[580px] gap-4">
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setTemplateTheme('light')}
-                      className={`px-6 py-3 rounded-xl text-sm font-medium transition-colors min-w-[150px] ${templateTheme === 'light'
-                        ? 'bg-pos-panel border-2 border-green-500 text-green-400'
-                        : 'bg-pos-bg border border-pos-border text-pos-muted active:text-pos-text active:border-pos-border'
-                        }`}
-                    >
-                      Light
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTemplateTheme('dark')}
-                      className={`px-6 py-3 rounded-xl text-sm font-medium transition-colors min-w-[150px] ${templateTheme === 'dark'
-                        ? 'bg-gray-900 border-2 border-green-500 text-green-400'
-                        : 'bg-[#1a1a1a] border border-pos-border text-pos-muted active:text-pos-text'
-                        }`}
-                    >
-                      Dark
-                    </button>
-                  </div>
-                  <div className="flex justify-center pt-5 pb-5">
-                    <button
-                      type="button"
-                      disabled={savingTemplateSettings}
-                      onClick={() => {
-                        setSavingTemplateSettings(true);
-                        try {
-                          if (typeof localStorage !== 'undefined') localStorage.setItem('pos-template-theme', templateTheme);
-                        } finally {
-                          setSavingTemplateSettings(false);
-                        }
-                      }}
-                      className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
-                    >
-                      <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
-                      </svg>
-                      {tr('control.save', 'Save')}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {subNavId === 'Payment types' && (
-                <div className="relative flex flex-col min-h-[610px] pb-[60px]">
-                  <div className="flex items-center justify-center mb-2">
-                    <button
-                      type="button"
-                      className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                      disabled={paymentTypesLoading}
-                      onClick={openNewPaymentTypeModal}
-                    >
-                      {tr('control.paymentTypes.new', 'New Payment Method')}
-                    </button>
-                  </div>
-                  {(() => {
-                    if (paymentTypesLoading) {
-                      return (
-                        <ul className="w-full flex flex-col">
-                          <li className="text-pos-muted text-xl py-4">{tr('control.paymentTypes.loading', 'Loading payment methods...')}</li>
-                        </ul>
-                      );
-                    }
-                    const sorted = [...paymentTypes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-                    if (sorted.length === 0) {
-                      return (
-                        <ul className="w-full flex flex-col">
-                          <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.paymentTypes.empty', 'No payment methods yet.')}</li>
-                        </ul>
-                      );
-                    }
-                    return (
-                      <>
-                        <div
-                          ref={paymentTypesListRef}
-                          className="max-h-[510px] overflow-y-auto rounded-lg border border-pos-border [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                          onScroll={updatePaymentTypesScrollState}
-                        >
-                          <ul className="w-full flex flex-col">
-                            {sorted.map((pt) => (
-                              <li
-                                key={pt.id}
-                                className="flex items-center w-full px-4 py-1 border-b border-pos-border last:border-b-0 bg-pos-bg transition-colors"
-                              >
-                                <span className="flex-1 text-pos-text text-sm font-medium">{pt.name}</span>
-                                <span className="w-[160px] shrink-0 text-pos-muted text-xs mr-2">
-                                  {tr(`control.paymentTypes.integration.${pt.integration}`, pt.integration || '—')}
-                                </span>
-                                <button
-                                  type="button"
-                                  className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
-                                  aria-label={pt.active ? tr('control.paymentTypes.deactivate', 'Deactivate') : tr('control.paymentTypes.activate', 'Activate')}
-                                  onClick={() => togglePaymentTypeActive(pt.id)}
-                                >
-                                  {pt.active ? (
-                                    <span className="w-4 h-4 inline-flex justify-center items-center text-green-500 text-sm">{'\u2713'}</span>
-                                  ) : (
-                                    <span className="w-4 h-4 inline-block rounded-full border-2 border-pos-muted" />
-                                  )}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
-                                  onClick={() => openEditPaymentTypeModal(pt)}
-                                  aria-label={tr('control.edit', 'Edit')}
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="p-2 mr-5 rounded text-pos-text active:bg-green-500 shrink-0"
-                                  onClick={() => setDeleteConfirmPaymentTypeId(pt.id)}
-                                  aria-label={tr('delete', 'Delete')}
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <PaginationArrows
-                          canPrev={canPaymentTypesScrollUp}
-                          canNext={canPaymentTypesScrollDown}
-                          onPrev={() => scrollPaymentTypesByPage('up')}
-                          onNext={() => scrollPaymentTypesByPage('down')}
-                        />
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+            <ControlViewCashRegisterContent
+              tr={tr}
+              subNavId={subNavId}
+              templateTheme={templateTheme}
+              setTemplateTheme={setTemplateTheme}
+              savingTemplateSettings={savingTemplateSettings}
+              setSavingTemplateSettings={setSavingTemplateSettings}
+              paymentTypesLoading={paymentTypesLoading}
+              openNewPaymentTypeModal={openNewPaymentTypeModal}
+              paymentTypes={paymentTypes}
+              paymentTypesListRef={paymentTypesListRef}
+              updatePaymentTypesScrollState={updatePaymentTypesScrollState}
+              canPaymentTypesScrollUp={canPaymentTypesScrollUp}
+              canPaymentTypesScrollDown={canPaymentTypesScrollDown}
+              scrollPaymentTypesByPage={scrollPaymentTypesByPage}
+              togglePaymentTypeActive={togglePaymentTypeActive}
+              openEditPaymentTypeModal={openEditPaymentTypeModal}
+              onRequestDeletePaymentType={setDeleteConfirmPaymentTypeId}
+              movePaymentType={movePaymentType}
+            />
           ) : topNavId === 'categories-products' && subNavId === 'Price Groups' ? (
-            <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
-              <div className="flex items-center w-full justify-center mb-2">
-                <button
-                  type="button"
-                  className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                  disabled={priceGroupsLoading}
-                  onClick={openPriceGroupModal}
-                >
-                  {tr('control.priceGroups.new', 'New price group')}
-                </button>
-              </div>
-              {(() => {
-                if (priceGroupsLoading) {
-                  return <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl py-4">{tr('control.priceGroups.loading', 'Loading price groups...')}</li></ul>;
-                }
-                if (priceGroups.length === 0) {
-                  return <ul className="w-full flex flex-col"><li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.priceGroups.empty', 'No price groups yet.')}</li></ul>;
-                }
-                return (
-                  <>
-                    <div
-                      ref={priceGroupsListRef}
-                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                      onScroll={updatePriceGroupsScrollState}
-                    >
-                      <ul className="w-full flex flex-col">
-                        {priceGroups.map((pg) => (
-                          <li
-                            key={pg.id}
-                            className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
-                          >
-                            <span className="font-medium">{pg.name}</span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text mr-5 active:text-green-500"
-                                onClick={() => openEditPriceGroupModal(pg)}
-                                aria-label="Edit"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text active:text-rose-500"
-                                onClick={() => setDeleteConfirmId(pg.id)}
-                                aria-label="Delete"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <PaginationArrows
-                      canPrev={canPriceGroupsScrollUp}
-                      canNext={canPriceGroupsScrollDown}
-                      onPrev={() => scrollPriceGroupsByPage('up')}
-                      onNext={() => scrollPriceGroupsByPage('down')}
-                    />
-                  </>
-                );
-              })()}
-            </div>
-          ) : topNavId === 'categories-products' && subNavId === 'Categories' ? (() => {
-            const sortedCategories = [...categories].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-            return (
-              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
-                <div className="flex items-center w-full justify-center mb-2">
-                  <button
-                    type="button"
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                    disabled={categoriesLoading}
-                    onClick={openCategoryModal}
-                  >
-                    {tr('control.categories.new', 'New category')}
-                  </button>
-                </div>
-                {categoriesLoading ? (
-                  <ul className="w-full flex flex-col">
-                    <li className="text-pos-muted text-xl py-4">{tr('control.categories.loading', 'Loading categories...')}</li>
-                  </ul>
-                ) : sortedCategories.length === 0 ? (
-                  <ul className="w-full flex flex-col">
-                    <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.categories.empty', 'No categories yet.')}</li>
-                  </ul>
-                ) : (
-                  <>
-                    <div
-                      ref={categoriesListRef}
-                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                      onScroll={updateCategoriesScrollState}
-                    >
-                      <ul className="w-full flex flex-col">
-                        {sortedCategories.map((cat, index) => (
-                          <li
-                            key={cat.id}
-                            className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
-                          >
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text active:text-rose-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                                onClick={() => handleMoveCategory(cat.id, 'down')}
-                                disabled={index >= sortedCategories.length - 1}
-                                aria-label="Move down"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text active:text-rose-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                                onClick={() => handleMoveCategory(cat.id, 'up')}
-                                disabled={index <= 0}
-                                aria-label="Move up"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v14" /></svg>
-                              </button>
-                            </div>
-                            <span className="flex-1 text-center font-medium">{cat.name}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                className="p-2 mr-5 rounded text-pos-text active:bg-green-500"
-                                onClick={() => openEditCategoryModal(cat)}
-                                aria-label="Edit"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text active:text-rose-500"
-                                onClick={() => setDeleteConfirmCategoryId(cat.id)}
-                                aria-label="Delete"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </>
-                )}
-                {sortedCategories.length > 0 && !categoriesLoading && (
-                  <PaginationArrows
-                    canPrev={canCategoriesScrollUp}
-                    canNext={canCategoriesScrollDown}
-                    onPrev={() => scrollCategoriesByPage('up')}
-                    onNext={() => scrollCategoriesByPage('down')}
-                  />
-                )}
-              </div>
-            );
-          })() : topNavId === 'categories-products' && subNavId === 'Products' ? (() => {
-            return (
-              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px] flex flex-col">
-                {/* Action bar: New Product, Positioning, Search */}
-                <div className="flex items-center w-full justify-center gap-4 mb-2 flex-wrap">
-                  <button
-                    type="button"
-                    disabled={!selectedCategoryId || productsLoading}
-                    onClick={openProductModal}
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                  >
-                    {tr('control.products.new', 'New Product')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openProductPositioningModal}
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                  >
-                    {tr('control.products.positioning', 'Positioning')}
-                  </button>
-                  <input
-                    type="text"
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    placeholder={tr('control.products.searchPlaceholder', 'Search products')}
-                    onClick={() => setShowProductSearchKeyboard(true)}
-                    onFocus={() => setShowProductSearchKeyboard(true)}
-                    className="px-4 py-3 rounded-lg bg-pos-bg border border-pos-border z-[20] text-pos-text text-sm min-w-[200px] placeholder:text-pos-muted cursor-pointer"
-                  />
-                </div>
-                {/* Category tabs: horizontal, scrollable, selected with underline */}
-                {categories.length > 0 && (
-                  <div className="flex items-center gap-2 mb-2 overflow-hidden">
-                    <button
-                      type="button"
-                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
-                      onClick={() => {
-                        const currentIndex = categories.findIndex((cat) => cat.id === selectedCategoryId);
-                        if (currentIndex <= 0) return;
-                        setSelectedCategoryId(categories[currentIndex - 1].id);
-                        setSelectedProductId(null);
-                      }}
-                      aria-label="Scroll left"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <div
-                      ref={productsCategoryTabsRef}
-                      className="flex gap-2 overflow-x-auto flex-1 min-w-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                    >
-                      {categories.map((cat) => (
-                        <button
-                          key={cat.id}
-                          data-category-id={String(cat.id)}
-                          type="button"
-                          className={`px-4 py-2 text-sm font-medium whitespace-nowrap shrink-0 transition-colors border-b-2 ${selectedCategoryId === cat.id
-                            ? 'bg-pos-bg/80 text-pos-text border-green-500'
-                            : 'text-pos-muted active:text-pos-text bg-transparent border-transparent active:bg-green-500'
-                            }`}
-                          onClick={() => { setSelectedCategoryId(cat.id); setSelectedProductId(null); }}
-                        >
-                          {cat.name}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
-                      onClick={() => {
-                        const currentIndex = categories.findIndex((cat) => cat.id === selectedCategoryId);
-                        if (currentIndex < 0 || currentIndex >= categories.length - 1) return;
-                        setSelectedCategoryId(categories[currentIndex + 1].id);
-                        setSelectedProductId(null);
-                      }}
-                      aria-label="Scroll right"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                  </div>
-                )}
-                {/* Product list: name (left), Subproducts (center), Edit/Delete (right) */}
-                <div
-                  ref={productsListRef}
-                  className="flex-1 overflow-auto max-h-[470px] min-h-0 bg-pos-bg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                  onScroll={updateProductsScrollState}
-                >
-                  {!selectedCategoryId ? (
-                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.products.selectCategoryHint', 'Select a category or add one in Categories.')}</p>
-                  ) : productsLoading ? (
-                    <p className="text-pos-muted text-xl py-4">{tr('control.products.loading', 'Loading products...')}</p>
-                  ) : filteredProducts.length === 0 ? (
-                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.products.emptyInCategory', 'No products in this category yet.')}</p>
-                  ) : (
-                    <ul className="w-full flex flex-col">
-                      {filteredProducts.map((product) => (
-                        <li
-                          key={product.id}
-                          className={`flex items-center w-full justify-between px-4 py-2 border-y border-pos-panel text-pos-text text-sm cursor-pointer ${selectedProductId === product.id ? 'bg-pos-panel/70' : 'bg-pos-bg'}`}
-                          onClick={(e) => { if (!e.target.closest('button')) setSelectedProductId(product.id); }}
-                        >
-                          <span className="min-w-[30%] text-left font-medium truncate" title={product.name}>
-                            {product.name}
-                          </span>
-                          <span className="flex-shrink-0 min-w-[30%] text-center text-sm text-white">
-                            <button
-                              type="button"
-                              className={`px-2 py-1 rounded text-sm text-white active:text-pos-text active:bg-green-500 ${productHasSubproductsById[product.id] ? 'font-medium' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openProductSubproductsModal(product);
-                              }}
-                            >
-                              {tr('control.products.subproductsColumn', 'Subproducts')}
-                            </button>
-                          </span>
-                          <div className="flex items-center justify-end min-w-[40%] gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              className="p-2 rounded text-pos-text mr-5 active:text-green-500"
-                              onClick={() => openEditProductModal(product)}
-                              aria-label="Edit"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                            </button>
-                            <button
-                              type="button"
-                              className="p-2 rounded text-pos-text active:text-rose-500"
-                              onClick={() => setDeleteConfirmProductId(product.id)}
-                              aria-label="Delete"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                {selectedCategoryId && filteredProducts.length > 0 && (
-                  <PaginationArrows
-                    canPrev={canProductsScrollUp}
-                    canNext={canProductsScrollDown}
-                    onPrev={() => scrollProductsByPage('up')}
-                    onNext={() => scrollProductsByPage('down')}
-                  />
-                )}
-              </div>
-            );
-          })() : topNavId === 'categories-products' && subNavId === 'Subproducts' ? (() => {
-            return (
-              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px] flex flex-col">
-                <div className="flex items-center w-full justify-center gap-4 mb-2 flex-wrap">
-                  <button
-                    type="button"
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50"
-                    disabled={subproductsLoading}
-                    onClick={openSubproductModal}
-                  >
-                    {tr('control.subproducts.new', 'New subproduct')}
-                  </button>
-                  <button
-                    type="button"
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors"
-                    onClick={() => setShowManageGroupsModal(true)}
-                  >
-                    {tr('control.subproducts.manageGroups', 'Manage Groups')}
-                  </button>
-                </div>
-                {subproductGroups.length > 0 && (
-                  <div className="flex items-center gap-2 mb-2 overflow-hidden">
-                    <button
-                      type="button"
-                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
-                      onClick={() => {
-                        const currentIndex = subproductGroups.findIndex((grp) => grp.id === selectedSubproductGroupId);
-                        if (currentIndex <= 0) return;
-                        setSelectedSubproductGroupId(subproductGroups[currentIndex - 1].id);
-                        setSelectedSubproductId(null);
-                      }}
-                      aria-label="Scroll left"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <div
-                      ref={subproductsGroupTabsRef}
-                      className="flex gap-2 overflow-x-auto flex-1 min-w-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                    >
-                      {subproductGroups.map((grp) => (
-                        <button
-                          key={grp.id}
-                          data-group-id={String(grp.id)}
-                          type="button"
-                          className={`px-4 py-2 text-sm font-medium whitespace-nowrap shrink-0 transition-colors border-b-2 ${selectedSubproductGroupId === grp.id
-                            ? 'bg-pos-bg/80 text-pos-text border-green-500'
-                            : 'text-pos-muted active:text-pos-text bg-transparent border-transparent active:bg-green-500'
-                            }`}
-                          onClick={() => setSelectedSubproductGroupId(grp.id)}
-                        >
-                          {grp.name}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="p-2 rounded text-pos-text active:bg-green-500 shrink-0"
-                      onClick={() => {
-                        const currentIndex = subproductGroups.findIndex((grp) => grp.id === selectedSubproductGroupId);
-                        if (currentIndex < 0 || currentIndex >= subproductGroups.length - 1) return;
-                        setSelectedSubproductGroupId(subproductGroups[currentIndex + 1].id);
-                        setSelectedSubproductId(null);
-                      }}
-                      aria-label="Scroll right"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                  </div>
-                )}
-                <div
-                  ref={subproductsListRef}
-                  className="flex-1 overflow-auto min-h-0 bg-pos-bg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                  onScroll={updateSubproductsScrollState}
-                >
-                  {!selectedSubproductGroupId ? (
-                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.subproducts.selectGroupHint', 'Select a group or add one via Manage Groups.')}</p>
-                  ) : subproductGroupsLoading ? (
-                    <p className="text-pos-muted text-xl py-4">{tr('control.subproducts.loadingGroups', 'Loading groups...')}</p>
-                  ) : subproductsLoading ? (
-                    <p className="text-pos-muted text-xl py-4">{tr('control.subproducts.loading', 'Loading subproducts...')}</p>
-                  ) : subproducts.length === 0 ? (
-                    <p className="text-pos-muted text-xl py-4 text-center">{tr('control.subproducts.empty', 'No subproducts in this group yet.')}</p>
-                  ) : (
-                    <ul className="w-full flex flex-col">
-                      {subproducts.map((sp) => (
-                        <li
-                          key={sp.id}
-                          className={`flex items-center w-full justify-between px-4 py-2 border-y border-pos-panel text-pos-text text-sm cursor-pointer ${selectedSubproductId === sp.id ? 'bg-pos-panel/70' : 'bg-pos-bg'}`}
-                          onClick={(e) => { if (!e.target.closest('button')) setSelectedSubproductId(sp.id); }}
-                        >
-                          <span className="flex-1 font-medium truncate" title={sp.name}>{sp.name}</span>
-                          <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <button type="button" className="p-2 rounded text-pos-text mr-5 active:bg-green-500" onClick={() => openEditSubproductModal(sp)} aria-label="Edit">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                            </button>
-                            <button type="button" className="p-2 rounded text-pos-text active:text-rose-500" onClick={() => setDeleteConfirmSubproductId(sp.id)} aria-label="Delete">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                {selectedSubproductGroupId && subproducts.length > 0 && (
-                  <PaginationArrows
-                    canPrev={canSubproductsScrollUp}
-                    canNext={canSubproductsScrollDown}
-                    onPrev={() => scrollSubproductsByPage('up')}
-                    onNext={() => scrollSubproductsByPage('down')}
-                  />
-                )}
-              </div>
-            );
-          })() : topNavId === 'categories-products' && subNavId === 'Kitchen' ? (() => {
-            return (
-              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
-                <div className="flex items-center w-full justify-center mb-2">
-                  <button
-                    type="button"
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors"
-                    onClick={openNewKitchenModal}
-                  >
-                    {tr('control.kitchen.newKitchen', 'New Kitchen')}
-                  </button>
-                </div>
-                {kitchens.length === 0 ? (
-                  <ul className="w-full flex flex-col">
-                    <li className="text-pos-muted text-xl py-4 text-center">{tr('control.kitchen.empty', 'No kitchens yet.')}</li>
-                  </ul>
-                ) : (
-                  <>
-                    <div
-                      ref={kitchenListRef}
-                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                      onScroll={updateKitchenScrollState}
-                    >
-                      <ul className="w-full flex flex-col">
-                        {kitchens.map((m) => {
-                          const kitchenHasProducts = Array.isArray(m.productIds) && m.productIds.length > 0;
-                          return (
-                            <li
-                              key={m.id}
-                              className="flex items-center w-full gap-2 px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
-                            >
-                              <span className="min-w-0 flex-1 font-medium truncate" title={m.name || '—'}>{m.name || '—'}</span>
-                              <div className="justify-center min-w-0 absolute left-1/2">
-                                <button
-                                  type="button"
-                                  className={`shrink-0 py-1.5 text-xs font-semibold active:bg-green-500 active:border-white/30 ${kitchenHasProducts ? 'text-white' : 'text-pos-muted'}`}
-                                  onClick={() => openKitchenProductsModal(m)}
-                                >
-                                  {tr('control.kitchen.setProduct', 'Set product')}
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                  type="button"
-                                  className="p-2 rounded text-pos-text mr-5 active:text-green-500"
-                                  onClick={() => openEditKitchenModal(m)}
-                                  aria-label="Edit"
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  className="p-2 rounded text-pos-text active:text-rose-500"
-                                  onClick={() => setDeleteConfirmKitchenId(m.id)}
-                                  aria-label="Delete"
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                    <PaginationArrows
-                      canPrev={canKitchenScrollUp}
-                      canNext={canKitchenScrollDown}
-                      onPrev={() => scrollKitchenByPage('up')}
-                      onNext={() => scrollKitchenByPage('down')}
-                    />
-                  </>
-                )}
-              </div>
-            );
-          })() : topNavId === 'categories-products' && subNavId === 'Discounts' ? (() => {
-            return (
-              <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
-                <div className="flex items-center w-full justify-center mb-2">
-                  <button
-                    type="button"
-                    className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors"
-                    onClick={openNewDiscountModal}
-                  >
-                    {tr('control.discounts.new', 'New discount')}
-                  </button>
-                </div>
-                {discounts.length === 0 ? (
-                  <ul className="w-full flex flex-col">
-                    <li className="text-pos-muted text-xl py-4 text-center">{tr('control.discounts.empty', 'No discounts yet.')}</li>
-                  </ul>
-                ) : (
-                  <>
-                    <div
-                      ref={discountsListRef}
-                      className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                      onScroll={updateDiscountsScrollState}
-                    >
-                      <ul className="w-full flex flex-col">
-                        {discounts.map((d) => (
-                          <li
-                            key={d.id}
-                            className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
-                          >
-                            <span className="flex-1 font-medium truncate" title={d.name || '—'}>{d.name || '—'}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text mr-5 active:text-green-500"
-                                onClick={() => openEditDiscountModal(d)}
-                                aria-label="Edit"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text active:text-rose-500"
-                                onClick={() => setDeleteConfirmDiscountId(d.id)}
-                                aria-label="Delete"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <PaginationArrows
-                      canPrev={canDiscountsScrollUp}
-                      canNext={canDiscountsScrollDown}
-                      onPrev={() => scrollDiscountsByPage('up')}
-                      onNext={() => scrollDiscountsByPage('down')}
-                    />
-                  </>
-                )}
-              </div>
-            );
-          })() : topNavId === 'categories-products' ? (
+            <ControlViewPriceGroups
+              tr={tr}
+              priceGroupsLoading={priceGroupsLoading}
+              priceGroups={priceGroups}
+              priceGroupsListRef={priceGroupsListRef}
+              updatePriceGroupsScrollState={updatePriceGroupsScrollState}
+              openPriceGroupModal={openPriceGroupModal}
+              openEditPriceGroupModal={openEditPriceGroupModal}
+              setDeleteConfirmId={setDeleteConfirmId}
+              canPriceGroupsScrollUp={canPriceGroupsScrollUp}
+              canPriceGroupsScrollDown={canPriceGroupsScrollDown}
+              scrollPriceGroupsByPage={scrollPriceGroupsByPage}
+            />
+          ) : topNavId === 'categories-products' && subNavId === 'Categories' ? (
+            <ControlViewCategories
+              tr={tr}
+              categories={categories}
+              categoriesLoading={categoriesLoading}
+              categoriesListRef={categoriesListRef}
+              updateCategoriesScrollState={updateCategoriesScrollState}
+              openCategoryModal={openCategoryModal}
+              openEditCategoryModal={openEditCategoryModal}
+              setDeleteConfirmCategoryId={setDeleteConfirmCategoryId}
+              handleMoveCategory={handleMoveCategory}
+              canCategoriesScrollUp={canCategoriesScrollUp}
+              canCategoriesScrollDown={canCategoriesScrollDown}
+              scrollCategoriesByPage={scrollCategoriesByPage}
+            />
+          ) : topNavId === 'categories-products' && subNavId === 'Products' ? (
+            <ControlViewProducts
+              tr={tr}
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              setSelectedCategoryId={setSelectedCategoryId}
+              setSelectedProductId={setSelectedProductId}
+              selectedProductId={selectedProductId}
+              productsLoading={productsLoading}
+              filteredProducts={filteredProducts}
+              productHasSubproductsById={productHasSubproductsById}
+              openProductModal={openProductModal}
+              openProductPositioningModal={openProductPositioningModal}
+              productSearch={productSearch}
+              setProductSearch={setProductSearch}
+              setShowProductSearchKeyboard={setShowProductSearchKeyboard}
+              productsCategoryTabsRef={productsCategoryTabsRef}
+              productsListRef={productsListRef}
+              updateProductsScrollState={updateProductsScrollState}
+              openProductSubproductsModal={openProductSubproductsModal}
+              openEditProductModal={openEditProductModal}
+              setDeleteConfirmProductId={setDeleteConfirmProductId}
+              canProductsScrollUp={canProductsScrollUp}
+              canProductsScrollDown={canProductsScrollDown}
+              scrollProductsByPage={scrollProductsByPage}
+            />
+          ) : topNavId === 'categories-products' && subNavId === 'Subproducts' ? (
+            <ControlViewSubproducts
+              tr={tr}
+              subproductsLoading={subproductsLoading}
+              subproductGroupsLoading={subproductGroupsLoading}
+              openSubproductModal={openSubproductModal}
+              setShowManageGroupsModal={setShowManageGroupsModal}
+              subproductGroups={subproductGroups}
+              selectedSubproductGroupId={selectedSubproductGroupId}
+              setSelectedSubproductGroupId={setSelectedSubproductGroupId}
+              setSelectedSubproductId={setSelectedSubproductId}
+              selectedSubproductId={selectedSubproductId}
+              subproductsGroupTabsRef={subproductsGroupTabsRef}
+              subproductsListRef={subproductsListRef}
+              updateSubproductsScrollState={updateSubproductsScrollState}
+              subproducts={subproducts}
+              openEditSubproductModal={openEditSubproductModal}
+              setDeleteConfirmSubproductId={setDeleteConfirmSubproductId}
+              canSubproductsScrollUp={canSubproductsScrollUp}
+              canSubproductsScrollDown={canSubproductsScrollDown}
+              scrollSubproductsByPage={scrollSubproductsByPage}
+            />
+          ) : topNavId === 'categories-products' && subNavId === 'Kitchen' ? (
+            <ControlViewKitchen
+              tr={tr}
+              kitchens={kitchens}
+              openNewKitchenModal={openNewKitchenModal}
+              kitchenListRef={kitchenListRef}
+              updateKitchenScrollState={updateKitchenScrollState}
+              openKitchenProductsModal={openKitchenProductsModal}
+              openEditKitchenModal={openEditKitchenModal}
+              setDeleteConfirmKitchenId={setDeleteConfirmKitchenId}
+              canKitchenScrollUp={canKitchenScrollUp}
+              canKitchenScrollDown={canKitchenScrollDown}
+              scrollKitchenByPage={scrollKitchenByPage}
+            />
+          ) : topNavId === 'categories-products' && subNavId === 'Discounts' ? (
+            <ControlViewDiscounts
+              tr={tr}
+              discounts={discounts}
+              openNewDiscountModal={openNewDiscountModal}
+              discountsListRef={discountsListRef}
+              updateDiscountsScrollState={updateDiscountsScrollState}
+              openEditDiscountModal={openEditDiscountModal}
+              setDeleteConfirmDiscountId={setDeleteConfirmDiscountId}
+              canDiscountsScrollUp={canDiscountsScrollUp}
+              canDiscountsScrollDown={canDiscountsScrollDown}
+              scrollDiscountsByPage={scrollDiscountsByPage}
+            />
+          ) : topNavId === 'categories-products' ? (
             <div className="rounded-xl border border-pos-border bg-pos-panel/30 p-8 min-h-[300px] flex items-center justify-center">
               <p className="text-pos-muted text-xl">
                 Select a section above to manage {subNavId.toLowerCase()}.
@@ -6374,9 +5524,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             {tr('control.labels.new', 'New label')}
                           </button>
                         </div>
-                        {labelsListLoading ? (
-                          <p className="text-pos-muted text-xl font-medium text-center py-12">{tr('control.labels.loading', 'Loading labels…')}</p>
-                        ) : sortedLabels.length === 0 ? (
+                        {labelsListLoading ? null : sortedLabels.length === 0 ? (
                           <ul className="w-full flex flex-col">
                             <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.labels.empty', 'No labels yet.')}</li>
                           </ul>
@@ -6698,9 +5846,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                   onScroll={updateTableLocationsScrollState}
                 >
                   <ul className="w-full flex flex-col">
-                    {tableLocationsLoading ? (
-                      <li className="text-pos-muted text-sm py-4 text-center">{tr('control.tables.loading', 'Loading table locations...')}</li>
-                    ) : tableLocations.length === 0 ? (
+                    {tableLocationsLoading ? null : tableLocations.length === 0 ? (
                       <li className="text-pos-muted text-sm py-6 text-center">{tr('control.tables.empty', 'No table locations yet.')}</li>
                     ) : (
                       tableLocations.map((loc) => {
@@ -7903,9 +7049,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
               )}
               {deviceSettingsTab === 'Category display' && (
                 <div className="grid grid-cols-1 text-sm px-4 md:grid-cols-3 lg:grid-cols-4 gap-x-10 gap-4">
-                  {categoriesLoading ? (
-                    <p className="text-pos-muted text-xl col-span-full">{tr('control.device.category.loading', 'Loading categories…')}</p>
-                  ) : (
+                  {categoriesLoading ? null : (
                     categories.map((cat) => {
                       const isChecked = deviceCategoryDisplayIds.length === 0 || deviceCategoryDisplayIds.includes(cat.id);
                       return (
@@ -8725,17 +7869,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
             </button>
 
             <div className="space-y-4 mt-6">
-              {loadingKitchenProductsCatalog && (
-                <div className="w-full flex items-center justify-center py-8">
-                  <div className="flex items-center gap-3 text-pos-text">
-                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
-                      <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                    <span className="text-sm">{tr('control.productSubproducts.loading', 'Loading...')}</span>
-                  </div>
-                </div>
-              )}
               <Dropdown
                 options={[
                   { value: '', label: tr('control.kitchen.allCategories', 'All categories') },
@@ -8774,9 +7907,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     ref={kitchenProductsLeftListRef}
                     className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
-                    {loadingKitchenProductsCatalog ? (
-                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
-                    ) : kitchenProductsCatalog.length === 0 ? (
+                    {loadingKitchenProductsCatalog ? null : kitchenProductsCatalog.length === 0 ? (
                       <div className="text-pos-muted px-2 py-4">{tr('control.kitchen.productsEmpty', 'No products yet.')}</div>
                     ) : kitchenProductsAvailable.length === 0 ? (
                       <div className="text-pos-muted px-2 py-4">
@@ -8858,9 +7989,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     ref={kitchenProductsRightListRef}
                     className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
-                    {loadingKitchenProductsCatalog ? (
-                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
-                    ) : kitchenProductsLinked.length === 0 ? (
+                    {loadingKitchenProductsCatalog ? null : kitchenProductsLinked.length === 0 ? (
                       <div className="text-pos-muted px-2 py-4">
                         {tr('control.kitchen.noLinkedProducts', 'No products linked yet.')}
                       </div>
@@ -10004,17 +9133,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
             </button>
 
             <div className="space-y-4 mt-6">
-              {loadingProductSubproductsLinked && (
-                <div className="w-full flex items-center justify-center py-8">
-                  <div className="flex items-center gap-3 text-pos-text">
-                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
-                      <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                    <span className="text-sm">{tr('control.productSubproducts.loading', 'Loading...')}</span>
-                  </div>
-                </div>
-              )}
               <Dropdown
                 options={[
                   { value: '', label: tr('control.productSubproducts.withoutGroup', 'Without group') },
@@ -10120,9 +9238,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     ref={productSubproductsListRef}
                     className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
-                    {loadingProductSubproductsLinked ? (
-                      <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
-                    ) : productSubproductsLinked.length === 0 ? (
+                    {loadingProductSubproductsLinked ? null : productSubproductsLinked.length === 0 ? (
                       <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.noLinkedYet', 'No subproducts linked yet.')}</div>
                     ) : (
                       <ul className="space-y-1">
