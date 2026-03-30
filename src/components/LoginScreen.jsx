@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Dropdown } from './Dropdown';
 
-const API = '/api';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 const TOAST_DURATION_MS = 3500;
 const PIN_LEN = 4;
 

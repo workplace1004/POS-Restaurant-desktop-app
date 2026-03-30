@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 
 const DEVICE_SETTINGS_STORAGE_KEY = 'pos_device_settings';
-const API = '/api';
 const OPTION_BUTTON_SLOT_COUNT = 28;
 const OPTION_BUTTON_MORE_ID = 'meer';
 const DEFAULT_OPTION_BUTTON_LAYOUT = [

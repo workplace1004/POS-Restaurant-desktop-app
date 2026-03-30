@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { useLanguage } from '../contexts/LanguageContext';
 import { KdsHeader } from './KdsHeader';
 import { KdsSettingsModal } from './KdsSettingsModal';
@@ -118,7 +119,7 @@ export function KdsPage({
   socket,
   currentUser,
   /** `/api` or full prefix e.g. `http://host:5000/api` (standalone KDS remote backend). */
-  apiPrefix = '/api',
+  apiPrefix = POS_API_PREFIX,
   standalone = false,
   /** When set (standalone login), this station only sees its kitchen — no ALL / other tabs. */
   stationKitchenId = null,

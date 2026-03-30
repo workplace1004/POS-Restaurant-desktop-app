@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { POS_API_PREFIX } from '../lib/apiOrigin.js';
+import { publicAssetUrl } from '../lib/publicAssetUrl.js';
 import { useLanguage } from '../contexts/LanguageContext';
 import { TableShapeSvg, getTableFill } from './TableShapeSvg';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -19,7 +21,7 @@ const ZOOM_MIN = 50;
 const ZOOM_MAX = 150;
 const ZOOM_STEP = 10;
 
-export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, selectedTableId = null, onSelectTable, onBack, time, api = '/api' }) {
+export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, selectedTableId = null, onSelectTable, onBack, time, api = POS_API_PREFIX }) {
   const { t } = useLanguage();
   const canvasRef = useRef(null);
   const [rooms, setRooms] = useState([]);
@@ -231,7 +233,10 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
         {time != null ? <span className="text-3xl">{time}</span> : null}
       </div>
 
-      <div className="flex-1 overflow-hidden p-6 bg-pos-bg">
+      <div className="flex-1 min-h-0 overflow-auto p-4 bg-pos-bg flex items-center justify-center">
+        <div
+          className="min-w-[980px] max-w-[980px] min-h-[580px] max-h-[580px] w-[980px] h-[580px] overflow-auto shrink-0 bg-pos-bg"
+        >
         <div
           style={{
             transform: `scale(${zoom / 100})`,
@@ -330,7 +335,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                       zIndex: 15
                     }}
                   >
-                    <img src="/flowerpot.svg" alt="" className="w-full h-full object-contain" />
+                    <img src={publicAssetUrl('/flowerpot.svg')} alt="" className="w-full h-full object-contain" />
                   </div>
                 ))
               )}
@@ -360,7 +365,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                   } cursor-pointer`}
                   style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
                 >
-                  <img src="/table.png" alt={`${t('table')} ${tableNumber}`} className="w-full h-full object-contain" />
+                  <img src={publicAssetUrl('/table.png')} alt={`${t('table')} ${tableNumber}`} className="w-full h-full object-contain" />
                   {tableColorOverlay ? <span className={`absolute inset-0 pointer-events-none ${tableColorOverlay}`} aria-hidden /> : null}
                   <span
                     className={`absolute inset-0 flex items-center justify-center text-[40px] font-bold -mt-10 pointer-events-none ${tableNumberColorClass}`}
@@ -372,6 +377,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
             })
           )}
           </div>
+        </div>
         </div>
       </div>
 

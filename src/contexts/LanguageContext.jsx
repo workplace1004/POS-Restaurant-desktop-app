@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { getT, getStoredLang, setStoredLang } from '../translations';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 
 const LanguageContext = createContext(null);
-const API = '/api';
 
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(getStoredLang);

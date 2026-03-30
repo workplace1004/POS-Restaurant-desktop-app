@@ -7,709 +7,100 @@ import { CalendarModal } from './CalendarModal';
 import { PaginationArrows } from './PaginationArrows';
 import { PrinterModal } from './PrinterModal';
 import { useLanguage } from '../contexts/LanguageContext';
-
-const API = '/api';
-
-/** Seeded KDS admin credential (same id as `seed.js`); hidden from Configuration → Kitchen list. */
-const KITCHEN_ADMIN_CREDENTIAL_ID = 'kitchen-kds-admin';
-
-const CONTROL_SIDEBAR_ITEMS = [
-  { id: 'personalize', label: 'Personalize Cash Register', icon: 'monitor' },
-  // { id: 'reports', label: 'Reports', icon: 'chart' },
-  { id: 'users', label: 'Users', icon: 'users' },
-  { id: 'language', label: 'Language', icon: 'language' }
-];
-
-const LANGUAGE_OPTIONS = [
-  { value: 'en', label: 'English' },
-  { value: 'nl', label: 'Dutch' },
-  { value: 'fr', label: 'French' },
-  { value: 'tr', label: 'Turkish' }
-];
-
-const TOP_NAV_ITEMS = [
-  { id: 'categories-products', label: 'Categories and products', icon: 'box' },
-  { id: 'cash-register', label: 'Cash Register Settings', icon: 'gear' },
-  { id: 'external-devices', label: 'External Devices', icon: 'printer' },
-  { id: 'tables', label: 'Tables', icon: 'table' }
-];
-
-const SUB_NAV_ITEMS = [
-  'Price Groups',
-  'Categories',
-  'Products',
-  'Subproducts',
-  'Discounts',
-  'Kitchen'
-];
-
-const CASH_REGISTER_SUB_NAV_ITEMS = [
-  'Template Settings',
-  'Device Settings',
-  'System Settings',
-  'Payment types',
-  'Production messages'
-];
-
-const EXTERNAL_DEVICES_SUB_NAV_ITEMS = [
-  'Printer',
-  'Price Display',
-  'RFID Reader',
-  'Barcode Scanner',
-  'Credit Card',
-  'Libra',
-  'Cashmatic',
-  'Payworld'
-];
-
-const PRINTER_TAB_DEFS = [
-  { id: 'General', labelKey: 'control.printerTabs.general', fallback: 'General' },
-  { id: 'Final tickets', labelKey: 'control.printerTabs.finalTickets', fallback: 'Final tickets' },
-  { id: 'Production Tickets', labelKey: 'control.printerTabs.productionTickets', fallback: 'Production Tickets' },
-  { id: 'Labels', labelKey: 'control.printerTabs.labels', fallback: 'Labels' },
-];
-
-const PRINTING_ORDER_OPTIONS = [
-  { value: 'as-registered', labelKey: 'control.external.asRegistered', fallback: 'As Registered' },
-  { value: 'reverse', labelKey: 'control.external.reverse', fallback: 'Reverse' }
-];
-
-const PRINTER_DISABLED_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' }
-];
-
-const SUBPRODUCT_VAT_OPTIONS = [
-  { value: '', label: '--' },
-  { value: '0', label: '0%' },
-  { value: '6', label: '6%' },
-  { value: '12', label: '12%' },
-  { value: '21', label: '21%' }
-];
-
-const GROUPING_RECEIPT_OPTIONS = [
-  { value: 'enable', labelKey: 'control.external.enable', fallback: 'Enable' },
-  { value: 'disable', labelKey: 'control.external.disable', fallback: 'Disable' }
-];
-
-const SCHEDULED_ORDERS_PRODUCTION_FLOW_OPTIONS = [
-  { value: 'scheduled-orders-print', labelKey: 'control.device.scheduledOrders.scheduledOrdersPrint', fallback: 'Scheduled orders…' },
-  { value: 'default', labelKey: 'control.device.scheduledOrders.default', fallback: 'Default' }
-];
-
-const SCHEDULED_ORDERS_LOADING_OPTIONS = [
-  { value: '0', labelKey: 'control.device.scheduledOrders.daysAgo0', fallback: '0 days ago' },
-  { value: '1', labelKey: 'control.device.scheduledOrders.daysAgo1', fallback: '1 day ago' },
-  { value: '7', labelKey: 'control.device.scheduledOrders.daysAgo7', fallback: '7 days ago' },
-  { value: '30', labelKey: 'control.device.scheduledOrders.daysAgo30', fallback: '30 days ago' }
-];
-
-const SCHEDULED_ORDERS_MODE_OPTIONS = [
-  { value: 'labels', labelKey: 'control.device.scheduledOrders.labels', fallback: 'Labels' },
-  { value: 'list', labelKey: 'control.device.scheduledOrders.list', fallback: 'List' }
-];
-
-const SCHEDULED_ORDERS_INVOICE_LAYOUT_OPTIONS = [
-  { value: 'standard', labelKey: 'control.device.scheduledOrders.standard', fallback: 'Standard' },
-  { value: 'compact', labelKey: 'control.device.scheduledOrders.compact', fallback: 'Compact' }
-];
-
-const SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS = [
-  { value: 'delivery-note', labelKey: 'control.device.scheduledOrders.deliveryNote', fallback: 'Delivery note' },
-  { value: 'order-date', labelKey: 'control.device.scheduledOrders.orderDate', fallback: 'Order date' }
-];
-
-const PRICE_DISPLAY_TYPE_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' }
-];
-
-const RFID_READER_TYPE_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
-  { value: 'serial', labelKey: 'control.external.serial', fallback: 'Serial' },
-  { value: 'usb-nfc', labelKey: 'control.external.rfidReaderType.usbNfc', fallback: 'USB NFC' }
-];
-
-const BARCODE_SCANNER_TYPE_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
-  { value: 'serial', labelKey: 'control.external.serial', fallback: 'Serial' },
-  { value: 'keyboard-input', labelKey: 'control.external.barcodeScannerType.keyboardInput', fallback: 'Keyboard input' },
-  { value: 'tcp-ip', labelKey: 'control.external.barcodeScannerType.tcpIp', fallback: 'TCP / IP' }
-];
-
-const CREDIT_CARD_TYPE_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
-  { value: 'payworld', labelKey: 'control.external.creditCardType.payworld', fallback: 'Payworld' },
-  { value: 'viva-wallet', labelKey: 'control.external.creditCardType.vivaWallet', fallback: 'Viva wallet' }
-];
-
-const SCALE_TYPE_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' },
-  { value: 'toshiba-sl4700', labelKey: 'control.external.scaleType.toshibaSl4700', fallback: 'Toshiba SL4700' },
-  { value: 'marques-b0', labelKey: 'control.external.scaleType.marquesB0', fallback: 'Marques B0' },
-  { value: 'cas-protocol', labelKey: 'control.external.scaleType.casProtocol', fallback: 'CAS Protocol' },
-  { value: 'aurora', labelKey: 'control.external.scaleType.aurora', fallback: 'Aurora' },
-  { value: 'longfly', labelKey: 'control.external.scaleType.longfly', fallback: 'Longfly' },
-  { value: 'dollar', labelKey: 'control.external.scaleType.dollar', fallback: 'Dollar' },
-  { value: 'elzab', labelKey: 'control.external.scaleType.elzab', fallback: 'Elzab' },
-  { value: 'marques-mobba-mode-a', labelKey: 'control.external.scaleType.marquesMobbaModeA', fallback: 'Marques Mobba Mode A' },
-  { value: 'adam-azextra', labelKey: 'control.external.scaleType.adamAzextra', fallback: 'Adam AZextra' },
-  { value: 'dialog-06', labelKey: 'control.external.scaleType.dialog06', fallback: 'Dialog 06' }
-];
-
-const SCALE_PORT_OPTIONS = [
-  { value: '', label: '' },
-  { value: 'COM 1', label: 'COM 1' },
-  { value: 'COM 2', label: 'COM 2' },
-  { value: 'COM 3', label: 'COM 3' },
-  { value: 'COM 4', label: 'COM 4' }
-];
-
-const REPORT_TABS = [
-  { id: 'financial', label: 'Financial Reports', icon: 'document' },
-  { id: 'user', label: 'User Reports', icon: 'person' },
-  { id: 'periodic', label: 'Periodic Reports', icon: 'chart' },
-  { id: 'settings', label: 'Settings', icon: 'gear' }
-];
-
-const REPORT_GENERATE_UNTIL_OPTIONS = [
-  { value: 'current-time', labelKey: 'control.reports.currentTime', fallback: 'Current time' }
-];
-
-const PERIODIC_REPORT_TIME_OPTIONS = Array.from({ length: 25 }, (_, i) => {
-  const h = i === 24 ? '24' : String(i).padStart(2, '0');
-  const label = i === 24 ? '24:00' : `${h}:00`;
-  return { value: label, label };
-});
-
-const USER_AVATAR_COLORS = ['#ef4444', '#22c55e', '#38bdf8', '#ec4899', '#a78bfa'];
-// User modal privilege avatars: blue, green, yellow, red, gray, dark gray, orange, magenta, pink
-const USER_PRIVILEGE_AVATAR_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#9ca3af', '#4b5563', '#f97316', '#d946ef', '#f472b6'];
-
-const USER_PRIVILEGE_OPTIONS = [
-  { id: 'roundTables', label: 'Rounding tables:' },
-  { id: 'adjustCustomers', label: 'Customize customers:' },
-  { id: 'openDrawer', label: 'Open drawer:' },
-  { id: 'discount', label: 'Discount:' },
-  { id: 'tableReturns', label: 'Table returns:' },
-  { id: 'historyReturns', label: 'History of returns:' },
-  { id: 'looseReturns', label: 'Individual returns:' },
-  { id: 'showInSellerList', label: 'Show in seller list:' },
-  { id: 'cancelPlannedOrders', label: 'Canceling planned orders:' },
-  { id: 'cashMachineReceiveManually', label: 'With cash machine recieve cash manually:' },
-  { id: 'createNewCustomer', label: 'Create new customer:' },
-  { id: 'revenueVisible', label: 'Turnover visible:' }
-];
-
-const DEFAULT_USER_PRIVILEGES = Object.fromEntries(USER_PRIVILEGE_OPTIONS.map((p) => [p.id, true]));
-
-const DISCOUNT_TRIGGER_OPTIONS = [
-  { value: 'number', label: 'Number' },
-  { value: 'weight', label: 'Weight' },
-  { value: 'min-amount', label: 'Minimum amount' },
-  { value: 'time', label: 'Time' }
-];
-
-const DISCOUNT_TYPE_OPTIONS = [
-  { value: 'amount', label: 'Amount' },
-  { value: 'percent', label: 'Percent' },
-  { value: 'free_products', label: 'Free products' },
-  { value: 'number', label: '+ Number' },
-  { value: 'weight', label: '+ Weight' },
-  { value: 'different_price_group', label: 'Different price group' },
-];
-
-const DISCOUNT_ON_OPTIONS = [
-  { value: 'products', label: 'Products' },
-  { value: 'categories', label: 'Categories' },
-  { value: 'all-products', label: 'All products' }
-];
-
-const REPORT_SETTINGS_ROWS = [
-  { id: 'category-totals', labelKey: 'control.reports.settings.categoryTotals', fallback: 'Category totals:' },
-  { id: 'product-totals', labelKey: 'control.reports.settings.productTotals', fallback: 'Product totals:' },
-  { id: 'vat-totals', labelKey: 'control.reports.settings.vatTotals', fallback: 'VAT totals:' },
-  { id: 'payments', labelKey: 'control.reports.settings.payments', fallback: 'Payments:' },
-  { id: 'ticket-types', labelKey: 'control.reports.settings.ticketTypes', fallback: 'Ticket types:' },
-  { id: 'eat-in-take-out', labelKey: 'control.reports.settings.eatInTakeOut', fallback: 'Eat-in / Take-out:' },
-  { id: 'open-tables', labelKey: 'control.reports.settings.openTables', fallback: 'Open tables:' },
-  { id: 'hour-totals', labelKey: 'control.reports.settings.hourTotals', fallback: 'Hour totals:' },
-  { id: 'hour-totals-per-user', labelKey: 'control.reports.settings.hourTotalsPerUser', fallback: 'Hour totals per user:' }
-];
-
-const DEFAULT_REPORT_SETTINGS = Object.fromEntries(
-  REPORT_SETTINGS_ROWS.map((row) => {
-    const allChecked = ['vat-totals', 'payments', 'ticket-types', 'eat-in-take-out'].includes(row.id);
-    return [row.id, { z: allChecked, x: allChecked, periodic: allChecked }];
-  })
-);
-
-const DEFAULT_LABELS_LIST = [
-  { id: 'lbl1', sizeLabel: '5.6cm x 3.5cm', sortOrder: 0 }
-];
-
-const DEFAULT_PRINTERS = [
-  { id: 'p1', name: 'RP4xx Series 200DPI TSC', isDefault: false, sortOrder: 0 },
-  { id: 'p2', name: 'ip printer', isDefault: true, sortOrder: 1 },
-  { id: 'p3', name: 'Xprinter XP-420B', isDefault: false, sortOrder: 2 },
-  { id: 'p4', name: 'bar printer', isDefault: false, sortOrder: 3 },
-  { id: 'p5', name: 'extra kitchen printer', isDefault: false, sortOrder: 4 },
-  { id: 'p6', name: 'extra printer', isDefault: false, sortOrder: 5 }
-];
-
-const VAT_OPTIONS = [
-  { value: 'standard', labelKey: 'control.external.standard', fallback: 'Standard' },
-  { value: 'take-out', labelKey: 'control.external.takeOut', fallback: 'Take-out' },
-  { value: 'eat-in', labelKey: 'control.external.eatIn', fallback: 'Eat-in' }
-];
-
-const DEVICE_SETTINGS_TABS = [
-  'General',
-  'Printer',
-  'Category display',
-  'Orders in waiting',
-  'Scheduled orders',
-  'Option buttons',
-  'Function buttons'
-];
-const DEVICE_SETTINGS_TAB_LABEL_KEYS = {
-  General: 'control.deviceSettingsTab.general',
-  Printer: 'control.deviceSettingsTab.printer',
-  'Category display': 'control.deviceSettingsTab.categoryDisplay',
-  'Orders in waiting': 'control.deviceSettingsTab.ordersInWaiting',
-  'Scheduled orders': 'control.deviceSettingsTab.scheduledOrders',
-  'Option buttons': 'control.deviceSettingsTab.optionButtons',
-  'Function buttons': 'control.deviceSettingsTab.functionButtons'
-};
-
-const FUNCTION_BUTTON_ITEMS = [
-  { id: 'tables', labelKey: 'control.functionButton.tables', fallbackLabel: 'Tafels' },
-  { id: 'weborders', labelKey: 'control.functionButton.weborders', fallbackLabel: 'Weborders' },
-  { id: 'in-wacht', labelKey: 'control.functionButton.inWaiting', fallbackLabel: 'In Wacht' },
-  { id: 'geplande-orders', labelKey: 'control.functionButton.scheduledOrders', fallbackLabel: 'Geplande orders' },
-  { id: 'reservaties', labelKey: 'control.functionButton.reservations', fallbackLabel: 'Reservaties' },
-  { id: 'verkopers', labelKey: 'control.functionButton.sellers', fallbackLabel: 'Verkopers' }
-];
-
-const FUNCTION_BUTTON_SLOT_COUNT = 4;
-const FUNCTION_BUTTON_ITEM_IDS = FUNCTION_BUTTON_ITEMS.map((item) => item.id);
-const FUNCTION_BUTTON_ITEM_BY_ID = Object.fromEntries(
-  FUNCTION_BUTTON_ITEMS.map((item) => [item.id, item])
-);
-
-const OPTION_BUTTON_ITEMS = [
-  { id: 'extra-bc-bedrag', labelKey: 'control.optionButton.extraBcAmount', fallbackLabel: 'Extra BC amount' },
-  { id: 'bc-refund', labelKey: 'control.optionButton.bcRefund', fallbackLabel: 'BC Refund' },
-  { id: 'stock-retour', labelKey: 'control.optionButton.stockRetour', fallbackLabel: 'Stock return' },
-  { id: 'product-labels', labelKey: 'control.optionButton.productLabels', fallbackLabel: 'Product Labels' },
-  { id: 'ticket-afdrukken', labelKey: 'control.optionButton.printTicket', fallbackLabel: 'Add ticket' },
-  { id: 'tegoed', labelKey: 'control.optionButton.credit', fallbackLabel: 'Credit' },
-  { id: 'tickets-optellen', labelKey: 'control.optionButton.sumTickets', fallbackLabel: 'Ticket To' },
-  { id: 'product-info', labelKey: 'control.optionButton.productInfo', fallbackLabel: 'Product info' },
-  { id: 'personeel-ticket', labelKey: 'control.optionButton.staffTicket', fallbackLabel: 'Staff consumables' },
-  { id: 'productie-bericht', labelKey: 'control.optionButton.productionMessage', fallbackLabel: 'Production message' },
-  { id: 'prijs-groep', labelKey: 'control.optionButton.priceGroup', fallbackLabel: 'Price group' },
-  { id: 'discount', labelKey: 'control.optionButton.discount', fallbackLabel: 'Discount' },
-  { id: 'kadobon', labelKey: 'control.optionButton.giftVoucher', fallbackLabel: 'Gift voucher' },
-  { id: 'various', labelKey: 'control.optionButton.various', fallbackLabel: 'Miscellaneous' },
-  { id: 'plu', labelKey: 'control.optionButton.plu', fallbackLabel: 'PLU' },
-  { id: 'product-zoeken', labelKey: 'control.optionButton.searchProduct', fallbackLabel: 'Search Product' },
-  { id: 'lade', labelKey: 'control.optionButton.drawer', fallbackLabel: 'Drawer' },
-  { id: 'klanten', labelKey: 'control.optionButton.customers', fallbackLabel: 'Customers' },
-  { id: 'historiek', labelKey: 'control.optionButton.history', fallbackLabel: 'History' },
-  { id: 'subtotaal', labelKey: 'control.optionButton.subtotal', fallbackLabel: 'Subtotaal' },
-  { id: 'terugname', labelKey: 'control.optionButton.return', fallbackLabel: 'Return name' },
-  { id: 'meer', labelKey: 'control.optionButton.more', fallbackLabel: 'Meer...' },
-  { id: 'eat-in-take-out', labelKey: 'control.optionButton.eatInTakeOut', fallbackLabel: 'Take Out' },
-  { id: 'externe-apps', labelKey: 'control.optionButton.externalApps', fallbackLabel: 'External Apps' },
-  { id: 'voor-verpakken', labelKey: 'control.optionButton.forPacking', fallbackLabel: 'Pre-packaging' },
-  { id: 'leeggoed-terugnemen', labelKey: 'control.optionButton.depositReturn', fallbackLabel: 'Return empty containers' },
-  { id: 'webshop-tijdsloten', labelKey: 'control.optionButton.webshopTimeslots', fallbackLabel: 'Webshop time slots' }
-];
-const OPTION_BUTTON_SLOT_COUNT = 28;
-const OPTION_BUTTON_LOCKED_ID = 'meer';
-const OPTION_BUTTON_ITEM_IDS = OPTION_BUTTON_ITEMS.map((item) => item.id);
-const OPTION_BUTTON_ITEM_BY_ID = Object.fromEntries(
-  OPTION_BUTTON_ITEMS.map((item) => [item.id, item])
-);
-const DEFAULT_OPTION_BUTTON_LAYOUT = [
-  'extra-bc-bedrag', '', 'bc-refund', 'stock-retour', 'product-labels', '', '',
-  'ticket-afdrukken', '', 'tegoed', 'tickets-optellen', '', 'product-info', 'personeel-ticket',
-  'productie-bericht', 'prijs-groep', 'discount', 'kadobon', 'various', 'plu', 'product-zoeken',
-  'lade', 'klanten', 'historiek', 'subtotaal', 'terugname', '', 'meer'
-];
-
-function normalizeFunctionButtonSlots(value) {
-  if (!Array.isArray(value)) return Array(FUNCTION_BUTTON_SLOT_COUNT).fill('');
-  const next = Array(FUNCTION_BUTTON_SLOT_COUNT).fill('');
-  const used = new Set();
-  for (let i = 0; i < FUNCTION_BUTTON_SLOT_COUNT; i += 1) {
-    const candidate = String(value[i] || '').trim();
-    if (!candidate) continue;
-    if (!FUNCTION_BUTTON_ITEM_IDS.includes(candidate)) continue;
-    if (used.has(candidate)) continue;
-    next[i] = candidate;
-    used.add(candidate);
-  }
-  return next;
-}
-
-function normalizeOptionButtonSlots(value) {
-  if (!Array.isArray(value)) return [...DEFAULT_OPTION_BUTTON_LAYOUT];
-  const next = Array(OPTION_BUTTON_SLOT_COUNT).fill('');
-  const used = new Set();
-  for (let i = 0; i < OPTION_BUTTON_SLOT_COUNT; i += 1) {
-    const candidate = String(value[i] || '').trim();
-    if (!candidate) continue;
-    if (!OPTION_BUTTON_ITEM_IDS.includes(candidate)) continue;
-    if (used.has(candidate)) continue;
-    next[i] = candidate;
-    used.add(candidate);
-  }
-  if (!next.includes(OPTION_BUTTON_LOCKED_ID)) {
-    next[OPTION_BUTTON_SLOT_COUNT - 1] = OPTION_BUTTON_LOCKED_ID;
-  }
-  return next;
-}
-
-const SYSTEM_SETTINGS_TABS = ['General', 'Prices', 'Ticket'];
-const SYSTEM_SETTINGS_TAB_LABEL_KEYS = {
-  General: 'control.systemSettingsTab.general',
-  Prices: 'control.systemSettingsTab.prices',
-  Ticket: 'control.systemSettingsTab.ticket'
-};
-
-const LEEGGOED_OPTIONS = [
-  { value: 'by-customers-name', labelKey: 'control.sys.deposit.byCustomersName', fallback: 'By customers name' },
-  { value: 'other', labelKey: 'control.sys.deposit.other', fallback: 'Other' }
-];
-
-const SAVINGS_DISCOUNT_OPTIONS = [
-  { value: '', labelKey: 'control.external.disabled', fallback: 'Disabled' },
-  { value: 'percentage', labelKey: 'control.sys.savings.percentage', fallback: 'Percentage' },
-  { value: 'amount', labelKey: 'control.sys.savings.amount', fallback: 'Amount' }
-];
-
-const TICKET_VOUCHER_VALIDITY_OPTIONS = [
-  { value: '1', labelKey: 'control.sys.voucher.month1', fallback: '1 month' },
-  { value: '3', labelKey: 'control.sys.voucher.month3', fallback: '3 months' },
-  { value: '6', labelKey: 'control.sys.voucher.month6', fallback: '6 months' },
-  { value: '12', labelKey: 'control.sys.voucher.month12', fallback: '12 months' }
-];
-
-const TICKET_SCHEDULED_PRINT_MODE_OPTIONS = [
-  { value: 'Production ticket', labelKey: 'control.sys.scheduledPrint.productionTicket', fallback: 'Production ticket' },
-  { value: 'label-small', labelKey: 'control.sys.scheduledPrint.smallLabel', fallback: 'Small label' },
-  { value: 'label-large', labelKey: 'control.sys.scheduledPrint.largeLabel', fallback: 'Large label' },
-  { value: 'label-Production ticket + Small label', labelKey: 'control.sys.scheduledPrint.prodPlusSmall', fallback: 'Production ticket + Small label' },
-  { value: 'Production ticket + Large label', labelKey: 'control.sys.scheduledPrint.prodPlusLarge', fallback: 'Production ticket + Large label' }
-];
-
-const TICKET_SCHEDULED_CUSTOMER_SORT_OPTIONS = [
-  { value: 'as-registered', labelKey: 'control.external.asRegistered', fallback: 'As Registered' },
-  { value: 'Alphabetical first name', labelKey: 'control.sys.customerSort.alphabeticalFirstName', fallback: 'Alphabetical first name' },
-  { value: 'Alphabetical last name', labelKey: 'control.sys.customerSort.alphabeticalLastName', fallback: 'Alphabetical last name' }
-];
-
-const BARCODE_TYPE_OPTIONS = [
-  { value: 'Code39', label: 'Code39' },
-  { value: 'Code93', label: 'Code93' },
-  { value: 'Code128', label: 'Code128' },
-  { value: 'Interleaved2of5', label: 'Interleaved 2 of 5' }
-];
-
-const TABLE_LOCATION_BACKGROUND_OPTIONS = [
-  { value: '', labelKey: 'control.tables.backgroundDefault', fallback: 'Default' },
-  { value: 'white', labelKey: 'control.tables.backgroundWhite', fallback: 'White' },
-  { value: 'gray', labelKey: 'control.tables.backgroundGray', fallback: 'Gray' },
-  { value: 'blue', labelKey: 'control.tables.backgroundBlue', fallback: 'Blue' }
-];
-
-const SET_TABLES_ZOOM_MIN = 50;
-const SET_TABLES_ZOOM_MAX = 150;
-const SET_TABLES_ZOOM_STEP = 10;
-
-const TABLE_TEMPLATE_OPTIONS = [
-  { id: '4table', src: '/4table.svg', chairs: 4, width: 130, height: 155 },
-  { id: '5table', src: '/5table.svg', chairs: 5, width: 145, height: 173 },
-  { id: '6table', src: '/6table.svg', chairs: 6, width: 150, height: 179 }
-];
-
-const TABLE_BOARD_COLOR_OPTIONS = [
-  '#facc15', // yellow
-  '#22c55e', // green
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#a855f7', // purple
-  '#ffffff'  // white
-];
-
-const createDefaultBoard = (table, color = '#facc15') => {
-  const tableW = Math.max(60, Number(table?.width) || 120);
-  const tableH = Math.max(40, Number(table?.height) || 80);
-  const boardW = Math.max(120, Math.round(tableW + 40));
-  const boardH = Math.max(120, Math.round(tableH + 40));
-  return {
-    id: `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    color,
-    x: 0,
-    y: 0,
-    width: boardW,
-    height: boardH,
-    rotation: 0
-  };
-};
-
-const normalizeBoardToItem = (b, defaultColor = '#facc15') => ({
-  id: b?.id && typeof b.id === 'string' ? b.id : `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-  color: typeof b?.color === 'string' && b.color.trim() ? b.color.trim() : defaultColor,
-  x: Number(b?.x) || 0,
-  y: Number(b?.y) || 0,
-  width: Math.max(10, Number(b?.width) || 120),
-  height: Math.max(10, Number(b?.height) || 120),
-  rotation: Number(b?.rotation) || 0
-});
-
-const createDefaultFlowerPot = () => ({
-  id: `flowerpot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-  x: 0,
-  y: 0,
-  width: 60,
-  height: 72,
-  rotation: 0
-});
-
-const normalizeFlowerPotToItem = (fp) => ({
-  id: fp?.id && typeof fp.id === 'string' ? fp.id : `flowerpot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-  x: Number(fp?.x) || 0,
-  y: Number(fp?.y) || 0,
-  width: Math.max(10, Number(fp?.width) || 60),
-  height: Math.max(10, Number(fp?.height) || 72),
-  rotation: Number(fp?.rotation) || 0
-});
-
-const createDefaultLayoutTable = (index = 1, templateType = '4table') => {
-  const tpl = TABLE_TEMPLATE_OPTIONS.find((item) => item.id === templateType) || TABLE_TEMPLATE_OPTIONS[0];
-  return {
-    id: `tbl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    name: `T-${String(index).padStart(2, '0')}`,
-    x: 120 + (index - 1) * 180,
-    y: 120 + ((index - 1) % 3) * 120,
-    width: tpl.width,
-    height: tpl.height,
-    chairs: tpl.chairs,
-    rotation: 0,
-    round: false,
-    templateType: tpl.id,
-    boards: [],
-    flowerPots: []
-  };
-};
-
-const normalizeLayoutEditorDraft = (raw, locationName = 'Restaurant') => {
-  const hasTablesArray = Array.isArray(raw?.tables);
-  const tables = Array.isArray(raw?.tables)
-    ? raw.tables.map((table, index) => ({
-      id: String(table?.id || `tbl-${index + 1}`),
-      name: String(table?.name || `T-${String(index + 1).padStart(2, '0')}`),
-      x: Number(table?.x) || 0,
-      y: Number(table?.y) || 0,
-      width: Math.max(60, Number(table?.width) || 120),
-      height: Math.max(40, Number(table?.height) || 80),
-      chairs: Math.max(0, Number(table?.chairs) || 4),
-      rotation: Number(table?.rotation) || 0,
-      round: !!table?.round,
-      templateType: TABLE_TEMPLATE_OPTIONS.some((tpl) => tpl.id === table?.templateType)
-        ? table.templateType
-        : ((Number(table?.chairs) || 4) >= 6 ? '6table' : (Number(table?.chairs) || 4) >= 5 ? '5table' : '4table'),
-      boards: (() => {
-        if (Array.isArray(table?.boards) && table.boards.length > 0) {
-          return table.boards.map((b) => normalizeBoardToItem(b));
-        }
-        if (table?.board && typeof table.board === 'object') {
-          return [normalizeBoardToItem(table.board)];
-        }
-        if (typeof table?.boardColor === 'string' && table.boardColor.trim()) {
-          return [normalizeBoardToItem(createDefaultBoard(table, table.boardColor.trim()))];
-        }
-        return [];
-      })(),
-      flowerPots: Array.isArray(table?.flowerPots) && table.flowerPots.length > 0
-        ? table.flowerPots.map((fp) => normalizeFlowerPotToItem(fp))
-        : (table?.flowerPot && typeof table.flowerPot === 'object' ? [normalizeFlowerPotToItem(table.flowerPot)] : [])
-    }))
-    : [];
-  return {
-    floorName: String(raw?.floorName || locationName || 'Restaurant'),
-    floorWidth: Math.min(979, Math.max(400, Number(raw?.floorWidth) ?? 979)),
-    floorHeight: Number(raw?.floorHeight) ?? 595.5,
-    bookingCapacity: Math.max(0, Number(raw?.bookingCapacity) || 0),
-    floors: Math.max(1, Number(raw?.floors) || 1),
-    tables: hasTablesArray ? tables : [createDefaultLayoutTable(1)]
-  };
-};
-
-const PAYMENT_INTEGRATION_OPTIONS = [
-  { value: 'manual_cash', labelKey: 'control.paymentTypes.integration.manual_cash', fallback: 'Manual Cash' },
-  { value: 'cashmatic', labelKey: 'control.paymentTypes.integration.cashmatic', fallback: 'Cashmatic' },
-  { value: 'payworld', labelKey: 'control.paymentTypes.integration.payworld', fallback: 'Payworld' },
-  { value: 'generic', labelKey: 'control.paymentTypes.integration.generic', fallback: 'Manual Card' }
-];
-
-const VAT_PERCENT_OPTIONS = [
-  { value: '', label: '--' },
-  { value: '0', label: '0%' },
-  { value: '6', label: '6%' },
-  { value: '9', label: '9%' },
-  { value: '12', label: '12%' },
-  { value: '21', label: '21%' }
-];
-
-const EXTRA_PRICE_PRINTER_OPTIONS = [
-  { value: 'Disabled', label: 'Disabled' }
-];
-
-const VERVALTYPE_OPTIONS = [
-  { value: 'Shelf life', label: 'Shelf life' },
-  { value: 'Expiration date', label: 'Expiration date' }
-];
-
-const PURCHASE_UNIT_OPTIONS = [
-  { value: 'Piece', label: 'Piece' },
-  { value: 'Kg', label: 'Kg' },
-  { value: 'Liter', label: 'Liter' },
-  { value: 'Meter', label: 'Meter' }
-];
-
-const PURCHASE_SUPPLIER_OPTIONS = [
-  { value: '', label: '--' }
-];
-
-const KIOSK_SUBS_OPTIONS = [
-  { value: 'unlimited', label: 'Unlimited' },
-  ...Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))
-];
-
-function IconMonitor({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-    </svg>
+import { publicAssetUrl } from '../lib/publicAssetUrl.js';
+
+import {
+  API,
+  KITCHEN_ADMIN_CREDENTIAL_ID,
+  CONTROL_SIDEBAR_ITEMS,
+  LANGUAGE_OPTIONS,
+  TOP_NAV_ITEMS,
+  SUB_NAV_ITEMS,
+  CASH_REGISTER_SUB_NAV_ITEMS,
+  EXTERNAL_DEVICES_SUB_NAV_ITEMS,
+  PRINTER_TAB_DEFS,
+  PRINTING_ORDER_OPTIONS,
+  PRINTER_DISABLED_OPTIONS,
+  SUBPRODUCT_VAT_OPTIONS,
+  GROUPING_RECEIPT_OPTIONS,
+  SCHEDULED_ORDERS_PRODUCTION_FLOW_OPTIONS,
+  SCHEDULED_ORDERS_LOADING_OPTIONS,
+  SCHEDULED_ORDERS_MODE_OPTIONS,
+  SCHEDULED_ORDERS_INVOICE_LAYOUT_OPTIONS,
+  SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS,
+  PRICE_DISPLAY_TYPE_OPTIONS,
+  RFID_READER_TYPE_OPTIONS,
+  BARCODE_SCANNER_TYPE_OPTIONS,
+  CREDIT_CARD_TYPE_OPTIONS,
+  SCALE_TYPE_OPTIONS,
+  SCALE_PORT_OPTIONS,
+  REPORT_TABS,
+  REPORT_GENERATE_UNTIL_OPTIONS,
+  PERIODIC_REPORT_TIME_OPTIONS,
+  USER_AVATAR_COLORS,
+  USER_PRIVILEGE_AVATAR_COLORS,
+  USER_PRIVILEGE_OPTIONS,
+  DEFAULT_USER_PRIVILEGES,
+  DISCOUNT_TRIGGER_OPTIONS,
+  DISCOUNT_TYPE_OPTIONS,
+  DISCOUNT_ON_OPTIONS,
+  REPORT_SETTINGS_ROWS,
+  DEFAULT_REPORT_SETTINGS,
+  DEFAULT_PRINTERS,
+  VAT_OPTIONS,
+  DEVICE_SETTINGS_TABS,
+  DEVICE_SETTINGS_TAB_LABEL_KEYS,
+  FUNCTION_BUTTON_ITEMS,
+  FUNCTION_BUTTON_SLOT_COUNT,
+  FUNCTION_BUTTON_ITEM_IDS,
+  FUNCTION_BUTTON_ITEM_BY_ID,
+  OPTION_BUTTON_ITEMS,
+  OPTION_BUTTON_SLOT_COUNT,
+  OPTION_BUTTON_LOCKED_ID,
+  OPTION_BUTTON_ITEM_IDS,
+  OPTION_BUTTON_ITEM_BY_ID,
+  DEFAULT_OPTION_BUTTON_LAYOUT,
+  SYSTEM_SETTINGS_TABS,
+  SYSTEM_SETTINGS_TAB_LABEL_KEYS,
+  LEEGGOED_OPTIONS,
+  SAVINGS_DISCOUNT_OPTIONS,
+  TICKET_VOUCHER_VALIDITY_OPTIONS,
+  TICKET_SCHEDULED_PRINT_MODE_OPTIONS,
+  TICKET_SCHEDULED_CUSTOMER_SORT_OPTIONS,
+  BARCODE_TYPE_OPTIONS,
+  TABLE_LOCATION_BACKGROUND_OPTIONS,
+  SET_TABLES_ZOOM_MIN,
+  SET_TABLES_ZOOM_MAX,
+  SET_TABLES_ZOOM_STEP,
+  TABLE_TEMPLATE_OPTIONS,
+  TABLE_BOARD_COLOR_OPTIONS,
+  PAYMENT_INTEGRATION_OPTIONS,
+  VAT_PERCENT_OPTIONS,
+  EXTRA_PRICE_PRINTER_OPTIONS,
+  VERVALTYPE_OPTIONS,
+  PURCHASE_UNIT_OPTIONS,
+  PURCHASE_SUPPLIER_OPTIONS,
+  KIOSK_SUBS_OPTIONS
+} from './controlView/constants.js';
+import {
+  normalizeFunctionButtonSlots,
+  normalizeOptionButtonSlots,
+  normalizeLayoutEditorDraft,
+  createDefaultLayoutTable,
+  createDefaultBoard,
+  normalizeBoardToItem,
+  createDefaultFlowerPot,
+  normalizeFlowerPotToItem
+} from './controlView/controlViewUtils.js';
+import { ControlViewSidebar, ControlViewMainNav } from './controlView/ControlViewChrome.jsx';
+
+/** Prisma `categoryId`: deepest selected category in the chain (not only index 0). */
+function resolveProductPrimaryCategoryId(productCategoryIds, selectedCategoryId) {
+  const list = (Array.isArray(productCategoryIds) ? productCategoryIds : []).filter(
+    (x) => x != null && String(x).trim() !== ''
   );
-}
-
-function IconChart({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-      <g fill="currentColor" fillRule="evenodd">
-        <rect x="15" rx="1" width="3" height="18" />
-        <rect x="10" y="5" width="3" height="13" rx="1" />
-        <rect x="5" y="9" width="3" height="9" rx="1" />
-        <rect y="13" width="3" height="5" rx="1.001" />
-      </g>
-    </svg>
-  );
-}
-
-function IconUsers({ className }) {
-  return (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 00-3-3.87" />
-      <path d="M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  );
-}
-
-function IconBox({ className }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 16 16">
-      <path fillRule="evenodd" clipRule="evenodd" d="M9.02.678a2.25 2.25 0 00-2.04 0L1.682 3.374A1.25 1.25 0 001 4.488v6.717c0 .658.37 1.26.956 1.56l5.023 2.557a2.25 2.25 0 002.042 0l5.023-2.557a1.75 1.75 0 00.956-1.56V4.488c0-.47-.264-.9-.683-1.114L9.021.678zM7.66 2.015a.75.75 0 01.68 0l4.436 2.258-1.468.734-4.805-2.403 1.157-.59zM4.84 3.45l-1.617.823L8 6.661l1.631-.815-4.79-2.396zM2.5 5.588v5.617c0 .094.053.18.137.223l4.613 2.348V7.964L2.5 5.588zm10.863 5.84L8.75 13.776V7.964l4.75-2.375v5.617a.25.25 0 01-.137.223z" />
-    </svg>
-  );
-}
-
-function IconGear({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  );
-}
-
-function IconPrinter({ className }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 70 70">
-      <path d="M62.597,21.583H8.46c-3.954,0-6.877,3.133-6.877,6.979v20.137c0,3.751,2.968,6.884,6.877,6.884h4.123v4.485c0,3.828,3.521,6.515,7.349,6.515h30.137c3.828,0,6.515-2.687,6.515-6.515v-4.485h6.014c3.481,0,4.986-2.268,4.986-6.884V28.563C67.583,23.216,64.771,21.583,62.597,21.583z M52.583,60.068c0,1.619-0.896,2.515-2.515,2.515H19.932c-1.619,0-3.349-0.896-3.349-2.515V46.932c0-1.619,1.729-3.349,3.349-3.349h30.137c1.619,0,2.515,1.729,2.515,3.349V60.068z M62.597,51.583h-6.014v-4.651c0-3.828-2.687-7.349-6.515-7.349H19.932c-3.828,0-7.349,3.521-7.349,7.349v4.651H8.46c-1.7,0-2.877-1.32-2.877-2.884V28.563c0-1.228,0.968-2.979,2.877-2.979h54.137c1.294,0,0.986,1.028,0.986,2.979v20.137C63.583,49.733,64.09,51.583,62.597,51.583z" />
-      <path d="M14.583,20.417c1.104,0,2-0.896,2-2V9.563c0-1.228,0.521-2.979,3.877-2.979h30.137c1.294,0,1.986,1.028,1.986,2.979v8.854c0,1.104,0.896,2,2,2s2-0.896,2-2V9.563c0-5.347-1.667-6.979-5.986-6.979H20.46c-5.543,0-7.877,2.084-7.877,6.979v8.854C12.583,19.521,13.479,20.417,14.583,20.417z" />
-      <path d="M17.417,31.583c0.552,0,1-0.447,1-1s-0.448-1-1-1h-3c-0.552,0-1,0.447-1,1s0.448,1,1,1H17.417z" />
-      <path d="M21.417,31.583h3c0.552,0,1-0.447,1-1s-0.448-1-1-1h-3c-0.552,0-1,0.447-1,1S20.865,31.583,21.417,31.583z" />
-      <path d="M55.417,33.583h-40c-0.552,0-1,0.447-1,1s0.448,1,1,1h40c0.552,0,1-0.447,1-1S55.969,33.583,55.417,33.583z" />
-      <path d="M22.417,49.583h12c0.552,0,1-0.447,1-1s-0.448-1-1-1h-12c-0.552,0-1,0.447-1,1S21.865,49.583,22.417,49.583z" />
-      <path d="M47.417,47.583h-9c-0.552,0-1,0.447-1,1s0.448,1,1,1h9c0.552,0,1-0.447,1-1S47.969,47.583,47.417,47.583z" />
-      <path d="M22.417,54.583h6c0.552,0,1-0.447,1-1s-0.448-1-1-1h-6c-0.552,0-1,0.447-1,1S21.865,54.583,22.417,54.583z" />
-      <path d="M31.417,53.583c0,0.553,0.448,1,1,1h7c0.552,0,1-0.447,1-1s-0.448-1-1-1h-7C31.865,52.583,31.417,53.03,31.417,53.583z" />
-      <path d="M32.417,57.583h-10c-0.552,0-1,0.447-1,1s0.448,1,1,1h10c0.552,0,1-0.447,1-1S32.969,57.583,32.417,57.583z" />
-      <path d="M43.417,57.583h-7c-0.552,0-1,0.447-1,1s0.448,1,1,1h7c0.552,0,1-0.447,1-1S43.969,57.583,43.417,57.583z" />
-      <path d="M47.417,52.583h-4c-0.552,0-1,0.447-1,1s0.448,1,1,1h4c0.552,0,1-0.447,1-1S47.969,52.583,47.417,52.583z" />
-    </svg>
-  );
-}
-
-function IconTable({ className }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 491.413 491.413">
-      <path d="M491.413,133.867c0-62.4-126.613-96.107-245.653-96.107S0,71.467,0,133.867c0,60.48,118.72,93.973,234.453,96v125.76c-0.213,0.747-0.533,1.387-0.853,2.133c-4.587,0.32-8.533,3.52-9.6,8.107c-1.173,4.16-2.773,8.107-4.8,11.947c-1.067,0.533-2.24,0.853-3.413,1.067c-12.373,1.6-30.08-17.707-36.693-27.307c-3.307-4.907-10.027-6.08-14.827-2.773c-4.8,3.307-6.08,10.027-2.773,14.827c2.347,3.413,20.373,29.013,42.987,35.2c-13.013,14.08-34.027,28.373-67.84,33.6c-5.867,0.853-9.813,6.293-8.96,12.16c0.747,5.227,5.333,9.067,10.56,9.067c0.533,0,1.067,0,1.6-0.107c56.853-8.64,83.733-39.68,95.787-61.227c3.627-3.093,6.827-6.613,9.387-10.667c2.56,3.947,5.76,7.573,9.387,10.667c12.16,21.547,39.04,52.587,95.893,61.227c0.533,0.107,1.067,0.107,1.6,0.107c5.867,0,10.667-4.8,10.667-10.667c0-5.333-3.84-9.813-9.067-10.56c-33.92-5.227-55.04-19.52-67.947-33.6c22.613-6.293,40.747-31.893,43.093-35.307c3.307-4.907,2.027-11.52-2.773-14.827c-4.907-3.307-11.52-2.027-14.827,2.773c-6.507,9.6-24.213,29.013-36.693,27.307c-1.173-0.107-2.453-0.533-3.52-1.067c-1.92-3.84-3.52-7.787-4.693-11.947c-1.067-4.48-5.013-7.787-9.6-8c-0.32-0.747-0.533-1.387-0.853-2.133l0.107-125.653C371.84,228.16,491.413,194.56,491.413,133.867z M248.32,208.747c-1.707-0.747-3.733-0.747-5.44,0C112.747,208,22.187,169.067,22.187,134.08c0-35.307,91.947-74.667,224-74.667s224,39.36,224,74.667C470.187,169.173,379.2,208.32,248.32,208.747z" />
-    </svg>
-  );
-}
-
-function IconDocument({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  );
-}
-
-function IconPerson({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-    </svg>
-  );
-}
-
-function IconLanguage({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-    </svg>
-  );
-}
-
-function ReportTabIcon({ id, className }) {
-  if (id === 'document') return <IconDocument className={className} />;
-  if (id === 'person') return <IconPerson className={className} />;
-  if (id === 'chart') return <IconChart className={className} />;
-  if (id === 'gear') return <IconGear className={className} />;
-  return null;
-}
-
-function SidebarIcon({ id, className }) {
-  if (id === 'monitor') return <IconMonitor className={className} />;
-  if (id === 'chart') return <IconChart className={className} />;
-  if (id === 'users') return <IconUsers className={className} />;
-  if (id === 'language') return <IconLanguage className={className} />;
-  return null;
-}
-
-function TopNavIcon({ id, className }) {
-  if (id === 'box') return <IconBox className={className} />;
-  if (id === 'gear') return <IconGear className={className} />;
-  if (id === 'printer') return <IconPrinter className={className} />;
-  if (id === 'table') return <IconTable className={className} />;
-  return null;
+  if (list.length) return list[list.length - 1];
+  return selectedCategoryId != null && String(selectedCategoryId).trim() !== '' ? selectedCategoryId : '';
 }
 
 export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, fetchTables, onFunctionButtonsSaved }) {
@@ -770,7 +161,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const discountTargetListRef = useRef(null);
   const [canDiscountTargetScrollUp, setCanDiscountTargetScrollUp] = useState(false);
   const [canDiscountTargetScrollDown, setCanDiscountTargetScrollDown] = useState(false);
-  const [discountKeyboardValue, setDiscountKeyboardValue] = useState('');
+  const [discountActiveField, setDiscountActiveField] = useState('name');
   const [savingDiscount, setSavingDiscount] = useState(false);
   const [deleteConfirmDiscountId, setDeleteConfirmDiscountId] = useState(null);
   const [discountCalendarField, setDiscountCalendarField] = useState(null); // 'start' | 'end' | null
@@ -881,6 +272,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [productPrinter3, setProductPrinter3] = useState('');
   const [productActiveField, setProductActiveField] = useState('name');
   const [savingProduct, setSavingProduct] = useState(false);
+  const [productSaveError, setProductSaveError] = useState(null);
   const [deleteConfirmProductId, setDeleteConfirmProductId] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const [showProductSearchKeyboard, setShowProductSearchKeyboard] = useState(false);
@@ -1094,6 +486,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const PRODUCTION_MESSAGES_PAGE_SIZE1 = 8;
   const [editingProductionMessageId, setEditingProductionMessageId] = useState(null);
   const [deleteConfirmProductionMessageId, setDeleteConfirmProductionMessageId] = useState(null);
+  const [savingProductionMessage, setSavingProductionMessage] = useState(false);
   const productionMessagesListRef = useRef(null);
   const [canProductionMessagesScrollUp, setCanProductionMessagesScrollUp] = useState(false);
   const [canProductionMessagesScrollDown, setCanProductionMessagesScrollDown] = useState(false);
@@ -1146,16 +539,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
   const [labelsType, setLabelsType] = useState('production-labels');
   const [labelsPrinter, setLabelsPrinter] = useState('p3');
-  const [labelsList, setLabelsList] = useState(() => {
-    try {
-      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_labels_list');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length) return parsed;
-      }
-    } catch (_) { }
-    return DEFAULT_LABELS_LIST.map((l, i) => ({ ...l, sortOrder: i }));
-  });
+  const [labelsList, setLabelsList] = useState([]);
+  const [labelsListLoading, setLabelsListLoading] = useState(false);
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [editingLabelId, setEditingLabelId] = useState(null);
   const [labelName, setLabelName] = useState('');
@@ -1167,6 +552,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [labelMarginBottom, setLabelMarginBottom] = useState('0');
   const [labelMarginTop, setLabelMarginTop] = useState('0');
   const [deleteConfirmLabelId, setDeleteConfirmLabelId] = useState(null);
+  const [savingLabel, setSavingLabel] = useState(false);
   const labelsListRef = useRef(null);
   const [canLabelsScrollUp, setCanLabelsScrollUp] = useState(false);
   const [canLabelsScrollDown, setCanLabelsScrollDown] = useState(false);
@@ -1234,6 +620,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const subproductAttachToListRef = useRef(null);
   const [subproductAddCategoryId, setSubproductAddCategoryId] = useState('');
   const [savingSubproduct, setSavingSubproduct] = useState(false);
+  const [subproductFieldErrors, setSubproductFieldErrors] = useState({
+    name: false,
+    keyName: false,
+    productionName: false,
+    vatTakeOut: false,
+    vatEatIn: false,
+    group: false,
+  });
+  const [subproductSaveError, setSubproductSaveError] = useState(null);
   const [deleteConfirmSubproductId, setDeleteConfirmSubproductId] = useState(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [showAddGroupInline, setShowAddGroupInline] = useState(false);
@@ -2205,7 +1600,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
   const mapTranslatedOptions = useCallback((opts) =>
     opts.map((o) => ({ value: o.value, label: o.labelKey ? tr(o.labelKey, o.fallback) : o.label }))
-  , [tr]);
+    , [tr]);
   const getFunctionButtonLabel = useCallback((id) => {
     const item = FUNCTION_BUTTON_ITEM_BY_ID[id];
     if (!item) return '';
@@ -2406,6 +1801,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const openProductModal = () => {
     setEditingProductId(null);
     setProductTab('general');
+    setProductSaveError(null);
     setProductName('');
     setProductKeyName('');
     setProductProductionName('');
@@ -2423,12 +1819,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setProductTabsUnlocked(true);
     setProductDisplayNumber(null);
     setAdvancedKassaPhotoPreview(null);
+    setKioskPictureFileName('');
     setShowProductModal(true);
   };
 
   const openEditProductModal = (product) => {
     setEditingProductId(product.id);
     setProductTab('general');
+    setProductSaveError(null);
     setProductName(product.name || '');
     setProductKeyName(product.keyName ?? '');
     setProductProductionName(product.productionName ?? '');
@@ -2513,6 +1911,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setExtraPricesRows([]);
     setExtraPricesSelectedIndex(0);
     setProductCategoryIds(['']);
+    setProductSaveError(null);
     setShowProductModal(false);
     setEditingProductId(null);
   };
@@ -2528,7 +1927,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   };
 
   const buildProductPayload = () => {
-    const categoryId = (productCategoryIds[0] || '') || selectedCategoryId;
+    const categoryId = resolveProductPrimaryCategoryId(productCategoryIds, selectedCategoryId);
     const payload = {
       name: productName.trim() || 'New product',
       price: parseFloat(productPrice) || 0,
@@ -2587,8 +1986,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
   const handleSaveProduct = async () => {
     if (!validateProductRequired()) return;
-    const categoryId = (productCategoryIds[0] || '') || selectedCategoryId;
-    if (!categoryId) return;
+    const categoryId = resolveProductPrimaryCategoryId(productCategoryIds, selectedCategoryId);
+    if (!categoryId) {
+      setProductSaveError(
+        tr('control.productModal.errorSelectCategory', 'Select a category for this product (Category dropdown).')
+      );
+      return;
+    }
+    setProductSaveError(null);
     setSavingProduct(true);
     const payload = buildProductPayload();
     try {
@@ -2598,24 +2003,41 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const updated = await res.json();
-        if (res.ok && updated) {
-          setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.id) {
+          setProducts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
           closeProductModal();
-        } else fetchProducts(selectedCategoryId);
+        } else {
+          const msg =
+            (typeof data?.error === 'string' && data.error) ||
+            (typeof data?.message === 'string' && data.message) ||
+            tr('control.productModal.saveFailed', 'Could not save product.') + ` (${res.status})`;
+          setProductSaveError(msg);
+          fetchProducts(selectedCategoryId);
+        }
       } else {
         const res = await fetch(`${API}/products`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, categoryId })
         });
-        const created = await res.json();
-        if (res.ok && created) {
-          setProducts((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.id) {
+          setProducts((prev) => [...prev, data].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
           closeProductModal();
-        } else fetchProducts(selectedCategoryId);
+        } else {
+          const msg =
+            (typeof data?.error === 'string' && data.error) ||
+            (typeof data?.message === 'string' && data.message) ||
+            tr('control.productModal.saveFailed', 'Could not save product.') + ` (${res.status})`;
+          setProductSaveError(msg);
+          fetchProducts(selectedCategoryId);
+        }
       }
-    } catch {
+    } catch (e) {
+      setProductSaveError(
+        e instanceof Error ? e.message : tr('control.productModal.saveNetworkError', 'Network error while saving.')
+      );
       fetchProducts(selectedCategoryId);
     } finally {
       setSavingProduct(false);
@@ -2748,6 +2170,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setSubproductName(value);
     setSubproductKeyName(value);
     setSubproductProductionName(value);
+    setSubproductFieldErrors((e) => ({ ...e, name: false, keyName: false, productionName: false }));
   }, []);
 
   const subproductKeyboardValue = subproductActiveField === 'name'
@@ -2763,9 +2186,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const subproductKeyboardOnChange = subproductActiveField === 'name'
     ? handleSubproductNameChange
     : subproductActiveField === 'keyName'
-      ? setSubproductKeyName
+      ? (v) => {
+        setSubproductKeyName(v);
+        setSubproductFieldErrors((e) => ({ ...e, keyName: false }));
+      }
       : subproductActiveField === 'productionName'
-        ? setSubproductProductionName
+        ? (v) => {
+          setSubproductProductionName(v);
+          setSubproductFieldErrors((e) => ({ ...e, productionName: false }));
+        }
         : subproductActiveField === 'price'
           ? setSubproductPrice
           : () => { };
@@ -2783,6 +2212,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setSubproductKioskPicture('');
     setSubproductAttachToCategoryIds([]);
     setSubproductAddCategoryId('');
+    setSubproductSaveError(null);
+    setSubproductFieldErrors({ name: false, keyName: false, productionName: false, vatTakeOut: false, vatEatIn: false, group: false });
     setShowSubproductModal(true);
   };
 
@@ -2811,6 +2242,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       setSubproductKioskPicture('');
       setSubproductAttachToCategoryIds([]);
     }
+    setSubproductSaveError(null);
+    setSubproductFieldErrors({ name: false, keyName: false, productionName: false, vatTakeOut: false, vatEatIn: false, group: false });
     setShowSubproductModal(true);
   };
 
@@ -2824,6 +2257,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setSubproductPrice('');
     setSubproductAttachToCategoryIds([]);
     setSubproductAddCategoryId('');
+    setSubproductSaveError(null);
+    setSubproductFieldErrors({ name: false, keyName: false, productionName: false, vatTakeOut: false, vatEatIn: false, group: false });
   };
 
   const persistSubproductExtra = (id, data) => {
@@ -2835,9 +2270,22 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     } catch (_) { }
   };
 
-  const handleSaveSubproduct = async () => {
+  const validateSubproductRequired = () => {
+    const name = !subproductName.trim();
+    const keyName = !subproductKeyName.trim();
+    const productionName = !subproductProductionName.trim();
+    const vatTakeOut = !subproductVatTakeOut;
+    const vatEatIn = !subproductVatEatIn;
     const groupId = subproductModalGroupId || selectedSubproductGroupId;
-    if (!groupId && !editingSubproductId) return;
+    const group = !editingSubproductId && !groupId;
+    setSubproductFieldErrors({ name, keyName, productionName, vatTakeOut, vatEatIn, group });
+    return !name && !keyName && !productionName && !vatTakeOut && !vatEatIn && !group;
+  };
+
+  const handleSaveSubproduct = async () => {
+    setSubproductSaveError(null);
+    if (!validateSubproductRequired()) return;
+    const groupId = subproductModalGroupId || selectedSubproductGroupId;
     setSavingSubproduct(true);
     const name = subproductName.trim() || 'New subproduct';
     const extraData = {
@@ -2849,6 +2297,10 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       kioskPicture: subproductKioskPicture.trim(),
       attachToCategoryIds: subproductAttachToCategoryIds
     };
+    const saveFailedMsg = (data, status) =>
+      (typeof data?.error === 'string' && data.error) ||
+      (typeof data?.message === 'string' && data.message) ||
+      tr('control.subproductModal.saveFailed', 'Could not save subproduct.') + (status != null ? ` (${status})` : '');
     try {
       if (editingSubproductId) {
         const res = await fetch(`${API}/subproducts/${editingSubproductId}`, {
@@ -2856,26 +2308,35 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name })
         });
-        const updated = await res.json();
-        if (res.ok && updated) {
+        const updated = await res.json().catch(() => ({}));
+        if (res.ok && updated?.id) {
           setSubproducts((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
           persistSubproductExtra(editingSubproductId, extraData);
           closeSubproductModal();
-        } else fetchSubproducts(selectedSubproductGroupId);
+        } else {
+          setSubproductSaveError(saveFailedMsg(updated, res.status));
+          fetchSubproducts(selectedSubproductGroupId);
+        }
       } else {
         const res = await fetch(`${API}/subproducts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, groupId })
         });
-        const created = await res.json();
-        if (res.ok && created) {
+        const created = await res.json().catch(() => ({}));
+        if (res.ok && created?.id) {
           setSubproducts((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
           persistSubproductExtra(created.id, extraData);
           closeSubproductModal();
-        } else fetchSubproducts(selectedSubproductGroupId);
+        } else {
+          setSubproductSaveError(saveFailedMsg(created, res.status));
+          fetchSubproducts(selectedSubproductGroupId);
+        }
       }
-    } catch {
+    } catch (e) {
+      setSubproductSaveError(
+        e instanceof Error ? e.message : tr('control.subproductModal.saveNetworkError', 'Network error while saving.')
+      );
       fetchSubproducts(selectedSubproductGroupId);
     } finally {
       setSavingSubproduct(false);
@@ -3306,41 +2767,41 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         const canvasWidth = prev.floorWidth ?? 979;
         const canvasHeight = prev.floorHeight ?? 595.5;
         return {
-        ...prev,
-        tables: prev.tables.map((table) => {
-          if (table.id !== drag.id) return table;
-          if (drag.type === 'flowerPot' && Array.isArray(table.flowerPots) && drag.flowerPotIndex != null && table.flowerPots[drag.flowerPotIndex]) {
-            const fp = table.flowerPots[drag.flowerPotIndex];
-            const fpWidth = Math.max(10, Number(fp.width) || 0);
-            const fpHeight = Math.max(10, Number(fp.height) || 0);
-            const maxX = Math.max(0, canvasWidth - fpWidth);
-            const maxY = Math.max(0, canvasHeight - fpHeight);
+          ...prev,
+          tables: prev.tables.map((table) => {
+            if (table.id !== drag.id) return table;
+            if (drag.type === 'flowerPot' && Array.isArray(table.flowerPots) && drag.flowerPotIndex != null && table.flowerPots[drag.flowerPotIndex]) {
+              const fp = table.flowerPots[drag.flowerPotIndex];
+              const fpWidth = Math.max(10, Number(fp.width) || 0);
+              const fpHeight = Math.max(10, Number(fp.height) || 0);
+              const maxX = Math.max(0, canvasWidth - fpWidth);
+              const maxY = Math.max(0, canvasHeight - fpHeight);
+              const x = Math.min(maxX, Math.max(0, drag.startX + dx));
+              const y = Math.min(maxY, Math.max(0, drag.startY + dy));
+              const nextFlowerPots = [...table.flowerPots];
+              nextFlowerPots[drag.flowerPotIndex] = { ...fp, x, y };
+              return { ...table, flowerPots: nextFlowerPots };
+            }
+            if (drag.type === 'board' && Array.isArray(table.boards) && drag.boardIndex != null && table.boards[drag.boardIndex]) {
+              const board = table.boards[drag.boardIndex];
+              const boardWidth = Math.max(10, Number(board.width) || 0);
+              const boardHeight = Math.max(10, Number(board.height) || 0);
+              const maxX = Math.max(0, canvasWidth - boardWidth);
+              const maxY = Math.max(0, canvasHeight - boardHeight);
+              const x = Math.min(maxX, Math.max(0, drag.startX + dx));
+              const y = Math.min(maxY, Math.max(0, drag.startY + dy));
+              const nextBoards = [...table.boards];
+              nextBoards[drag.boardIndex] = { ...board, x, y };
+              return { ...table, boards: nextBoards };
+            }
+            const tableWidth = table.round ? Math.max(70, Number(table.width) || 0) : Math.max(60, Number(table.width) || 0);
+            const tableHeight = table.round ? tableWidth : Math.max(40, Number(table.height) || 0);
+            const maxX = Math.max(0, canvasWidth - tableWidth);
+            const maxY = Math.max(0, canvasHeight - tableHeight);
             const x = Math.min(maxX, Math.max(0, drag.startX + dx));
             const y = Math.min(maxY, Math.max(0, drag.startY + dy));
-            const nextFlowerPots = [...table.flowerPots];
-            nextFlowerPots[drag.flowerPotIndex] = { ...fp, x, y };
-            return { ...table, flowerPots: nextFlowerPots };
-          }
-          if (drag.type === 'board' && Array.isArray(table.boards) && drag.boardIndex != null && table.boards[drag.boardIndex]) {
-            const board = table.boards[drag.boardIndex];
-            const boardWidth = Math.max(10, Number(board.width) || 0);
-            const boardHeight = Math.max(10, Number(board.height) || 0);
-            const maxX = Math.max(0, canvasWidth - boardWidth);
-            const maxY = Math.max(0, canvasHeight - boardHeight);
-            const x = Math.min(maxX, Math.max(0, drag.startX + dx));
-            const y = Math.min(maxY, Math.max(0, drag.startY + dy));
-            const nextBoards = [...table.boards];
-            nextBoards[drag.boardIndex] = { ...board, x, y };
-            return { ...table, boards: nextBoards };
-          }
-          const tableWidth = table.round ? Math.max(70, Number(table.width) || 0) : Math.max(60, Number(table.width) || 0);
-          const tableHeight = table.round ? tableWidth : Math.max(40, Number(table.height) || 0);
-          const maxX = Math.max(0, canvasWidth - tableWidth);
-          const maxY = Math.max(0, canvasHeight - tableHeight);
-          const x = Math.min(maxX, Math.max(0, drag.startX + dx));
-          const y = Math.min(maxY, Math.max(0, drag.startY + dy));
-          return { ...table, x, y };
-        })
+            return { ...table, x, y };
+          })
         };
       });
     };
@@ -3419,46 +2880,46 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const applyDeviceSettingsToState = (saved) => {
     if (!saved || typeof saved !== 'object') return;
     if (saved.useSubproducts != null) setDeviceUseSubproducts(!!saved.useSubproducts);
-      if (saved.autoLogoutAfterTransaction != null) setDeviceAutoLogoutAfterTransaction(!!saved.autoLogoutAfterTransaction);
-      if (saved.autoReturnToTablePlan != null) setDeviceAutoReturnToTablePlan(!!saved.autoReturnToTablePlan);
-      if (saved.disableCashButtonInPayment != null) setDeviceDisableCashButtonInPayment(!!saved.disableCashButtonInPayment);
-      if (saved.openPriceWithoutPopup != null) setDeviceOpenPriceWithoutPopup(!!saved.openPriceWithoutPopup);
-      if (saved.openCashDrawerAfterOrder != null) setDeviceOpenCashDrawerAfterOrder(!!saved.openCashDrawerAfterOrder);
-      if (saved.autoReturnToCounterSale != null) setDeviceAutoReturnToCounterSale(!!saved.autoReturnToCounterSale);
-      if (saved.askSendToKitchen != null) setDeviceAskSendToKitchen(!!saved.askSendToKitchen);
-      if (saved.counterSaleVat != null) setDeviceCounterSaleVat(saved.counterSaleVat);
-      if (saved.tableSaleVat != null) setDeviceTableSaleVat(saved.tableSaleVat);
-      if (saved.timeoutLogout != null) setDeviceTimeoutLogout(Number(saved.timeoutLogout) || 0);
-      if (saved.fixedBorder != null) setDeviceFixedBorder(!!saved.fixedBorder);
-      if (saved.alwaysOnTop != null) setDeviceAlwaysOnTop(!!saved.alwaysOnTop);
-      if (saved.askInvoiceOrTicket != null) setDeviceAskInvoiceOrTicket(!!saved.askInvoiceOrTicket);
-      if (saved.printerGroupingProducts != null) setDevicePrinterGroupingProducts(!!saved.printerGroupingProducts);
-      if (saved.printerShowErrorScreen != null) setDevicePrinterShowErrorScreen(!!saved.printerShowErrorScreen);
-      if (saved.printerProductionMessageOnVat != null) setDevicePrinterProductionMessageOnVat(!!saved.printerProductionMessageOnVat);
-      if (saved.printerNextCourseOrder != null) setDevicePrinterNextCourseOrder(saved.printerNextCourseOrder);
-      if (saved.printerStandardMode != null) setDevicePrinterStandardMode(saved.printerStandardMode);
-      if (saved.printerQROrderPrinter != null) setDevicePrinterQROrderPrinter(saved.printerQROrderPrinter || '');
-      if (saved.printerReprintWithNextCourse != null) setDevicePrinterReprintWithNextCourse(!!saved.printerReprintWithNextCourse);
-      if (saved.printerPrintZeroTickets != null) setDevicePrinterPrintZeroTickets(!!saved.printerPrintZeroTickets);
-      if (saved.printerGiftVoucherAtMin != null) setDevicePrinterGiftVoucherAtMin(!!saved.printerGiftVoucherAtMin);
-      if (Array.isArray(saved.categoryDisplayIds)) setDeviceCategoryDisplayIds(saved.categoryDisplayIds);
-      if (saved.ordersConfirmOnHold != null) setDeviceOrdersConfirmOnHold(!!saved.ordersConfirmOnHold);
-      if (saved.ordersPrintBarcodeAfterCreate != null) setDeviceOrdersPrintBarcodeAfterCreate(!!saved.ordersPrintBarcodeAfterCreate);
-      if (saved.ordersCustomerCanBeModified != null) setDeviceOrdersCustomerCanBeModified(!!saved.ordersCustomerCanBeModified);
-      if (saved.ordersBookTableToWaiting != null) setDeviceOrdersBookTableToWaiting(!!saved.ordersBookTableToWaiting);
-      if (saved.ordersFastCustomerName != null) setDeviceOrdersFastCustomerName(!!saved.ordersFastCustomerName);
-      if (saved.scheduledPrinter != null) setDeviceScheduledPrinter(saved.scheduledPrinter || '');
-      if (saved.scheduledProductionFlow != null) setDeviceScheduledProductionFlow(saved.scheduledProductionFlow);
-      if (saved.scheduledLoading != null) setDeviceScheduledLoading(saved.scheduledLoading);
-      if (saved.scheduledMode != null) setDeviceScheduledMode(saved.scheduledMode);
-      if (saved.scheduledInvoiceLayout != null) setDeviceScheduledInvoiceLayout(saved.scheduledInvoiceLayout);
-      if (saved.scheduledCheckoutAt != null) setDeviceScheduledCheckoutAt(saved.scheduledCheckoutAt);
-      if (saved.scheduledPrintBarcodeLabel != null) setDeviceScheduledPrintBarcodeLabel(!!saved.scheduledPrintBarcodeLabel);
-      if (saved.scheduledDeliveryNoteToTurnover != null) setDeviceScheduledDeliveryNoteToTurnover(!!saved.scheduledDeliveryNoteToTurnover);
-      if (saved.scheduledPrintProductionReceipt != null) setDeviceScheduledPrintProductionReceipt(!!saved.scheduledPrintProductionReceipt);
-      if (saved.scheduledPrintCustomerProductionReceipt != null) setDeviceScheduledPrintCustomerProductionReceipt(!!saved.scheduledPrintCustomerProductionReceipt);
-      if (saved.scheduledWebOrderAutoPrint != null) setDeviceScheduledWebOrderAutoPrint(!!saved.scheduledWebOrderAutoPrint);
-      if (saved.optionButtonLayout != null) setOptionButtonSlots(normalizeOptionButtonSlots(saved.optionButtonLayout));
+    if (saved.autoLogoutAfterTransaction != null) setDeviceAutoLogoutAfterTransaction(!!saved.autoLogoutAfterTransaction);
+    if (saved.autoReturnToTablePlan != null) setDeviceAutoReturnToTablePlan(!!saved.autoReturnToTablePlan);
+    if (saved.disableCashButtonInPayment != null) setDeviceDisableCashButtonInPayment(!!saved.disableCashButtonInPayment);
+    if (saved.openPriceWithoutPopup != null) setDeviceOpenPriceWithoutPopup(!!saved.openPriceWithoutPopup);
+    if (saved.openCashDrawerAfterOrder != null) setDeviceOpenCashDrawerAfterOrder(!!saved.openCashDrawerAfterOrder);
+    if (saved.autoReturnToCounterSale != null) setDeviceAutoReturnToCounterSale(!!saved.autoReturnToCounterSale);
+    if (saved.askSendToKitchen != null) setDeviceAskSendToKitchen(!!saved.askSendToKitchen);
+    if (saved.counterSaleVat != null) setDeviceCounterSaleVat(saved.counterSaleVat);
+    if (saved.tableSaleVat != null) setDeviceTableSaleVat(saved.tableSaleVat);
+    if (saved.timeoutLogout != null) setDeviceTimeoutLogout(Number(saved.timeoutLogout) || 0);
+    if (saved.fixedBorder != null) setDeviceFixedBorder(!!saved.fixedBorder);
+    if (saved.alwaysOnTop != null) setDeviceAlwaysOnTop(!!saved.alwaysOnTop);
+    if (saved.askInvoiceOrTicket != null) setDeviceAskInvoiceOrTicket(!!saved.askInvoiceOrTicket);
+    if (saved.printerGroupingProducts != null) setDevicePrinterGroupingProducts(!!saved.printerGroupingProducts);
+    if (saved.printerShowErrorScreen != null) setDevicePrinterShowErrorScreen(!!saved.printerShowErrorScreen);
+    if (saved.printerProductionMessageOnVat != null) setDevicePrinterProductionMessageOnVat(!!saved.printerProductionMessageOnVat);
+    if (saved.printerNextCourseOrder != null) setDevicePrinterNextCourseOrder(saved.printerNextCourseOrder);
+    if (saved.printerStandardMode != null) setDevicePrinterStandardMode(saved.printerStandardMode);
+    if (saved.printerQROrderPrinter != null) setDevicePrinterQROrderPrinter(saved.printerQROrderPrinter || '');
+    if (saved.printerReprintWithNextCourse != null) setDevicePrinterReprintWithNextCourse(!!saved.printerReprintWithNextCourse);
+    if (saved.printerPrintZeroTickets != null) setDevicePrinterPrintZeroTickets(!!saved.printerPrintZeroTickets);
+    if (saved.printerGiftVoucherAtMin != null) setDevicePrinterGiftVoucherAtMin(!!saved.printerGiftVoucherAtMin);
+    if (Array.isArray(saved.categoryDisplayIds)) setDeviceCategoryDisplayIds(saved.categoryDisplayIds);
+    if (saved.ordersConfirmOnHold != null) setDeviceOrdersConfirmOnHold(!!saved.ordersConfirmOnHold);
+    if (saved.ordersPrintBarcodeAfterCreate != null) setDeviceOrdersPrintBarcodeAfterCreate(!!saved.ordersPrintBarcodeAfterCreate);
+    if (saved.ordersCustomerCanBeModified != null) setDeviceOrdersCustomerCanBeModified(!!saved.ordersCustomerCanBeModified);
+    if (saved.ordersBookTableToWaiting != null) setDeviceOrdersBookTableToWaiting(!!saved.ordersBookTableToWaiting);
+    if (saved.ordersFastCustomerName != null) setDeviceOrdersFastCustomerName(!!saved.ordersFastCustomerName);
+    if (saved.scheduledPrinter != null) setDeviceScheduledPrinter(saved.scheduledPrinter || '');
+    if (saved.scheduledProductionFlow != null) setDeviceScheduledProductionFlow(saved.scheduledProductionFlow);
+    if (saved.scheduledLoading != null) setDeviceScheduledLoading(saved.scheduledLoading);
+    if (saved.scheduledMode != null) setDeviceScheduledMode(saved.scheduledMode);
+    if (saved.scheduledInvoiceLayout != null) setDeviceScheduledInvoiceLayout(saved.scheduledInvoiceLayout);
+    if (saved.scheduledCheckoutAt != null) setDeviceScheduledCheckoutAt(saved.scheduledCheckoutAt);
+    if (saved.scheduledPrintBarcodeLabel != null) setDeviceScheduledPrintBarcodeLabel(!!saved.scheduledPrintBarcodeLabel);
+    if (saved.scheduledDeliveryNoteToTurnover != null) setDeviceScheduledDeliveryNoteToTurnover(!!saved.scheduledDeliveryNoteToTurnover);
+    if (saved.scheduledPrintProductionReceipt != null) setDeviceScheduledPrintProductionReceipt(!!saved.scheduledPrintProductionReceipt);
+    if (saved.scheduledPrintCustomerProductionReceipt != null) setDeviceScheduledPrintCustomerProductionReceipt(!!saved.scheduledPrintCustomerProductionReceipt);
+    if (saved.scheduledWebOrderAutoPrint != null) setDeviceScheduledWebOrderAutoPrint(!!saved.scheduledWebOrderAutoPrint);
+    if (saved.optionButtonLayout != null) setOptionButtonSlots(normalizeOptionButtonSlots(saved.optionButtonLayout));
     setSelectedFunctionButtonSlotIndex(null);
     setSelectedOptionButtonSlotIndex(null);
   };
@@ -3470,7 +2931,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_device_settings');
       const saved = raw ? JSON.parse(raw) : {};
       applyDeviceSettingsToState(saved);
-    } catch (_) {}
+    } catch (_) { }
     let cancelled = false;
     (async () => {
       try {
@@ -3927,40 +3388,79 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   };
 
-  const persistProductionMessages = (next) => {
-    setProductionMessages(next);
+  const fetchProductionMessages = useCallback(async () => {
     try {
-      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_production_messages', JSON.stringify(next));
-    } catch (_) { }
-  };
+      const res = await fetch(`${API}/production-messages`);
+      const data = await res.json().catch(() => []);
+      if (!res.ok) {
+        showToast('error', tr('control.productionMessages.loadFailed', 'Could not load production messages.'));
+        return;
+      }
+      setProductionMessages(Array.isArray(data) ? data : []);
+    } catch {
+      showToast('error', tr('control.productionMessages.loadFailed', 'Could not load production messages.'));
+      setProductionMessages([]);
+    }
+  }, [showToast, tr]);
+
+  const fetchPrinterLabels = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/printer-labels`);
+      const data = await res.json().catch(() => []);
+      if (!res.ok) {
+        showToast('error', tr('control.labels.loadFailed', 'Could not load labels.'));
+        setLabelsList([]);
+        return;
+      }
+      setLabelsList(Array.isArray(data) ? data : []);
+    } catch {
+      showToast('error', tr('control.labels.loadFailed', 'Could not load labels.'));
+      setLabelsList([]);
+    }
+  }, [showToast, tr]);
 
   useEffect(() => {
     if (!showProductionMessagesModal) return;
-    try {
-      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_production_messages');
-      const list = raw ? JSON.parse(raw) : [];
-      setProductionMessages(Array.isArray(list) ? list : []);
-      setProductionMessageInput('');
-      setEditingProductionMessageId(null);
-    } catch (_) {
-      setProductionMessages([]);
-    }
-  }, [showProductionMessagesModal]);
+    fetchProductionMessages();
+    setProductionMessageInput('');
+    setEditingProductionMessageId(null);
+  }, [showProductionMessagesModal, fetchProductionMessages]);
 
-  const handleAddOrUpdateProductionMessage = () => {
+  const handleAddOrUpdateProductionMessage = async () => {
     const text = (productionMessageInput || '').trim();
     if (!text) return;
-    const sorted = [...productionMessages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    if (editingProductionMessageId) {
-      const next = sorted.map((m) => (m.id === editingProductionMessageId ? { ...m, text } : m));
-      persistProductionMessages(next);
+    setSavingProductionMessage(true);
+    try {
+      if (editingProductionMessageId) {
+        const res = await fetch(`${API}/production-messages/${editingProductionMessageId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        const errBody = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('error', errBody?.error || tr('control.productionMessages.saveFailed', 'Could not save production message.'));
+          return;
+        }
+      } else {
+        const res = await fetch(`${API}/production-messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        const errBody = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('error', errBody?.error || tr('control.productionMessages.saveFailed', 'Could not save production message.'));
+          return;
+        }
+      }
+      setProductionMessageInput('');
       setEditingProductionMessageId(null);
-    } else {
-      const newId = 'pm-' + Date.now();
-      const next = [...sorted, { id: newId, text, sortOrder: sorted.length }];
-      persistProductionMessages(next);
+      await fetchProductionMessages();
+      showToast('success', tr('control.productionMessages.saved', 'Production message saved.'));
+    } finally {
+      setSavingProductionMessage(false);
     }
-    setProductionMessageInput('');
   };
 
   const startEditProductionMessage = (m) => {
@@ -3973,22 +3473,22 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setProductionMessageInput('');
   };
 
-  const handleDeleteProductionMessage = (id) => {
-    const next = productionMessages.filter((m) => m.id !== id).map((m, i) => ({ ...m, sortOrder: i }));
-    persistProductionMessages(next);
-    setDeleteConfirmProductionMessageId(null);
-    if (editingProductionMessageId === id) cancelEditProductionMessage();
-  };
-
-  const moveProductionMessage = (id, direction) => {
-    const sorted = [...productionMessages].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    const idx = sorted.findIndex((m) => m.id === id);
-    if (idx < 0) return;
-    const swap = direction === 'up' ? idx - 1 : idx + 1;
-    if (swap < 0 || swap >= sorted.length) return;
-    [sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]];
-    const withOrder = sorted.map((m, i) => ({ ...m, sortOrder: i }));
-    persistProductionMessages(withOrder);
+  const handleDeleteProductionMessage = async (id) => {
+    try {
+      const res = await fetch(`${API}/production-messages/${id}`, { method: 'DELETE' });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast('error', errBody?.error || tr('control.productionMessages.deleteFailed', 'Could not delete production message.'));
+        return;
+      }
+      await fetchProductionMessages();
+      showToast('success', tr('control.productionMessages.deleted', 'Production message deleted.'));
+    } catch {
+      showToast('error', tr('control.productionMessages.deleteFailed', 'Could not delete production message.'));
+    } finally {
+      setDeleteConfirmProductionMessageId(null);
+      if (editingProductionMessageId === id) cancelEditProductionMessage();
+    }
   };
 
   const persistPrinters = (next) => {
@@ -4430,48 +3930,77 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const labelsPrinterOptions = printers.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((p) => ({ value: p.id, label: p.name }));
 
   const labelsTypeOptions = useMemo(
-    () => [{ value: 'production-labels', label: tr('control.labels.type.productionLabels', 'Production labels') }],
+    () => [
+      { value: 'production-labels', label: tr('control.labels.type.productionLabels', 'Production labels') },
+      { value: 'article-label', label: tr('control.labels.type.articleLabel', 'Article label') },
+      { value: 'scale-labels', label: tr('control.labels.type.scaleLabels', 'Scale labels') },
+      { value: 'pre-packaging-labels', label: tr('control.labels.type.prePackagingLabels', 'Pre-packaging labels') },
+    ],
     [tr]
   );
 
   useEffect(() => {
     if (printerTab !== 'Labels') return;
-    try {
-      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_labels');
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (s.type != null) setLabelsType(s.type);
-        if (s.printer != null) setLabelsPrinter(s.printer);
+    let cancelled = false;
+    const load = async () => {
+      setLabelsListLoading(true);
+      try {
+        const [labelsRes, settingsRes] = await Promise.all([
+          fetch(`${API}/printer-labels`),
+          fetch(`${API}/settings/printer-labels`),
+        ]);
+        const labelsData = await labelsRes.json().catch(() => []);
+        const settingsData = await settingsRes.json().catch(() => ({}));
+        if (cancelled) return;
+        if (labelsRes.ok && Array.isArray(labelsData)) {
+          setLabelsList(labelsData);
+        } else {
+          setLabelsList([]);
+          if (!labelsRes.ok) {
+            showToast('error', tr('control.labels.loadFailed', 'Could not load labels.'));
+          }
+        }
+        if (settingsRes.ok && settingsData && typeof settingsData === 'object') {
+          if (settingsData.type != null) setLabelsType(String(settingsData.type));
+          if (settingsData.printer != null) setLabelsPrinter(String(settingsData.printer));
+        }
+      } catch {
+        if (!cancelled) {
+          setLabelsList([]);
+          showToast('error', tr('control.labels.loadFailed', 'Could not load labels.'));
+        }
+      } finally {
+        if (!cancelled) setLabelsListLoading(false);
       }
-      const rawList = typeof localStorage !== 'undefined' && localStorage.getItem('pos_printer_labels_list');
-      if (rawList) {
-        const list = JSON.parse(rawList);
-        if (Array.isArray(list) && list.length) setLabelsList(list);
-      }
-    } catch (_) { }
-  }, [printerTab]);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [printerTab, showToast, tr]);
 
   useEffect(() => {
     if (printerTab !== 'Labels') setLabelsListPage(0);
   }, [printerTab]);
 
-  const persistLabelsList = (next) => {
-    setLabelsList(next);
+  const saveLabelsSettings = async (updates) => {
+    const next = {
+      type: updates.type != null ? updates.type : labelsType,
+      printer: updates.printer != null ? updates.printer : labelsPrinter,
+    };
+    if (updates.type != null) setLabelsType(updates.type);
+    if (updates.printer != null) setLabelsPrinter(updates.printer);
     try {
-      if (typeof localStorage !== 'undefined') localStorage.setItem('pos_printer_labels_list', JSON.stringify(next));
-    } catch (_) { }
-  };
-
-  const saveLabelsSettings = (updates) => {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      const raw = localStorage.getItem('pos_printer_labels');
-      const prev = raw ? JSON.parse(raw) : {};
-      const next = { type: labelsType, printer: labelsPrinter, ...updates };
-      localStorage.setItem('pos_printer_labels', JSON.stringify(next));
-      if (updates.type != null) setLabelsType(updates.type);
-      if (updates.printer != null) setLabelsPrinter(updates.printer);
-    } catch (_) { }
+      const res = await fetch(`${API}/settings/printer-labels`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast('error', errBody?.error || tr('control.labels.settingsSaveFailed', 'Could not save label printer settings.'));
+      }
+    } catch {
+      showToast('error', tr('control.labels.settingsSaveFailed', 'Could not save label printer settings.'));
+    }
   };
 
   const openNewLabelModal = () => {
@@ -4513,10 +4042,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setLabelMarginTop('0');
   };
 
-  const handleSaveLabel = () => {
+  const handleSaveLabel = async () => {
     const name = (labelName || '').trim();
     if (!name) return;
-    const sorted = [...labelsList].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
     const payload = {
       name,
       sizeLabel: name,
@@ -4526,34 +4054,58 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       marginLeft: Number(labelMarginLeft) || 0,
       marginRight: Number(labelMarginRight) || 0,
       marginBottom: Number(labelMarginBottom) || 0,
-      marginTop: Number(labelMarginTop) || 0
+      marginTop: Number(labelMarginTop) || 0,
     };
-    if (editingLabelId) {
-      const next = sorted.map((l) => (l.id === editingLabelId ? { ...l, ...payload } : l));
-      persistLabelsList(next);
-    } else {
-      const newId = 'lbl-' + Date.now();
-      const next = [...sorted, { id: newId, ...payload, sortOrder: sorted.length }];
-      persistLabelsList(next);
+    setSavingLabel(true);
+    try {
+      if (editingLabelId) {
+        const res = await fetch(`${API}/printer-labels/${editingLabelId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const errBody = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('error', errBody?.error || tr('control.labels.saveFailed', 'Could not save label.'));
+          return;
+        }
+      } else {
+        const res = await fetch(`${API}/printer-labels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const errBody = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('error', errBody?.error || tr('control.labels.saveFailed', 'Could not save label.'));
+          return;
+        }
+      }
+      await fetchPrinterLabels();
+      showToast('success', tr('control.labels.saved', 'Label saved.'));
+      closeLabelModal();
+    } catch {
+      showToast('error', tr('control.labels.saveFailed', 'Could not save label.'));
+    } finally {
+      setSavingLabel(false);
     }
-    closeLabelModal();
   };
 
-  const handleDeleteLabel = (id) => {
-    const next = labelsList.filter((l) => l.id !== id).map((l, i) => ({ ...l, sortOrder: i }));
-    persistLabelsList(next);
-    setDeleteConfirmLabelId(null);
-  };
-
-  const moveLabel = (id, direction) => {
-    const sorted = [...labelsList].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    const idx = sorted.findIndex((l) => l.id === id);
-    if (idx < 0) return;
-    const swap = direction === 'up' ? idx - 1 : idx + 1;
-    if (swap < 0 || swap >= sorted.length) return;
-    [sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]];
-    const withOrder = sorted.map((l, i) => ({ ...l, sortOrder: i }));
-    persistLabelsList(withOrder);
+  const handleDeleteLabel = async (id) => {
+    try {
+      const res = await fetch(`${API}/printer-labels/${id}`, { method: 'DELETE' });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast('error', errBody?.error || tr('control.labels.deleteFailed', 'Could not delete label.'));
+        return;
+      }
+      await fetchPrinterLabels();
+      showToast('success', tr('control.labels.deleted', 'Label deleted.'));
+    } catch {
+      showToast('error', tr('control.labels.deleteFailed', 'Could not delete label.'));
+    } finally {
+      setDeleteConfirmLabelId(null);
+    }
   };
 
   useEffect(() => {
@@ -5120,16 +4672,43 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setDeleteConfirmUserId(null);
   };
 
+  const normalizeDiscountRow = useCallback((row) => {
+    if (!row || row.id == null) return null;
+    let targetIds = [];
+    try {
+      if (row.targetIdsJson) {
+        const p = JSON.parse(row.targetIdsJson);
+        if (Array.isArray(p)) targetIds = p.map(String).filter(Boolean);
+      }
+    } catch (_) { /* ignore */ }
+    return {
+      ...row,
+      targetIds,
+      targetId: targetIds[0] || '',
+      combinable: !!row.combinable,
+    };
+  }, []);
+
+  const fetchDiscounts = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/discounts`);
+      const data = await res.json().catch(() => []);
+      if (!res.ok) {
+        showToast('error', tr('control.discounts.loadFailed', 'Could not load discounts.'));
+        return;
+      }
+      const list = Array.isArray(data) ? data : [];
+      setDiscounts(list.map(normalizeDiscountRow).filter(Boolean));
+    } catch {
+      showToast('error', tr('control.discounts.loadFailed', 'Could not load discounts.'));
+      setDiscounts([]);
+    }
+  }, [normalizeDiscountRow, showToast, tr]);
+
   useEffect(() => {
     if (topNavId !== 'categories-products' || subNavId !== 'Discounts') return;
-    try {
-      const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_discounts');
-      if (raw) {
-        const list = JSON.parse(raw);
-        if (Array.isArray(list)) setDiscounts(list);
-      }
-    } catch (_) { }
-  }, [topNavId, subNavId]);
+    fetchDiscounts();
+  }, [topNavId, subNavId, fetchDiscounts]);
 
   useEffect(() => {
     if (!showDiscountModal) return;
@@ -5189,7 +4768,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setDiscountTargetIds([]);
     setDiscountPieces('');
     setDiscountCombinable(false);
-    setDiscountKeyboardValue('');
+    setDiscountActiveField('name');
     setShowDiscountModal(true);
   };
 
@@ -5207,7 +4786,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setDiscountTargetId('');
     setDiscountPieces(String(d.pieces ?? ''));
     setDiscountCombinable(!!d.combinable);
-    setDiscountKeyboardValue('');
+    setDiscountActiveField('name');
     setShowDiscountModal(true);
   };
 
@@ -5217,47 +4796,74 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setDiscountName('');
     setDiscountTargetId('');
     setDiscountTargetIds([]);
-    setDiscountKeyboardValue('');
+    setDiscountActiveField('name');
     setDiscountCalendarField(null);
   };
 
-  const persistDiscounts = (list) => {
-    setDiscounts(list);
-    if (typeof localStorage !== 'undefined') localStorage.setItem('pos_discounts', JSON.stringify(list));
+  const discountKeyboardValue =
+    discountActiveField === 'name'
+      ? discountName
+      : discountActiveField === 'pieces'
+        ? discountPieces
+        : discountActiveField === 'value'
+          ? discountValue
+          : '';
+
+  const discountKeyboardOnChange = (v) => {
+    if (discountActiveField === 'name') setDiscountName(v);
+    else if (discountActiveField === 'pieces') setDiscountPieces(v);
+    else if (discountActiveField === 'value') setDiscountValue(v);
   };
 
-  const handleSaveDiscount = () => {
+  const handleSaveDiscount = async () => {
     setSavingDiscount(true);
     try {
-      const payload = {
-        id: editingDiscountId || `d-${Date.now()}`,
+      const body = {
         name: discountName.trim() || 'New discount',
         trigger: discountTrigger,
         type: discountType,
-        value: discountValue.trim(),
+        value: discountValue.trim() || null,
         startDate: discountStartDate,
         endDate: discountEndDate,
         discountOn,
-        targetId: discountTargetIds[0] || '',
+        pieces: discountPieces.trim() || null,
+        combinable: discountCombinable,
         targetIds: discountTargetIds,
-        pieces: discountPieces.trim(),
-        combinable: discountCombinable
       };
-      if (editingDiscountId) {
-        const next = discounts.map((d) => (d.id === editingDiscountId ? payload : d));
-        persistDiscounts(next);
-      } else {
-        persistDiscounts([...discounts, payload]);
+      const url = editingDiscountId ? `${API}/discounts/${editingDiscountId}` : `${API}/discounts`;
+      const res = await fetch(url, {
+        method: editingDiscountId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast('error', data?.error || tr('control.discounts.saveFailed', 'Could not save discount.'));
+        return;
       }
       closeDiscountModal();
+      await fetchDiscounts();
+      showToast('success', tr('control.discounts.saved', 'Discount saved.'));
     } finally {
       setSavingDiscount(false);
     }
   };
 
-  const handleDeleteDiscount = (id) => {
-    persistDiscounts(discounts.filter((d) => d.id !== id));
-    setDeleteConfirmDiscountId(null);
+  const handleDeleteDiscount = async (id) => {
+    try {
+      const res = await fetch(`${API}/discounts/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast('error', err?.error || tr('control.discounts.deleteFailed', 'Could not delete discount.'));
+        return;
+      }
+      await fetchDiscounts();
+      showToast('success', tr('control.discounts.deleted', 'Discount deleted.'));
+    } catch {
+      showToast('error', tr('control.discounts.deleteFailed', 'Could not delete discount.'));
+    } finally {
+      setDeleteConfirmDiscountId(null);
+    }
   };
 
   const fetchKitchens = useCallback(async () => {
@@ -5478,155 +5084,32 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
   return (
     <div className="flex h-full bg-pos-bg text-pos-text">
-      {/* Control left sidebar */}
-      <aside className="w-1/5 shrink-0 flex flex-col bg-pos-panel border-r border-pos-border">
-        <nav className="flex flex-col gap-0.5 flex-1 p-3">
-          {CONTROL_SIDEBAR_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`flex items-center gap-3 px-2 py-3 rounded-lg text-left text-md transition-colors ${controlSidebarId === item.id
-                ? 'bg-pos-bg text-pos-text font-medium'
-                : 'text-pos-muted active:bg-green-500 active:text-pos-text'
-                }`}
-              onClick={() => setControlSidebarId(item.id)}
-            >
-              <SidebarIcon id={item.icon} className="w-6 h-6 shrink-0" />
-              {tr(`control.sidebar.${item.id}`, item.label)}
-            </button>
-          ))}
-        </nav>
-        <div className="p-4 w-full flex flex-col items-center gap-2">
-          {currentUser && (
-            <p className="text-pos-text text-xl font-medium truncate px-1">{currentUser.label}</p>
-          )}
-          <div className="flex flex-col">
-            <button
-              type="button"
-              className="px-3 py-1 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 text-2xl"
-              onClick={() => onBack?.()}
-            >
-              {tr('backName', 'Back')}
-            </button>
-            <button
-              type="button"
-              className="px-3 py-2 rounded-lg text-rose-500 active:text-pos-text active:bg-green-500 text-2xl font-medium"
-              onClick={() => setShowLogoutModal(true)}
-            >
-              {tr('logOut', 'Log out')}
-            </button>
-          </div>
-        </div>
-      </aside>
+      <ControlViewSidebar
+        tr={tr}
+        currentUser={currentUser}
+        onBack={onBack}
+        onRequestLogout={() => setShowLogoutModal(true)}
+        controlSidebarId={controlSidebarId}
+        setControlSidebarId={setControlSidebarId}
+      />
 
-      {/* Main content area */}
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Top navigation - Personalize only */}
-        {controlSidebarId === 'personalize' && (
-          <div className="flex items-center gap-1 py-2 px-4 justify-between w-full bg-pos-bg/50">
-            {TOP_NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`flex items-center gap-2 px-2 py-3 rounded-lg text-lg transition-colors ${topNavId === item.id
-                  ? 'bg-pos-panel text-pos-text font-medium border border-pos-border'
-                  : 'text-pos-muted active:text-pos-text active:bg-green-500 border border-transparent'
-                  }`}
-                onClick={() => {
-                  setTopNavId(item.id);
-                  if (item.id === 'categories-products') setSubNavId('Price Groups');
-                  if (item.id === 'cash-register') setSubNavId('Template Settings');
-                  if (item.id === 'external-devices') setSubNavId('Printer');
-                }}
-              >
-                <TopNavIcon id={item.icon} className="w-6 h-6 shrink-0" />
-                {tr(`control.topNav.${item.id}`, item.label)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Reports tabs - when Reports sidebar selected */}
-        {controlSidebarId === 'reports' && (
-          <div className="flex items-center gap-1 px-4 py-2 justify-around w-full bg-pos-bg/50">
-            {REPORT_TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${reportTabId === item.id
-                  ? 'bg-pos-panel text-pos-text font-medium border border-pos-border'
-                  : 'text-pos-muted active:text-pos-text active:bg-green-500 border border-transparent'
-                  }`}
-                onClick={() => setReportTabId(item.id)}
-              >
-                <ReportTabIcon id={item.icon} className="w-5 h-5 shrink-0" />
-                {tr(`control.reportTabs.${item.id}`, item.label)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Sub-navigation - Categories and products */}
-        {controlSidebarId === 'personalize' && topNavId === 'categories-products' && (
-          <div className="flex items-center w-full justify-between gap-1 px-4 bg-pos-bg">
-            {SUB_NAV_ITEMS.map((label) => (
-              <button
-                key={label}
-                type="button"
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${subNavId === label
-                  ? 'bg-pos-panel text-pos-text font-medium'
-                  : 'text-pos-muted active:text-pos-text active:bg-green-500'
-                  }`}
-                onClick={() => setSubNavId(label)}
-              >
-                {tr(`control.subNav.${label}`, label)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Sub-navigation - Cash Register Settings */}
-        {controlSidebarId === 'personalize' && topNavId === 'cash-register' && (
-          <div className="flex items-center w-full justify-around gap-1 px-4 py-3 bg-pos-bg">
-            {CASH_REGISTER_SUB_NAV_ITEMS.map((label) => (
-              <button
-                key={label}
-                type="button"
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${subNavId === label
-                  ? 'bg-pos-panel text-pos-text font-medium'
-                  : 'text-pos-muted active:text-pos-text active:bg-green-500'
-                  }`}
-                onClick={() => {
-                  setSubNavId(label);
-                  if (label === 'Device Settings') setShowDeviceSettingsModal(true);
-                  if (label === 'System Settings') setShowSystemSettingsModal(true);
-                  if (label === 'Production messages') setShowProductionMessagesModal(true);
-                }}
-              >
-                {tr(`control.subNav.${label}`, label)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Sub-navigation - External Devices */}
-        {controlSidebarId === 'personalize' && topNavId === 'external-devices' && (
-          <div className="flex items-center w-full justify-between gap-1 px-4 bg-pos-bg">
-            {EXTERNAL_DEVICES_SUB_NAV_ITEMS.map((label) => (
-              <button
-                key={label}
-                type="button"
-                className={`px-4 py-2 rounded-lg text-sm transition-colors ${subNavId === label
-                  ? 'bg-pos-panel text-pos-text font-medium'
-                  : 'text-pos-muted active:text-pos-text active:bg-green-500'
-                  }`}
-                onClick={() => setSubNavId(label)}
-              >
-                {tr(`control.subNav.${label}`, label)}
-              </button>
-            ))}
-          </div>
-        )}
+        <ControlViewMainNav
+          tr={tr}
+          controlSidebarId={controlSidebarId}
+          topNavId={topNavId}
+          setTopNavId={setTopNavId}
+          subNavId={subNavId}
+          setSubNavId={setSubNavId}
+          reportTabId={reportTabId}
+          setReportTabId={setReportTabId}
+          onCashRegisterSubNavSelect={(label) => {
+            setSubNavId(label);
+            if (label === 'Device Settings') setShowDeviceSettingsModal(true);
+            if (label === 'System Settings') setShowSystemSettingsModal(true);
+            if (label === 'Production messages') setShowProductionMessagesModal(true);
+          }}
+        />
 
         {/* Content area */}
         <main className="flex-1 overflow-hidden px-4 pt-2">
@@ -6005,11 +5488,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       }}
                       className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
                     >
-                    <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
-                    </svg>
-                    {tr('control.save', 'Save')}
-                  </button>
+                      <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" />
+                      </svg>
+                      {tr('control.save', 'Save')}
+                    </button>
                   </div>
                 </div>
               )}
@@ -6052,7 +5535,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             {sorted.map((pt) => (
                               <li
                                 key={pt.id}
-                                className="flex items-center w-full px-4 py-1 border-b border-pos-border last:border-b-0 bg-pos-bg active:bg-green-500 transition-colors"
+                                className="flex items-center w-full px-4 py-1 border-b border-pos-border last:border-b-0 bg-pos-bg transition-colors"
                               >
                                 <span className="flex-1 text-pos-text text-sm font-medium">{pt.name}</span>
                                 <span className="w-[160px] shrink-0 text-pos-muted text-xs mr-2">
@@ -6360,10 +5843,10 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           <span className="min-w-[30%] text-left font-medium truncate" title={product.name}>
                             {product.name}
                           </span>
-                          <span className="flex-shrink-0 min-w-[30%] text-center text-pos-muted text-sm">
+                          <span className="flex-shrink-0 min-w-[30%] text-center text-sm text-white">
                             <button
                               type="button"
-                              className={`px-2 py-1 rounded text-sm active:text-pos-text active:bg-green-500 ${productHasSubproductsById[product.id] ? 'text-white font-medium' : 'text-pos-muted'}`}
+                              className={`px-2 py-1 rounded text-sm text-white active:text-pos-text active:bg-green-500 ${productHasSubproductsById[product.id] ? 'font-medium' : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openProductSubproductsModal(product);
@@ -6546,39 +6029,39 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         {kitchens.map((m) => {
                           const kitchenHasProducts = Array.isArray(m.productIds) && m.productIds.length > 0;
                           return (
-                          <li
-                            key={m.id}
-                            className="flex items-center w-full gap-2 px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
-                          >
-                            <span className="min-w-0 flex-1 font-medium truncate" title={m.name || '—'}>{m.name || '—'}</span>
-                            <div className="justify-center min-w-0 absolute left-1/2">
-                              <button
-                                type="button"
-                                className={`shrink-0 py-1.5 text-xs font-semibold active:bg-green-500 active:border-white/30 ${kitchenHasProducts ? 'text-white' : 'text-pos-muted'}`}
-                                onClick={() => openKitchenProductsModal(m)}
-                              >
-                                {tr('control.kitchen.setProduct', 'Set product')}
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text mr-5 active:text-green-500"
-                                onClick={() => openEditKitchenModal(m)}
-                                aria-label="Edit"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                className="p-2 rounded text-pos-text active:text-rose-500"
-                                onClick={() => setDeleteConfirmKitchenId(m.id)}
-                                aria-label="Delete"
-                              >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </div>
-                          </li>
+                            <li
+                              key={m.id}
+                              className="flex items-center w-full gap-2 px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                            >
+                              <span className="min-w-0 flex-1 font-medium truncate" title={m.name || '—'}>{m.name || '—'}</span>
+                              <div className="justify-center min-w-0 absolute left-1/2">
+                                <button
+                                  type="button"
+                                  className={`shrink-0 py-1.5 text-xs font-semibold active:bg-green-500 active:border-white/30 ${kitchenHasProducts ? 'text-white' : 'text-pos-muted'}`}
+                                  onClick={() => openKitchenProductsModal(m)}
+                                >
+                                  {tr('control.kitchen.setProduct', 'Set product')}
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  className="p-2 rounded text-pos-text mr-5 active:text-green-500"
+                                  onClick={() => openEditKitchenModal(m)}
+                                  aria-label="Edit"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="p-2 rounded text-pos-text active:text-rose-500"
+                                  onClick={() => setDeleteConfirmKitchenId(m.id)}
+                                  aria-label="Delete"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </div>
+                            </li>
                           );
                         })}
                       </ul>
@@ -6887,11 +6370,13 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         <div className="flex flex-wrap items-center justify-center w-full gap-4 mb-2">
                           <Dropdown options={labelsTypeOptions} value={labelsType} onChange={(v) => saveLabelsSettings({ type: v })} placeholder={tr('control.labels.selectPlaceholder', 'Select')} className="text-sm min-w-[200px]" />
                           <Dropdown options={labelsPrinterOptions} value={labelsPrinter} onChange={(v) => saveLabelsSettings({ printer: v })} placeholder={tr('control.labels.selectPrinter', 'Select printer')} className="text-sm min-w-[200px]" />
-                          <button type="button" className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50" onClick={openNewLabelModal}>
+                          <button type="button" className="px-6 py-3 rounded-lg text-sm font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 active:border-white/30 transition-colors disabled:opacity-50" disabled={labelsListLoading} onClick={openNewLabelModal}>
                             {tr('control.labels.new', 'New label')}
                           </button>
                         </div>
-                        {sortedLabels.length === 0 ? (
+                        {labelsListLoading ? (
+                          <p className="text-pos-muted text-xl font-medium text-center py-12">{tr('control.labels.loading', 'Loading labels…')}</p>
+                        ) : sortedLabels.length === 0 ? (
                           <ul className="w-full flex flex-col">
                             <li className="text-pos-muted text-xl font-medium text-center py-4">{tr('control.labels.empty', 'No labels yet.')}</li>
                           </ul>
@@ -7477,7 +6962,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       <div className='flex w-full gap-5'>
                         <div className="flex items-center">
                           <label className="block font-medium min-w-[100px] text-gray-200">{tr('name', 'Name')} : </label>
-                          <input type="text" value={discountName} onChange={(e) => setDiscountName(e.target.value)} placeholder={tr('control.discounts.modal.discountNamePlaceholder', 'Discount name')} className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200 placeholder:text-gray-500" />
+                          <input
+                            type="text"
+                            value={discountName}
+                            onChange={(e) => setDiscountName(e.target.value)}
+                            onFocus={() => setDiscountActiveField('name')}
+                            onClick={() => setDiscountActiveField('name')}
+                            placeholder={tr('control.discounts.modal.discountNamePlaceholder', 'Discount name')}
+                            className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200 placeholder:text-gray-500"
+                          />
                         </div>
                         <div className="flex w-full items-center">
                           <label className="block font-medium text-gray-200 min-w-[100px]">{tr('control.discounts.modal.discountOn', 'Discount on')} : </label>
@@ -7490,7 +6983,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           <Dropdown options={DISCOUNT_TRIGGER_OPTIONS.map((opt) => ({ ...opt, label: tr(`control.discounts.trigger.${opt.value}`, opt.label) }))} value={discountTrigger} onChange={setDiscountTrigger} placeholder={tr('control.discounts.trigger.number', 'Number')} className="text-md min-w-[150px]" />
                         </div>
                         <div className="flex gap-5 items-center pl-5">
-                          <input type="text" value={discountPieces} onChange={(e) => setDiscountPieces(e.target.value)} placeholder="" className="px-4 w-[70px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200" />
+                          <input
+                            type="text"
+                            value={discountPieces}
+                            onChange={(e) => setDiscountPieces(e.target.value)}
+                            onFocus={() => setDiscountActiveField('pieces')}
+                            onClick={() => setDiscountActiveField('pieces')}
+                            placeholder=""
+                            className="px-4 w-[70px] bg-pos-panel h-[40px] py-3 border border-gray-300 rounded-lg text-gray-200"
+                          />
                           <label className="block font-medium text-gray-200">{tr('control.discounts.modal.pieces', 'Piece(s)')}</label>
                         </div>
                         <div className="flex items-center gap-3 pl-5">
@@ -7506,7 +7007,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           <Dropdown options={DISCOUNT_TYPE_OPTIONS.map((opt) => ({ ...opt, label: tr(`control.discounts.type.${opt.value}`, opt.label) }))} value={discountType} onChange={setDiscountType} placeholder={tr('control.discounts.type.amount', 'Amount')} className="text-md min-w-[150px]" />
                         </div>
                         <div className="flex items-center pl-5 gap-5">
-                          <input type="text" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} placeholder="0" className="flex-1 px-4 max-w-[70px] h-[40px] py-3 border border-gray-300 rounded-lg bg-pos-panel text-gray-200" />
+                          <input
+                            type="text"
+                            value={discountValue}
+                            onChange={(e) => setDiscountValue(e.target.value)}
+                            onFocus={() => setDiscountActiveField('value')}
+                            onClick={() => setDiscountActiveField('value')}
+                            placeholder="0"
+                            className="flex-1 px-4 max-w-[70px] h-[40px] py-3 border border-gray-300 rounded-lg bg-pos-panel text-gray-200"
+                          />
                           <span className="text-md text-gray-200 shrink-0">{tr('control.discounts.modal.currency', 'euro')}</span>
                         </div>
                       </div>
@@ -7611,7 +7120,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                   </button>
                 </div>
                 <div className="shrink-0">
-                  <KeyboardWithNumpad value={discountKeyboardValue} onChange={setDiscountKeyboardValue} />
+                  <KeyboardWithNumpad value={discountKeyboardValue} onChange={discountKeyboardOnChange} />
                 </div>
                 {discountCalendarField && (
                   <CalendarModal
@@ -7720,7 +7229,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
       {showSetTablesModal && topNavId === 'tables' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="relative bg-pos-bg rounded-xl border border-pos-border shadow-2xl w-full overflow-hidden flex">
+          <div className="relative bg-pos-bg rounded-xl border border-pos-border shadow-2xl w-full overflow-hidden flex flex-col">
             <button
               type="button"
               className="absolute top-4 right-4 z-20 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500"
@@ -7732,13 +7241,12 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
               </svg>
             </button>
 
-            <div className="w-[250px] shrink-0 border-r border-pos-border bg-black px-6 py-6 overflow-auto text-sm">
-              <h3 className="text-pos-text text-lg font-semibold mb-4">
-                {tr('control.tables.setTables', 'Set tables')} - {setTablesLocationName || 'Restaurant'}
-              </h3>
-
-              <div className="space-y-3 text-pos-text">
-                <div className="grid grid-cols-2 gap-2 pt-1">
+            <div>
+              <div className="shrink-0 border-r border-pos-border bg-black px-3 py-3 text-sm">
+                <div className="flex gap-2">
+                  <h3 className="text-pos-text text-lg font-semibold">
+                    {tr('control.tables.setTables', 'Set tables')} - {setTablesLocationName || 'Restaurant'}
+                  </h3>
                   <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={addSetTable}>
                     + {tr('control.tables.table', 'table')}
                   </button>
@@ -7777,159 +7285,310 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                   >
                     - flower pot
                   </button>
+                  <button
+                    type="button"
+                    className="px-5 py-2 rounded-lg bg-green-600 text-white active:bg-green-500 text-sm"
+                    onClick={saveSetTablesLayout}
+                  >
+                    {tr('control.save', 'Save')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-5 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm"
+                    onClick={closeSetTablesModal}
+                  >
+                    {tr('cancel', 'Cancel')}
+                  </button>
                 </div>
-                <div className="h-px bg-pos-border my-2" />
+              </div>
+            </div>
 
+            <div className="flex-1 p-1 min-w-0 bg-[#1f2b36] flex justify-center items-center">
+              <div ref={setTablesCanvasRef} className="min-w-[980px] max-w-[980px] min-h-[580px] max-h-[580px] rounded-lg border border-pos-border bg-[#2f3e50] relative overflow-auto">
+                <div
+                  style={{
+                    transform: `scale(${setTablesCanvasZoom / 100})`,
+                    transformOrigin: '0 0',
+                    width: `${setTablesDraft.floorWidth ?? 979}px`,
+                    height: `${setTablesDraft.floorHeight ?? 595.5}px`,
+                    minWidth: `${setTablesDraft.floorWidth ?? 979}px`,
+                    minHeight: `${setTablesDraft.floorHeight ?? 595.5}px`
+                  }}
+                  className="relative"
+                >
+                  {setTablesDraft.tables.map((table) => {
+                    const template = TABLE_TEMPLATE_OPTIONS.find((item) => item.id === table.templateType) || null;
+                    const sizeStyle = table.round
+                      ? { width: `${Math.max(70, table.width)}px`, height: `${Math.max(70, table.width)}px` }
+                      : { width: `${table.width}px`, height: `${table.height}px` };
+                    return (
+                      <button
+                        key={table.id}
+                        type="button"
+                        className={`absolute flex items-center justify-center font-semibold border-2 text-white transition-colors overflow-hidden ${table.round
+                          ? 'rounded-full border-transparent bg-transparent'
+                          : 'rounded-md border-transparent bg-transparent'
+                          } ${setTablesSelectedTableId === table.id && selectedSetBoardIndex == null && selectedSetFlowerPotIndex == null ? 'ring-4 ring-yellow-400' : ''} ${setTablesDraggingId === table.id ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
+                        style={{
+                          left: `${Math.max(0, table.x)}px`,
+                          top: `${Math.max(0, table.y)}px`,
+                          transform: `rotate(${table.rotation || 0}deg)`,
+                          zIndex: 20,
+                          ...sizeStyle
+                        }}
+                        onClick={() => {
+                          setSetTablesSelectedTableId(table.id);
+                          setSetTablesSelectedBoardIndex(null);
+                          setSetTablesSelectedFlowerPotIndex(null);
+                        }}
+                        onMouseDown={(event) => startSetTableDrag(event, table)}
+                      >
+                        {template ? (
+                          <img src={publicAssetUrl(template.src)} alt={table.name} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+                        ) : null}
+                        <span className="relative z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]">{table.name}</span>
+                      </button>
+                    );
+                  })}
+                  {setTablesDraft.tables.flatMap((table) =>
+                    (Array.isArray(table.boards) ? table.boards : []).map((board, idx) => {
+                      const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedBoardIndex === idx;
+                      const isDraggingBoard = setTablesDraggingId === table.id && setTablesDraggingType === 'board' && setTablesDragRef.current?.boardIndex === idx;
+                      return (
+                        <button
+                          key={board.id || `board-${table.id}-${idx}`}
+                          type="button"
+                          className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} ${isDraggingBoard ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
+                          style={{
+                            left: `${Math.max(0, Number(board.x) || 0)}px`,
+                            top: `${Math.max(0, Number(board.y) || 0)}px`,
+                            width: `${Math.max(10, Number(board.width) || 10)}px`,
+                            height: `${Math.max(10, Number(board.height) || 10)}px`,
+                            transform: `rotate(${Number(board.rotation) || 0}deg)`,
+                            zIndex: 10,
+                            backgroundColor: board.color || '#facc15',
+                            opacity: 0.55
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSetTablesSelectedTableId(table.id);
+                            setSetTablesSelectedBoardIndex(idx);
+                            setSetTablesSelectedFlowerPotIndex(null);
+                          }}
+                          onMouseDown={(event) => startSetBoardDrag(event, table, idx)}
+                        />
+                      );
+                    })
+                  )}
+                  {setTablesDraft.tables.flatMap((table) =>
+                    (Array.isArray(table.flowerPots) ? table.flowerPots : []).map((fp, idx) => {
+                      const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedFlowerPotIndex === idx;
+                      const isDragging = setTablesDraggingId === table.id && setTablesDraggingType === 'flowerPot' && setTablesDragRef.current?.flowerPotIndex === idx;
+                      return (
+                        <button
+                          key={fp.id || `flowerpot-${table.id}-${idx}`}
+                          type="button"
+                          className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
+                          style={{
+                            left: `${Math.max(0, Number(fp.x) || 0)}px`,
+                            top: `${Math.max(0, Number(fp.y) || 0)}px`,
+                            width: `${Math.max(10, Number(fp.width) || 10)}px`,
+                            height: `${Math.max(10, Number(fp.height) || 10)}px`,
+                            transform: `rotate(${Number(fp.rotation) || 0}deg)`,
+                            zIndex: 15
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSetTablesSelectedTableId(table.id);
+                            setSetTablesSelectedBoardIndex(null);
+                            setSetTablesSelectedFlowerPotIndex(idx);
+                          }}
+                          onMouseDown={(event) => startSetFlowerPotDrag(event, table, idx)}
+                        >
+                          <img src={publicAssetUrl('/flowerpot.svg')} alt="Flower pot" className="w-full h-full object-contain pointer-events-none" />
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-pos-border bg-pos-panel p-1 shadow-lg">
+                  <button
+                    type="button"
+                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
+                    onClick={() => setSetTablesCanvasZoom((z) => Math.max(SET_TABLES_ZOOM_MIN, z - SET_TABLES_ZOOM_STEP))}
+                    aria-label="Zoom out"
+                  >
+                    −
+                  </button>
+                  <span className="min-w-[3ch] text-center text-sm text-pos-text px-1">{setTablesCanvasZoom}%</span>
+                  <button
+                    type="button"
+                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
+                    onClick={() => setSetTablesCanvasZoom((z) => Math.min(SET_TABLES_ZOOM_MAX, z + SET_TABLES_ZOOM_STEP))}
+                    aria-label="Zoom in"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className='px-5 py-2'>
+              <div className="flex flex-col gap-2 w-full items-center">
                 {!selectedSetBoard && !selectedSetFlowerPot ? (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('name', 'Name')}</span>
+                  <div className="flex gap-5">
+                    <div className="flex items-center h-[40px]">
+                      <span className="shrink-0">{tr('name', 'Name')} :&nbsp;</span>
                       <input
                         type="text"
                         value={selectedSetTable?.name || ''}
                         onChange={(e) => updateSelectedSetTable({ name: e.target.value })}
-                        className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                        className="min-w-[100px] max-w-[100px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                       />
                     </div>
 
-                    {[
-                      { key: 'x', label: 'x' },
-                      { key: 'y', label: 'y' },
-                      { key: 'width', label: tr('control.tables.width', 'Width') },
-                      ...(!selectedSetTable?.round ? [{ key: 'height', label: tr('control.tables.height', 'Height') }] : [])
-                    ].map((field) => (
-                      <div key={field.key} className="flex items-center gap-3">
-                        <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: 'x', label: 'x' },
+                        { key: 'y', label: 'y' },
+                        { key: 'width', label: tr('control.tables.width', 'Width') },
+                        ...(!selectedSetTable?.round ? [{ key: 'height', label: tr('control.tables.height', 'Height') }] : [])
+                      ].map((field) => (
+                        <div key={field.key} className="flex items-center gap-2 mr-5">
+                          <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
+                          <input
+                            type="number"
+                            value={selectedSetTable ? selectedSetTable[field.key] : 0}
+                            onChange={(e) => {
+                              const nextVal = Number(e.target.value);
+                              const safe = Number.isFinite(nextVal) ? nextVal : 0;
+                              if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, safe) });
+                              else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, safe) });
+                              else updateSelectedSetTable({ [field.key]: safe });
+                            }}
+                            className="min-w-[70px] max-w-[70px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          />
+                          <button
+                            type="button"
+                            className="w-8 h-10 rounded text-xl bg-pos-panel border border-pos-border active:bg-green-500"
+                            onClick={() => {
+                              const current = Number(selectedSetTable?.[field.key]) || 0;
+                              const nextVal = current - 10;
+                              if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, nextVal) });
+                              else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, nextVal) });
+                              else updateSelectedSetTable({ [field.key]: nextVal });
+                            }}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            className="w-8 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                            onClick={() => {
+                              const current = Number(selectedSetTable?.[field.key]) || 0;
+                              const nextVal = current + 10;
+                              if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, nextVal) });
+                              else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, nextVal) });
+                              else updateSelectedSetTable({ [field.key]: nextVal });
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col gap-2 -ml-5">
+                      <div className="flex items-center gap-3 w-full justify-between">
+                        <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={360}
+                          value={selectedSetTable?.rotation ?? 0}
+                          onChange={(e) => updateSelectedSetTable({ rotation: Number(e.target.value) || 0 })}
+                          className="flex-1 max-w-[85px]"
+                        />
                         <input
                           type="number"
-                          value={selectedSetTable ? selectedSetTable[field.key] : 0}
+                          min={0}
+                          max={360}
+                          value={selectedSetTable?.rotation ?? 0}
                           onChange={(e) => {
-                            const nextVal = Number(e.target.value);
-                            const safe = Number.isFinite(nextVal) ? nextVal : 0;
-                            if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, safe) });
-                            else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, safe) });
-                            else updateSelectedSetTable({ [field.key]: safe });
+                            const v = Number(e.target.value);
+                            const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
+                            updateSelectedSetTable({ rotation: clamped });
                           }}
-                          className="min-w-[50px] max-w-[50px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          className="min-w-[40px] max-w-[80px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
                         />
-                        <button
-                          type="button"
-                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
-                          onClick={() => {
-                            const current = Number(selectedSetTable?.[field.key]) || 0;
-                            const nextVal = current - 10;
-                            if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, nextVal) });
-                            else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, nextVal) });
-                            else updateSelectedSetTable({ [field.key]: nextVal });
-                          }}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
-                          onClick={() => {
-                            const current = Number(selectedSetTable?.[field.key]) || 0;
-                            const nextVal = current + 10;
-                            if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, nextVal) });
-                            else if (field.key === 'height') updateSelectedSetTable({ height: Math.max(40, nextVal) });
-                            else updateSelectedSetTable({ [field.key]: nextVal });
-                          }}
-                        >
-                          +
-                        </button>
                       </div>
-                    ))}
 
-                    <div className="flex items-center gap-3 w-full justify-between">
-                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={360}
-                        value={selectedSetTable?.rotation ?? 0}
-                        onChange={(e) => updateSelectedSetTable({ rotation: Number(e.target.value) || 0 })}
-                        className="flex-1 max-w-[85px]"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        max={360}
-                        value={selectedSetTable?.rotation ?? 0}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
-                          updateSelectedSetTable({ rotation: clamped });
-                        }}
-                        className="min-w-[40px] max-w-[80px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
-                      />
+                      <label className="flex items-center gap-3">
+                        <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.round', 'Round')}</span>
+                        <input
+                          type="checkbox"
+                          checked={!!selectedSetTable?.round}
+                          onChange={(e) => updateSelectedSetTable({ round: e.target.checked })}
+                          className="w-7 h-7"
+                        />
+                      </label>
                     </div>
 
-                    <label className="flex items-center gap-3">
-                      <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.round', 'Round')}</span>
-                      <input
-                        type="checkbox"
-                        checked={!!selectedSetTable?.round}
-                        onChange={(e) => updateSelectedSetTable({ round: e.target.checked })}
-                        className="w-7 h-7"
-                      />
-                    </label>
-
-                    <div className="h-px bg-pos-border my-2" />
-                  </>
+                  </div>
                 ) : null}
 
                 {selectedSetBoard ? (
-                  <div className="space-y-2 pt-1">
-                    {[
-                      { key: 'x', label: 'board x' },
-                      { key: 'y', label: 'board y' },
-                      { key: 'width', label: tr('control.tables.width', 'Width') },
-                      { key: 'height', label: tr('control.tables.height', 'Height') }
-                    ].map((field) => (
-                      <div key={`board-${field.key}`} className="flex items-center gap-3">
-                        <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
-                        <input
-                          type="number"
-                          value={selectedSetBoard[field.key]}
-                          onChange={(e) => {
-                            const nextVal = Number(e.target.value);
-                            const safe = Number.isFinite(nextVal) ? nextVal : 0;
-                            if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, safe) });
-                            else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, safe) });
-                            else updateSelectedSetBoard({ [field.key]: safe });
-                          }}
-                          className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
-                        />
-                        <button
-                          type="button"
-                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
-                          onClick={() => {
-                            const current = Number(selectedSetBoard[field.key]) || 0;
-                            const nextVal = current - 10;
-                            if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, nextVal) });
-                            else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, nextVal) });
-                            else updateSelectedSetBoard({ [field.key]: nextVal });
-                          }}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
-                          onClick={() => {
-                            const current = Number(selectedSetBoard[field.key]) || 0;
-                            const nextVal = current + 10;
-                            if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, nextVal) });
-                            else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, nextVal) });
-                            else updateSelectedSetBoard({ [field.key]: nextVal });
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-3">
+                  <div className="flex">
+                    <div className='grid grid-cols-2 gap-2'>
+                      {[
+                        { key: 'x', label: 'board x' },
+                        { key: 'y', label: 'board y' },
+                        { key: 'width', label: tr('control.tables.width', 'Width') },
+                        { key: 'height', label: tr('control.tables.height', 'Height') }
+                      ].map((field) => (
+                        <div key={`board-${field.key}`} className="flex items-center gap-2 mr-5">
+                          <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
+                          <input
+                            type="number"
+                            value={selectedSetBoard[field.key]}
+                            onChange={(e) => {
+                              const nextVal = Number(e.target.value);
+                              const safe = Number.isFinite(nextVal) ? nextVal : 0;
+                              if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, safe) });
+                              else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, safe) });
+                              else updateSelectedSetBoard({ [field.key]: safe });
+                            }}
+                            className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          />
+                          <button
+                            type="button"
+                            className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                            onClick={() => {
+                              const current = Number(selectedSetBoard[field.key]) || 0;
+                              const nextVal = current - 10;
+                              if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, nextVal) });
+                              else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, nextVal) });
+                              else updateSelectedSetBoard({ [field.key]: nextVal });
+                            }}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                            onClick={() => {
+                              const current = Number(selectedSetBoard[field.key]) || 0;
+                              const nextVal = current + 10;
+                              if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, nextVal) });
+                              else if (field.key === 'height') updateSelectedSetBoard({ height: Math.max(10, nextVal) });
+                              else updateSelectedSetBoard({ [field.key]: nextVal });
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center h-[40px]">
                       <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
                       <input
                         type="range"
@@ -7956,57 +7615,58 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                 ) : null}
 
                 {selectedSetFlowerPot ? (
-                  <div className="space-y-2 pt-1">
-                    <div className="text-pos-text font-medium">{tr('control.tables.flowerPot', 'Flower pot')}</div>
-                    {[
-                      { key: 'x', label: 'flower pot x' },
-                      { key: 'y', label: 'flower pot y' },
-                      { key: 'width', label: tr('control.tables.width', 'Width') },
-                      { key: 'height', label: tr('control.tables.height', 'Height') }
-                    ].map((field) => (
-                      <div key={`flowerpot-${field.key}`} className="flex items-center gap-3">
-                        <span className="min-w-[70px] max-w-[70px] shrink-0">{field.label}</span>
-                        <input
-                          type="number"
-                          value={selectedSetFlowerPot[field.key]}
-                          onChange={(e) => {
-                            const nextVal = Number(e.target.value);
-                            const safe = Number.isFinite(nextVal) ? nextVal : 0;
-                            if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, safe) });
-                            else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, safe) });
-                            else updateSelectedSetFlowerPot({ [field.key]: safe });
-                          }}
-                          className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
-                        />
-                        <button
-                          type="button"
-                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
-                          onClick={() => {
-                            const current = Number(selectedSetFlowerPot[field.key]) || 0;
-                            const nextVal = current - 10;
-                            if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, nextVal) });
-                            else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, nextVal) });
-                            else updateSelectedSetFlowerPot({ [field.key]: nextVal });
-                          }}
-                        >
-                          -
-                        </button>
-                        <button
-                          type="button"
-                          className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
-                          onClick={() => {
-                            const current = Number(selectedSetFlowerPot[field.key]) || 0;
-                            const nextVal = current + 10;
-                            if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, nextVal) });
-                            else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, nextVal) });
-                            else updateSelectedSetFlowerPot({ [field.key]: nextVal });
-                          }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-3">
+                  <div className="flex">
+                    <div className='grid grid-cols-2 gap-2'>
+                      {[
+                        { key: 'x', label: 'flower pot x' },
+                        { key: 'y', label: 'flower pot y' },
+                        { key: 'width', label: tr('control.tables.width', 'Width') },
+                        { key: 'height', label: tr('control.tables.height', 'Height') }
+                      ].map((field) => (
+                        <div key={`flowerpot-${field.key}`} className="flex items-center gap-2 mr-5">
+                          <span className="min-w-[100px] max-w-[100px] shrink-0">{field.label}</span>
+                          <input
+                            type="number"
+                            value={selectedSetFlowerPot[field.key]}
+                            onChange={(e) => {
+                              const nextVal = Number(e.target.value);
+                              const safe = Number.isFinite(nextVal) ? nextVal : 0;
+                              if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, safe) });
+                              else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, safe) });
+                              else updateSelectedSetFlowerPot({ [field.key]: safe });
+                            }}
+                            className="min-w-[70px] max-w-[70px] px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          />
+                          <button
+                            type="button"
+                            className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                            onClick={() => {
+                              const current = Number(selectedSetFlowerPot[field.key]) || 0;
+                              const nextVal = current - 10;
+                              if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, nextVal) });
+                              else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, nextVal) });
+                              else updateSelectedSetFlowerPot({ [field.key]: nextVal });
+                            }}
+                          >
+                            -
+                          </button>
+                          <button
+                            type="button"
+                            className="w-10 h-10 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                            onClick={() => {
+                              const current = Number(selectedSetFlowerPot[field.key]) || 0;
+                              const nextVal = current + 10;
+                              if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, nextVal) });
+                              else if (field.key === 'height') updateSelectedSetFlowerPot({ height: Math.max(10, nextVal) });
+                              else updateSelectedSetFlowerPot({ [field.key]: nextVal });
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center h-[40px]">
                       <span className="min-w-[70px] max-w-[70px] shrink-0">{tr('control.tables.rotation', 'Rotation')}</span>
                       <input
                         type="range"
@@ -8031,153 +7691,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     </div>
                   </div>
                 ) : null}
-
-                <div className="pt-3 flex gap-3 w-full justify-center">
-                  <button
-                    type="button"
-                    className="px-5 py-2 rounded-lg bg-green-600 text-white active:bg-green-500 text-sm"
-                    onClick={saveSetTablesLayout}
-                  >
-                    {tr('control.save', 'Save')}
-                  </button>
-                  <button
-                    type="button"
-                    className="px-5 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm"
-                    onClick={closeSetTablesModal}
-                  >
-                    {tr('cancel', 'Cancel')}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 min-w-0 bg-[#1f2b36] p-6">
-              <div ref={setTablesCanvasRef} className="w-full h-full rounded-lg border border-pos-border bg-[#2f3e50] relative overflow-auto">
-                <div
-                  style={{
-                    transform: `scale(${setTablesCanvasZoom / 100})`,
-                    transformOrigin: '0 0',
-                    width: `${setTablesDraft.floorWidth ?? 979}px`,
-                    height: `${setTablesDraft.floorHeight ?? 595.5}px`,
-                    minWidth: `${setTablesDraft.floorWidth ?? 979}px`,
-                    minHeight: `${setTablesDraft.floorHeight ?? 595.5}px`
-                  }}
-                  className="relative"
-                >
-                {setTablesDraft.tables.map((table) => {
-                  const template = TABLE_TEMPLATE_OPTIONS.find((item) => item.id === table.templateType) || null;
-                  const sizeStyle = table.round
-                    ? { width: `${Math.max(70, table.width)}px`, height: `${Math.max(70, table.width)}px` }
-                    : { width: `${table.width}px`, height: `${table.height}px` };
-                  return (
-                    <button
-                      key={table.id}
-                      type="button"
-                      className={`absolute flex items-center justify-center font-semibold border-2 text-white transition-colors overflow-hidden ${table.round
-                        ? 'rounded-full border-transparent bg-transparent'
-                        : 'rounded-md border-transparent bg-transparent'
-                        } ${setTablesSelectedTableId === table.id && selectedSetBoardIndex == null && selectedSetFlowerPotIndex == null ? 'ring-4 ring-yellow-400' : ''} ${setTablesDraggingId === table.id ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
-                      style={{
-                        left: `${Math.max(0, table.x)}px`,
-                        top: `${Math.max(0, table.y)}px`,
-                        transform: `rotate(${table.rotation || 0}deg)`,
-                        zIndex: 20,
-                        ...sizeStyle
-                      }}
-                      onClick={() => {
-                        setSetTablesSelectedTableId(table.id);
-                        setSetTablesSelectedBoardIndex(null);
-                        setSetTablesSelectedFlowerPotIndex(null);
-                      }}
-                      onMouseDown={(event) => startSetTableDrag(event, table)}
-                    >
-                      {template ? (
-                        <img src={template.src} alt={table.name} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
-                      ) : null}
-                      <span className="relative z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]">{table.name}</span>
-                    </button>
-                  );
-                })}
-                {setTablesDraft.tables.flatMap((table) =>
-                  (Array.isArray(table.boards) ? table.boards : []).map((board, idx) => {
-                    const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedBoardIndex === idx;
-                    const isDraggingBoard = setTablesDraggingId === table.id && setTablesDraggingType === 'board' && setTablesDragRef.current?.boardIndex === idx;
-                    return (
-                      <button
-                        key={board.id || `board-${table.id}-${idx}`}
-                        type="button"
-                        className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} ${isDraggingBoard ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
-                        style={{
-                          left: `${Math.max(0, Number(board.x) || 0)}px`,
-                          top: `${Math.max(0, Number(board.y) || 0)}px`,
-                          width: `${Math.max(10, Number(board.width) || 10)}px`,
-                          height: `${Math.max(10, Number(board.height) || 10)}px`,
-                          transform: `rotate(${Number(board.rotation) || 0}deg)`,
-                          zIndex: 10,
-                          backgroundColor: board.color || '#facc15',
-                          opacity: 0.55
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSetTablesSelectedTableId(table.id);
-                          setSetTablesSelectedBoardIndex(idx);
-                          setSetTablesSelectedFlowerPotIndex(null);
-                        }}
-                        onMouseDown={(event) => startSetBoardDrag(event, table, idx)}
-                      />
-                    );
-                  })
-                )}
-                {setTablesDraft.tables.flatMap((table) =>
-                  (Array.isArray(table.flowerPots) ? table.flowerPots : []).map((fp, idx) => {
-                    const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedFlowerPotIndex === idx;
-                    const isDragging = setTablesDraggingId === table.id && setTablesDraggingType === 'flowerPot' && setTablesDragRef.current?.flowerPotIndex === idx;
-                    return (
-                      <button
-                        key={fp.id || `flowerpot-${table.id}-${idx}`}
-                        type="button"
-                        className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} active:bg-green-500`}
-                        style={{
-                          left: `${Math.max(0, Number(fp.x) || 0)}px`,
-                          top: `${Math.max(0, Number(fp.y) || 0)}px`,
-                          width: `${Math.max(10, Number(fp.width) || 10)}px`,
-                          height: `${Math.max(10, Number(fp.height) || 10)}px`,
-                          transform: `rotate(${Number(fp.rotation) || 0}deg)`,
-                          zIndex: 15
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSetTablesSelectedTableId(table.id);
-                          setSetTablesSelectedBoardIndex(null);
-                          setSetTablesSelectedFlowerPotIndex(idx);
-                        }}
-                        onMouseDown={(event) => startSetFlowerPotDrag(event, table, idx)}
-                      >
-                        <img src="/flowerpot.svg" alt="Flower pot" className="w-full h-full object-contain pointer-events-none" />
-                      </button>
-                    );
-                  })
-                )}
-                </div>
-                <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-pos-border bg-pos-panel p-1 shadow-lg">
-                  <button
-                    type="button"
-                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
-                    onClick={() => setSetTablesCanvasZoom((z) => Math.max(SET_TABLES_ZOOM_MIN, z - SET_TABLES_ZOOM_STEP))}
-                    aria-label="Zoom out"
-                  >
-                    −
-                  </button>
-                  <span className="min-w-[3ch] text-center text-sm text-pos-text px-1">{setTablesCanvasZoom}%</span>
-                  <button
-                    type="button"
-                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
-                    onClick={() => setSetTablesCanvasZoom((z) => Math.min(SET_TABLES_ZOOM_MAX, z + SET_TABLES_ZOOM_STEP))}
-                    aria-label="Zoom in"
-                  >
-                    +
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -8195,7 +7708,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                   className="rounded-xl border border-pos-border bg-pos-panel active:bg-green-500 p-5 flex flex-col items-center gap-4"
                   onClick={() => addSetTableWithTemplate(template.id)}
                 >
-                  <img src={template.src} alt={template.id} className="w-[170px] h-[170px] object-contain" />
+                  <img src={publicAssetUrl(template.src)} alt={template.id} className="w-[170px] h-[170px] object-contain" />
                 </button>
               ))}
             </div>
@@ -8476,7 +7989,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     </div>
                     <div className="flex items-center gap-5">
                       <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.device.scheduled.checkoutAt', 'Scheduled order checkout at:')}</span>
-                        <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS)} value={deviceScheduledCheckoutAt} onChange={setDeviceScheduledCheckoutAt} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
+                      <Dropdown options={mapTranslatedOptions(SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS)} value={deviceScheduledCheckoutAt} onChange={setDeviceScheduledCheckoutAt} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px] max-w-[150px]" />
                     </div>
                   </div>
                   <div className="flex flex-col gap-4">
@@ -9007,7 +8520,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
               </div>
             </div>
             <div className="flex justify-center pt-5 pb-5">
-              <button type="button" className="flex items-center text-md gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={!(labelName || '').trim()} onClick={handleSaveLabel}>
+              <button type="button" className="flex items-center text-md gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingLabel || !(labelName || '').trim()} onClick={handleSaveLabel}>
                 <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                 {tr('control.save', 'Save')}
               </button>
@@ -9036,10 +8549,10 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                 <button
                   type="button"
                   className="px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-sm shrink-0"
-                  disabled={!(productionMessageInput || '').trim()}
+                  disabled={savingProductionMessage || !(productionMessageInput || '').trim()}
                   onClick={handleAddOrUpdateProductionMessage}
                 >
-                  {editingProductionMessageId ? 'Update' : 'Add'}
+                  {savingProductionMessage ? tr('control.saving', 'Saving...') : editingProductionMessageId ? 'Update' : 'Add'}
                 </button>
               </div>
             </div>
@@ -9529,6 +9042,16 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                 );
               })}
             </div>
+            {productSaveError ? (
+              <div className="shrink-0 px-6 pt-2">
+                <p
+                  role="alert"
+                  className="rounded-lg border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-sm text-rose-100"
+                >
+                  {productSaveError}
+                </p>
+              </div>
+            ) : null}
             {/* Single scrollable area for all tabs so keyboard stays fixed at bottom */}
             <div className="flex-1 min-h-0 w-full overflow-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {productTab === 'general' && (
@@ -9553,11 +9076,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       </div>
                       <div className="flex items-center gap-1">
                         <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.vatTakeOut', 'VAT Take out')}:</label>
-                        <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatTakeOut} onChange={(v) => { setProductVatTakeOut(v); setProductFieldErrors((e) => ({ ...e, vatTakeOut: false })); }} placeholder="--" className={`text-md min-w-[150px] ${productFieldErrors.vatTakeOut ? '!bg-rose-500/40 !border-rose-400' : ''}`} />
+                        <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatTakeOut} onChange={(v) => { setProductVatTakeOut(v); setProductFieldErrors((e) => ({ ...e, vatTakeOut: false })); }} placeholder="--" className="text-md min-w-[150px]" hasError={productFieldErrors.vatTakeOut} />
                       </div>
                       <div className="flex items-center gap-1">
                         <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.vatEatIn', 'VAT Eat in')}:</label>
-                        <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatEatIn} onChange={(v) => { setProductVatEatIn(v); setProductFieldErrors((e) => ({ ...e, vatEatIn: false })); }} placeholder="--" className={`text-md min-w-[150px] ${productFieldErrors.vatEatIn ? '!bg-rose-500/40 !border-rose-400' : ''}`} />
+                        <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatEatIn} onChange={(v) => { setProductVatEatIn(v); setProductFieldErrors((e) => ({ ...e, vatEatIn: false })); }} placeholder="--" className="text-md min-w-[150px]" hasError={productFieldErrors.vatEatIn} />
                       </div>
                       {productTabsUnlocked ? (
                         <div className="flex items-center gap-1 h-[40px]">
@@ -9817,7 +9340,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                                 </div>
                               </div>
                             </td>
-                              <td className="min-w-[200px] min-h-[40px] max-h-[40px] px-4 py-1">
+                            <td className="min-w-[200px] min-h-[40px] max-h-[40px] px-4 py-1">
                               <input
                                 type="text"
                                 value={row.otherPrice}
@@ -10025,16 +9548,52 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       </div>
                     </div>
                     <div className='flex items-start gap-2'>
-                      <div className='flex items-center'>
+                      <div className='flex flex-wrap items-center gap-2'>
                         <label className="block text-pos-text pr-10">{tr('control.productModal.kiosk.kioskPicture', 'Kiosk picture')}:</label>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0">
                             {tr('control.productModal.chooseFile', 'Choose File')}
-                            <input type="file" className="hidden focus:border-green-500 focus:outline-none" accept="image/*" onChange={(e) => setKioskPictureFileName(e.target.files?.[0]?.name ?? '')} />
+                            <input
+                              type="file"
+                              className="hidden focus:border-green-500 focus:outline-none"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = '';
+                                if (!file || !file.type.startsWith('image/')) return;
+                                const dataUrl = await new Promise((resolve, reject) => {
+                                  const reader = new FileReader();
+                                  reader.onload = () => resolve(String(reader.result || ''));
+                                  reader.onerror = () => reject(reader.error);
+                                  reader.readAsDataURL(file);
+                                }).catch(() => '');
+                                if (dataUrl) setKioskPictureFileName(dataUrl);
+                              }}
+                            />
                           </label>
-                          <span className="text-pos-muted pl-5">{kioskPictureFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
+                          {kioskPictureFileName ? (
+                            <div className="flex items-center gap-2 pl-1">
+                              {kioskPictureFileName.startsWith('data:') || /^https?:/i.test(kioskPictureFileName) ? (
+                                <img
+                                  src={kioskPictureFileName}
+                                  alt=""
+                                  className="h-16 w-16 object-cover rounded-lg border border-pos-border shrink-0"
+                                />
+                              ) : (
+                                <span className="text-pos-muted text-sm max-w-[200px] truncate">{kioskPictureFileName}</span>
+                              )}
+                              <button
+                                type="button"
+                                className="px-2 py-1 text-sm border border-pos-border rounded-lg text-pos-text active:bg-green-500 shrink-0"
+                                onClick={() => setKioskPictureFileName('')}
+                              >
+                                {tr('control.productModal.removePhoto', 'Remove')}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-pos-muted pl-1">{tr('control.productModal.noFileChosen', 'No file chosen')}</span>
+                          )}
                         </div>
-
                       </div>
                     </div>
                   </div>
@@ -10641,154 +10200,168 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <div className="flex-1 min-h-0 overflow-auto w-full">
-              <div className="p-6 flex w-full text-sm pt-14">
-                <div className='flex flex-col gap-3 w-1/3'>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.name', 'Name :')} </label>
-                    <input
-                      type="text"
-                      value={subproductName}
-                      onChange={(e) => handleSubproductNameChange(e.target.value)}
-                      onFocus={() => setSubproductActiveField('name')}
-                      placeholder=""
-                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
-                    />
+              <div className="p-6 flex flex-col w-full text-sm pt-14 gap-3">
+                {subproductSaveError ? (
+                  <div className="w-full shrink-0">
+                    <p role="alert" className="rounded-lg border border-rose-500/60 bg-rose-500/15 px-3 py-2 text-sm text-rose-100">
+                      {subproductSaveError}
+                    </p>
                   </div>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.keyName', 'Key name :')} </label>
-                    <input
-                      type="text"
-                      value={subproductKeyName}
-                      onChange={(e) => setSubproductKeyName(e.target.value)}
-                      onFocus={() => setSubproductActiveField('keyName')}
-                      placeholder=""
-                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
-                    />
-                  </div>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.productionName', 'Production name :')} </label>
-                    <input
-                      type="text"
-                      value={subproductProductionName}
-                      onChange={(e) => setSubproductProductionName(e.target.value)}
-                      onFocus={() => setSubproductActiveField('productionName')}
-                      placeholder=""
-                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
-                    />
-                  </div>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.price', 'Price :')} </label>
-                    <input
-                      type="text"
-                      value={subproductPrice}
-                      onChange={(e) => setSubproductPrice(e.target.value)}
-                      onFocus={() => setSubproductActiveField('price')}
-                      placeholder=""
-                      className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
-                    />
-                  </div>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.vatTakeOut', 'VAT Take out :')} </label>
-                    <Dropdown options={SUBPRODUCT_VAT_OPTIONS} value={subproductVatTakeOut} onChange={setSubproductVatTakeOut} placeholder="--" className="text-md min-w-[150px]" />
-                  </div>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.vatEatIn', 'VAT Eat in :')} </label>
-                    <Dropdown options={SUBPRODUCT_VAT_OPTIONS} value={subproductVatEatIn} onChange={setSubproductVatEatIn} placeholder="--" className="text-md min-w-[150px]" />
-                  </div>
-                </div>
-                <div className='flex flex-col gap-3 w-1/3'>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[100px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.group', 'Group :')} </label>
-                    <Dropdown
-                      options={subproductGroups.map((g) => ({ value: g.id, label: g.name }))}
-                      value={subproductModalGroupId}
-                      onChange={setSubproductModalGroupId}
-                      placeholder="--"
-                      className="text-md min-w-[150px]"
-                    />
-                  </div>
-                  <div className="flex gap-2 w-full items-center">
-                    <label className="block min-w-[100px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.kioskPicture', 'Kiosk picture :')} </label>
-                    <div className="w-[200px] flex items-center justify-start flex-wrap gap-2">
-                      {!subproductKioskPicture ? (
-                        <label className="px-4 py-2 border border-gray-300 rounded-lg text-gray-200 active:bg-green-500 cursor-pointer shrink-0 text-md">
-                          {tr('control.subproductModal.select', 'Select')}
-                          <input
-                            type="file"
-                            className="hidden focus:border-green-500 focus:outline-none"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file && file.type.startsWith('image/')) {
-                                const dataUrl = await new Promise((resolve, reject) => {
-                                  const reader = new FileReader();
-                                  reader.onload = () => resolve(String(reader.result || ''));
-                                  reader.onerror = () => reject(reader.error);
-                                  reader.readAsDataURL(file);
-                                }).catch(() => '');
-                                if (dataUrl) setSubproductKioskPicture(dataUrl);
-                              }
-                              e.target.value = '';
-                            }}
-                          />
-                        </label>
-                      ) : (
-                        <>
-                          <img src={subproductKioskPicture} alt="Kiosk" className="w-16 h-16 object-cover rounded-lg border border-gray-300 shrink-0" />
-                          <button
-                            type="button"
-                            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-200 active:bg-green-500 text-md shrink-0"
-                            onClick={() => setSubproductKioskPicture('')}
-                          >
-                            {tr('control.subproductModal.remove', 'Remove')}
-                          </button>
-                        </>
-                      )}
+                ) : null}
+                <div className="flex w-full flex-row flex-wrap gap-y-3">
+                  <div className='flex flex-col gap-3 w-1/3'>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.name', 'Name :')} </label>
+                      <input
+                        type="text"
+                        value={subproductName}
+                        onChange={(e) => handleSubproductNameChange(e.target.value)}
+                        onFocus={() => setSubproductActiveField('name')}
+                        onClick={() => setSubproductActiveField('name')}
+                        placeholder=""
+                        className={`px-4 w-[150px] h-[40px] py-3 text-md border rounded-lg text-gray-200 caret-white ${subproductFieldErrors.name ? 'bg-rose-500/40 border-rose-500' : 'bg-pos-panel border-gray-300'}`}
+                      />
+                    </div>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.keyName', 'Key name :')} </label>
+                      <input
+                        type="text"
+                        value={subproductKeyName}
+                        onChange={(e) => { setSubproductKeyName(e.target.value); setSubproductFieldErrors((err) => ({ ...err, keyName: false })); }}
+                        onFocus={() => setSubproductActiveField('keyName')}
+                        onClick={() => setSubproductActiveField('keyName')}
+                        placeholder=""
+                        className={`px-4 w-[150px] h-[40px] py-3 text-md border rounded-lg text-gray-200 ${subproductFieldErrors.keyName ? 'bg-rose-500/40 border-rose-500' : 'bg-pos-panel border-gray-300'}`}
+                      />
+                    </div>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.productionName', 'Production name :')} </label>
+                      <input
+                        type="text"
+                        value={subproductProductionName}
+                        onChange={(e) => { setSubproductProductionName(e.target.value); setSubproductFieldErrors((err) => ({ ...err, productionName: false })); }}
+                        onFocus={() => setSubproductActiveField('productionName')}
+                        onClick={() => setSubproductActiveField('productionName')}
+                        placeholder=""
+                        className={`px-4 w-[150px] h-[40px] py-3 text-md border rounded-lg text-gray-200 ${subproductFieldErrors.productionName ? 'bg-rose-500/40 border-rose-500' : 'bg-pos-panel border-gray-300'}`}
+                      />
+                    </div>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.price', 'Price :')} </label>
+                      <input
+                        type="text"
+                        value={subproductPrice}
+                        onChange={(e) => setSubproductPrice(e.target.value)}
+                        onFocus={() => setSubproductActiveField('price')}
+                        onClick={() => setSubproductActiveField('price')}
+                        placeholder=""
+                        className="px-4 w-[150px] bg-pos-panel h-[40px] py-3 text-md border border-gray-300 rounded-lg text-gray-200"
+                      />
+                    </div>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.vatTakeOut', 'VAT Take out :')} </label>
+                      <Dropdown options={SUBPRODUCT_VAT_OPTIONS} value={subproductVatTakeOut} onChange={(v) => { setSubproductVatTakeOut(v); setSubproductFieldErrors((err) => ({ ...err, vatTakeOut: false })); }} placeholder="--" className="text-md min-w-[150px]" hasError={subproductFieldErrors.vatTakeOut} />
+                    </div>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[110px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.vatEatIn', 'VAT Eat in :')} </label>
+                      <Dropdown options={SUBPRODUCT_VAT_OPTIONS} value={subproductVatEatIn} onChange={(v) => { setSubproductVatEatIn(v); setSubproductFieldErrors((err) => ({ ...err, vatEatIn: false })); }} placeholder="--" className="text-md min-w-[150px]" hasError={subproductFieldErrors.vatEatIn} />
                     </div>
                   </div>
-                </div>
-                <div className="flex flex-col w-1/3 items-center gap-3">
-                  <label className="block text-md font-medium text-gray-200">{tr('control.subproductModal.attachTo', 'Attach To')}</label>
-                  <div ref={subproductAttachToListRef} className="border border-gray-300 rounded-lg bg-pos-panel/30 w-full h-[220px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                    <ul className="p-2">
-                      {categories.length === 0 ? (
-                        <li className="text-pos-muted text-md py-2 px-2">{tr('control.subproductModal.noCategoriesAvailable', 'No categories available')}</li>
-                      ) : (
-                        categories.map((c) => {
-                          const attached = subproductAttachToCategoryIds.includes(c.id);
-                          const toggle = () => setSubproductAttachToCategoryIds((prev) => attached ? prev.filter((id) => id !== c.id) : [...prev, c.id]);
-                          return (
-                            <li
-                              key={c.id}
-                              role="button"
-                              tabIndex={0}
-                              className={`text-md py-1.5 px-2 flex items-center gap-2 cursor-pointer rounded select-none ${attached ? 'text-gray-200 font-medium bg-pos-panel' : 'text-pos-muted'} active:bg-green-500`}
-                              onClick={toggle}
-                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
-                              aria-label={attached ? tr('control.subproductModal.attachedToHint', 'Attached to {name}. Click to detach.').replace('{name}', c.name || '') : tr('control.subproductModal.attachToHint', 'Click to attach to {name}').replace('{name}', c.name || '')}
+                  <div className='flex flex-col gap-3 w-1/3'>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[100px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.group', 'Group :')} </label>
+                      <Dropdown
+                        options={subproductGroups.map((g) => ({ value: g.id, label: g.name }))}
+                        value={subproductModalGroupId}
+                        onChange={(v) => { setSubproductModalGroupId(v); setSubproductFieldErrors((err) => ({ ...err, group: false })); }}
+                        placeholder="--"
+                        className="text-md min-w-[150px]"
+                        hasError={subproductFieldErrors.group}
+                      />
+                    </div>
+                    <div className="flex gap-2 w-full items-center">
+                      <label className="block min-w-[100px] text-md font-medium text-gray-200 mb-2">{tr('control.subproductModal.kioskPicture', 'Kiosk picture :')} </label>
+                      <div className="w-[200px] flex items-center justify-start flex-wrap gap-2">
+                        {!subproductKioskPicture ? (
+                          <label className="px-4 py-2 border border-gray-300 rounded-lg text-gray-200 active:bg-green-500 cursor-pointer shrink-0 text-md">
+                            {tr('control.subproductModal.select', 'Select')}
+                            <input
+                              type="file"
+                              className="hidden focus:border-green-500 focus:outline-none"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file && file.type.startsWith('image/')) {
+                                  const dataUrl = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => resolve(String(reader.result || ''));
+                                    reader.onerror = () => reject(reader.error);
+                                    reader.readAsDataURL(file);
+                                  }).catch(() => '');
+                                  if (dataUrl) setSubproductKioskPicture(dataUrl);
+                                }
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        ) : (
+                          <>
+                            <img src={subproductKioskPicture} alt="Kiosk" className="w-16 h-16 object-cover rounded-lg border border-gray-300 shrink-0" />
+                            <button
+                              type="button"
+                              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-200 active:bg-green-500 text-md shrink-0"
+                              onClick={() => setSubproductKioskPicture('')}
                             >
-                              <span className="uppercase font-medium truncate flex-1 min-w-0">{(c.name || '').toUpperCase()}</span>
-                              <input
-                                type="checkbox"
-                                checked={attached}
-                                onChange={() => { }}
-                                onClick={(e) => { e.stopPropagation(); toggle(); }}
-                                className="w-5 h-5 rounded border-gray-300 cursor-pointer shrink-0"
-                                aria-label={attached ? tr('control.subproductModal.detachFromHint', 'Detach from {name}').replace('{name}', c.name || '') : tr('control.subproductModal.attachToCategoryHint', 'Attach to {name}').replace('{name}', c.name || '')}
-                              />
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
+                              {tr('control.subproductModal.remove', 'Remove')}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex w-full justify-around gap-2 items-center pt-2">
-                    <button type="button" className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300" aria-label="Scroll attach list up" onClick={() => scrollSubproductAttachToByPage('up')}>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                    </button>
-                    <button type="button" className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300" aria-label="Scroll attach list down" onClick={() => scrollSubproductAttachToByPage('down')}>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
+                  <div className="flex flex-col w-1/3 items-center gap-3">
+                    <label className="block text-md font-medium text-gray-200">{tr('control.subproductModal.attachTo', 'Attach To')}</label>
+                    <div ref={subproductAttachToListRef} className="border border-gray-300 rounded-lg bg-pos-panel/30 w-full h-[220px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                      <ul className="p-2">
+                        {categories.length === 0 ? (
+                          <li className="text-pos-muted text-md py-2 px-2">{tr('control.subproductModal.noCategoriesAvailable', 'No categories available')}</li>
+                        ) : (
+                          categories.map((c) => {
+                            const attached = subproductAttachToCategoryIds.includes(c.id);
+                            const toggle = () => setSubproductAttachToCategoryIds((prev) => attached ? prev.filter((id) => id !== c.id) : [...prev, c.id]);
+                            return (
+                              <li
+                                key={c.id}
+                                role="button"
+                                tabIndex={0}
+                                className={`text-md py-1.5 px-2 flex items-center gap-2 cursor-pointer rounded select-none ${attached ? 'text-gray-200 font-medium bg-pos-panel' : 'text-pos-muted'} active:bg-green-500`}
+                                onClick={toggle}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+                                aria-label={attached ? tr('control.subproductModal.attachedToHint', 'Attached to {name}. Click to detach.').replace('{name}', c.name || '') : tr('control.subproductModal.attachToHint', 'Click to attach to {name}').replace('{name}', c.name || '')}
+                              >
+                                <span className="uppercase font-medium truncate flex-1 min-w-0">{(c.name || '').toUpperCase()}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={attached}
+                                  onChange={() => { }}
+                                  onClick={(e) => { e.stopPropagation(); toggle(); }}
+                                  className="w-5 h-5 rounded border-gray-300 cursor-pointer shrink-0"
+                                  aria-label={attached ? tr('control.subproductModal.detachFromHint', 'Detach from {name}').replace('{name}', c.name || '') : tr('control.subproductModal.attachToCategoryHint', 'Attach to {name}').replace('{name}', c.name || '')}
+                                />
+                              </li>
+                            );
+                          })
+                        )}
+                      </ul>
+                    </div>
+                    <div className="flex w-full justify-around gap-2 items-center pt-2">
+                      <button type="button" className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300" aria-label="Scroll attach list up" onClick={() => scrollSubproductAttachToByPage('up')}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                      </button>
+                      <button type="button" className="p-2 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 border border-gray-300" aria-label="Scroll attach list down" onClick={() => scrollSubproductAttachToByPage('down')}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -10840,10 +10413,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     </div>
                     <div
                       ref={manageGroupsListRef}
-                      className="w-full border border-gray-300 max-h-[250px] overflow-y-auto rounded-lg overflow-hidden bg-pos-panel/30 cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      className={`w-full border border-gray-300 max-h-[250px] overflow-y-auto rounded-lg overflow-hidden bg-pos-panel/30 cursor-grab active:cursor-grabbing [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${sortedGroups.length === 0 ? 'min-h-[180px]' : ''}`}
                       onScroll={updateManageGroupsPaginationState}
                       onPointerDown={(e) => {
                         if (e.pointerType === 'mouse' && e.button !== 0) return;
+                        // Do not capture pointer for drag-scroll when interacting with controls — capture
+                        // would steal clicks from edit/delete (and other) buttons inside the list.
+                        const t = e.target;
+                        if (t && typeof t.closest === 'function' && t.closest('button, input, textarea, select, a, label')) return;
                         const el = manageGroupsListRef.current;
                         if (!el) return;
                         manageGroupsDragRef.current = {
@@ -10879,44 +10456,75 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     >
                       <table className="w-full border-collapse">
                         <tbody>
-                          {sortedGroups.map((grp) => (
-                            <tr
-                              key={grp.id}
-                              className={`border-b border-gray-300 w-full items-center min-h-[40px] flex justify-between ${selectedManageGroupId === grp.id ? 'bg-pos-panel/70' : ''} active:bg-green-500`}
-                              onClick={(e) => { if (!e.target.closest('button')) setSelectedManageGroupId(grp.id); }}
-                            >
-                              <td className="w-full py-2 px-3">
-                                {editingGroupId === grp.id ? (
-                                  <div className="flex items-center w-full justify-between gap-2 flex-wrap">
-                                    <input
-                                      type="text"
-                                      value={editingGroupName}
-                                      onChange={(e) => setEditingGroupName(e.target.value)}
-                                      className="flex min-w-[200px] max-w-[200px] px-4 h-[40px] py-3 bg-pos-panel border border-gray-300 rounded-lg text-gray-200 text-md"
-                                      autoFocus
-                                      onClick={(e) => e.stopPropagation()}
+                          {sortedGroups.length === 0 ? (
+                            <tr>
+                              <td colSpan={2} className="py-10 px-4 align-middle">
+                                <div className="flex flex-col items-center justify-center gap-3 text-center text-pos-muted" role="status">
+                                  <svg className="w-24 h-24 shrink-0" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                                    <path
+                                      d="M20 28h22l6 8h30a6 6 0 016 6v36a6 6 0 01-6 6H26a6 6 0 01-6-6V34a6 6 0 016-6z"
+                                      stroke="currentColor"
+                                      strokeWidth="2.5"
+                                      strokeLinejoin="round"
+                                      opacity="0.45"
                                     />
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <button type="button" className="flex items-center text-md gap-2 px-4 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 shrink-0" disabled={savingGroup} onClick={(e) => { e.stopPropagation(); handleSaveEditGroup(); }}>{tr('control.save', 'Save')}</button>
-                                      <button type="button" className="flex items-center text-md gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-gray-300 text-gray-200 font-medium active:bg-green-500 shrink-0" onClick={(e) => { e.stopPropagation(); setEditingGroupId(null); setEditingGroupName(''); }}>{tr('cancel', 'Cancel')}</button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span className="font-medium text-md text-gray-200">{grp.name}</span>
-                                )}
+                                    <path
+                                      d="M26 44h44M26 56h32M26 68h24"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeDasharray="5 5"
+                                      opacity="0.35"
+                                    />
+                                    <circle cx="68" cy="36" r="16" stroke="currentColor" strokeWidth="2.5" opacity="0.5" />
+                                    <path d="M62 36h12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
+                                  </svg>
+                                  <p className="text-md max-w-sm text-gray-400">
+                                    {tr('control.subproducts.manageGroups.noGroups', 'No groups yet. Add one above.')}
+                                  </p>
+                                </div>
                               </td>
-                              {editingGroupId !== grp.id && (
-                                <td className="py-2 px-3 text-right flex items-center gap-1 shrink-0">
-                                  <button type="button" className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 inline-flex align-middle" onClick={(e) => { e.stopPropagation(); setEditingGroupId(grp.id); setEditingGroupName(grp.name || ''); }} aria-label={tr('control.edit', 'Edit')}>
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                  </button>
-                                  <button type="button" className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 inline-flex align-middle" onClick={(e) => { e.stopPropagation(); setDeleteConfirmGroupId(grp.id); }} aria-label={tr('delete', 'Delete')}>
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                  </button>
-                                </td>
-                              )}
                             </tr>
-                          ))}
+                          ) : (
+                            sortedGroups.map((grp) => (
+                              <tr
+                                key={grp.id}
+                                className={`border-b border-gray-300 w-full items-center min-h-[40px] flex justify-between ${selectedManageGroupId === grp.id ? 'bg-pos-panel/70' : ''} active:bg-green-500`}
+                                onClick={(e) => { if (!e.target.closest('button')) setSelectedManageGroupId(grp.id); }}
+                              >
+                                <td className="flex-1 min-w-0 py-2 px-3">
+                                  {editingGroupId === grp.id ? (
+                                    <div className="flex items-center w-full justify-between gap-2 flex-wrap">
+                                      <input
+                                        type="text"
+                                        value={editingGroupName}
+                                        onChange={(e) => setEditingGroupName(e.target.value)}
+                                        className="flex min-w-[200px] max-w-[200px] px-4 h-[40px] py-3 bg-pos-panel border border-gray-300 rounded-lg text-gray-200 text-md"
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <button type="button" className="flex items-center text-md gap-2 px-4 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 shrink-0" disabled={savingGroup} onClick={(e) => { e.stopPropagation(); handleSaveEditGroup(); }}>{tr('control.save', 'Save')}</button>
+                                        <button type="button" className="flex items-center text-md gap-2 px-4 py-2 rounded-lg bg-pos-panel border border-gray-300 text-gray-200 font-medium active:bg-green-500 shrink-0" onClick={(e) => { e.stopPropagation(); setEditingGroupId(null); setEditingGroupName(''); }}>{tr('cancel', 'Cancel')}</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="font-medium text-md text-gray-200">{grp.name}</span>
+                                  )}
+                                </td>
+                                {editingGroupId !== grp.id && (
+                                  <td className="relative z-[1] py-2 px-3 text-right flex items-center gap-1 shrink-0">
+                                    <button type="button" className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 inline-flex align-middle" onClick={(e) => { e.stopPropagation(); setEditingGroupId(grp.id); setEditingGroupName(grp.name || ''); }} aria-label={tr('control.edit', 'Edit')}>
+                                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    </button>
+                                    <button type="button" className="p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 inline-flex align-middle" onClick={(e) => { e.stopPropagation(); setDeleteConfirmGroupId(grp.id); }} aria-label={tr('delete', 'Delete')}>
+                                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -10928,7 +10536,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         onClick={() => pageManageGroups('up')}
                         aria-label="Previous page"
                       >
-                        <img src="/arrow-up.svg" alt="" className="w-5 h-5 invert opacity-90" />
+                        <img src={publicAssetUrl('/arrow-up.svg')} alt="" className="w-5 h-5 invert opacity-90" />
                       </button>
                       <button
                         type="button"
@@ -10937,7 +10545,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         onClick={() => pageManageGroups('down')}
                         aria-label="Next page"
                       >
-                        <img src="/arrow-down.svg" alt="" className="w-5 h-5 invert opacity-90" />
+                        <img src={publicAssetUrl('/arrow-down.svg')} alt="" className="w-5 h-5 invert opacity-90" />
                       </button>
                     </div>
                   </div>

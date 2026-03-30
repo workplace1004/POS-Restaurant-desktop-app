@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const LANGUAGE_OPTIONS = [
@@ -88,7 +89,7 @@ function labelsFor(lang) {
   return LABELS[k] || LABELS.en;
 }
 
-export function KdsSettingsModal({ open, onClose, kitchenId, kitchenName, apiPrefix = '/api' }) {
+export function KdsSettingsModal({ open, onClose, kitchenId, kitchenName, apiPrefix = POS_API_PREFIX }) {
   const [uiLang, setUiLang] = useState('en');
   const [language, setLanguage] = useState('en');
   const [pinNew, setPinNew] = useState('');

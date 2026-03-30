@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { publicAssetUrl } from '../lib/publicAssetUrl.js';
 
 /** Empty category / no categories illustration for main product panel */
 function NoCategoriesIcon({ className }) {
@@ -325,7 +326,7 @@ export function ProductArea({
                   >
                     {product.kassaPhotoPath ? (
                       <img
-                        src={product.kassaPhotoPath}
+                        src={publicAssetUrl(product.kassaPhotoPath)}
                         alt={product.name}
                         className="max-w-[45px] absolute top-0 left-0 mt-1 ml-1 min-w-[45px] max-h-[45px] min-h-[45px] object-cover rounded"
                       />

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { KeyboardWithNumpad } from './KeyboardWithNumpad';
 
-const API = '/api';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 const ROW1_KEYS = 'a z e r t y u i o p'.split(' ');
 const ROW2_KEYS = 'q s d f g h j k l m'.split(' ');
 const ROW3_KEYS = 'w x c v b n , €'.split(' ');

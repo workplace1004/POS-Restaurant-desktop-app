@@ -223,16 +223,39 @@ model Kitchen {
 }
 
 model Discount {
-  id         String   @id @default(cuid())
-  name       String
-  trigger    String?  @default("number")
-  type       String?  @default("amount")
-  value      String?
-  startDate  String?
-  endDate    String?
-  discountOn String?  @default("products")
-  pieces     String?
-  combinable  Boolean? @default(false)
+  id              String   @id @default(cuid())
+  name            String
+  trigger         String?  @default("number")
+  type            String?  @default("amount")
+  value           String?
+  startDate       String?
+  endDate         String?
+  discountOn      String?  @default("products")
+  pieces          String?
+  combinable      Boolean? @default(false)
+  targetIdsJson   String? // JSON array of product or category ids (Control → discount targets)
+}
+
+// Preset texts for production tickets (Control → Production messages)
+model ProductionMessage {
+  id        String @id @default(cuid())
+  text      String
+  sortOrder Int    @default(0)
+}
+
+// Label sizes / margins (Control → Printer → Labels)
+model PrinterLabel {
+  id           String  @id @default(cuid())
+  name         String
+  sizeLabel    String?
+  height       String?
+  width        String?
+  standard     Boolean @default(false)
+  marginLeft   Int     @default(0)
+  marginRight  Int     @default(0)
+  marginBottom Int     @default(0)
+  marginTop    Int     @default(0)
+  sortOrder    Int     @default(0)
 }
 
 // App settings (e.g. language)

@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { CalendarModal } from './CalendarModal';
 import { AddRecurringOrderModal } from './AddRecurringOrderModal';
 import { useLanguage } from '../contexts/LanguageContext';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 
 const SortIcon = () => (
   <span className="ml-0.5 align-middle" aria-hidden>^</span>
@@ -258,7 +259,7 @@ export function InPlanningModal({
   const selectedOrderItems = selectedOrder?.items ?? [];
 
   const runProductionPrint = async (orderId) => {
-    const prodRes = await fetch('/api/printers/production', {
+    const prodRes = await fetch(`${API}/printers/production`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId })
@@ -277,7 +278,7 @@ export function InPlanningModal({
   };
 
   const runPlanningTotalsPrint = async (orderId) => {
-    const res = await fetch('/api/printers/planning-totals', {
+    const res = await fetch(`${API}/printers/planning-totals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId })

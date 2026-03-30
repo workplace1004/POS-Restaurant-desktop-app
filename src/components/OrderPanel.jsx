@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
+import { publicAssetUrl } from '../lib/publicAssetUrl.js';
 import { useLanguage } from '../contexts/LanguageContext';
 import { InWaitingNameModal } from './InWaitingNameModal';
 import { InPlanningDateTimeModal } from './InPlanningDateTimeModal';
@@ -13,7 +15,7 @@ const KEYPAD = [
 const formatSubtotalPrice = (n) => `€ ${Number(n).toFixed(2).replace('.', ',')}`;
 const roundCurrency = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const formatPaymentAmount = (n) => `€${roundCurrency(n).toFixed(2)}`;
-const TABLE_SAVED_ORDERS_API = '/api/settings/table-saved-orders';
+const TABLE_SAVED_ORDERS_API = `${API}/settings/table-saved-orders`;
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
 
 function sumAmountsByIntegration(methods, amounts, integration) {
@@ -331,7 +333,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     (async () => {
       setPaymentMethodsLoading(true);
       try {
-        const res = await fetch('/api/payment-methods?active=1');
+        const res = await fetch(`${API}/payment-methods?active=1`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || cancelled) return;
         const list = Array.isArray(data?.data) ? data.data : [];
@@ -431,7 +433,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     const cents = Math.round((Number(amountEuro) || 0) * 100);
     if (cents <= 0) return;
 
-    const startRes = await fetch('/api/cashmatic/start', {
+    const startRes = await fetch(`${API}/cashmatic/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount: cents })
@@ -448,11 +450,11 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
     for (let i = 0; i < 90; i += 1) {
       if (cancelCashmaticRequestedRef.current) {
-        await fetch(`/api/cashmatic/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
+        await fetch(`${API}/cashmatic/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
         throw new Error('Cashmatic payment cancelled.');
       }
       await sleep(1000);
-      const statusRes = await fetch(`/api/cashmatic/status/${encodeURIComponent(sessionId)}`);
+      const statusRes = await fetch(`${API}/cashmatic/status/${encodeURIComponent(sessionId)}`);
       const statusData = await statusRes.json().catch(() => ({}));
       if (!statusRes.ok) {
         throw new Error(statusData?.error || 'Unable to read Cashmatic payment status.');
@@ -460,7 +462,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
       const state = String(statusData?.data?.state || '').toUpperCase();
       if (state === 'PAID' || state === 'FINISHED' || state === 'FINISHED_MANUAL') {
-        await fetch(`/api/cashmatic/finish/${encodeURIComponent(sessionId)}`, { method: 'POST' });
+        await fetch(`${API}/cashmatic/finish/${encodeURIComponent(sessionId)}`, { method: 'POST' });
         activeCashmaticSessionIdRef.current = null;
         return;
       }
@@ -469,7 +471,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       }
     }
 
-    await fetch(`/api/cashmatic/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
+    await fetch(`${API}/cashmatic/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
     activeCashmaticSessionIdRef.current = null;
     throw new Error('Cashmatic payment timeout. Please try again.');
   };
@@ -485,7 +487,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       details: null,
     });
 
-    const startRes = await fetch('/api/payworld/start', {
+    const startRes = await fetch(`${API}/payworld/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount })
@@ -508,7 +510,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
     for (let i = 0; i < 150; i += 1) {
       if (cancelPayworldRequestedRef.current) {
-        await fetch(`/api/payworld/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
+        await fetch(`${API}/payworld/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
         setPayworldStatus({
           state: 'CANCELLED',
           message: tr('orderPanel.paymentCancelled', 'Payment cancelled.'),
@@ -517,7 +519,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         throw new Error(tr('orderPanel.paymentCancelled', 'Payment cancelled.'));
       }
       await sleep(1000);
-      const statusRes = await fetch(`/api/payworld/status/${encodeURIComponent(sessionId)}`);
+      const statusRes = await fetch(`${API}/payworld/status/${encodeURIComponent(sessionId)}`);
       const statusData = await statusRes.json().catch(() => ({}));
       if (!statusRes.ok || statusData?.ok === false) {
         throw new Error(statusData?.error || 'Unable to read Payworld payment status.');
@@ -548,7 +550,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       }
     }
 
-    await fetch(`/api/payworld/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
+    await fetch(`${API}/payworld/cancel/${encodeURIComponent(sessionId)}`, { method: 'POST' }).catch(() => { });
     setPayworldStatus({
       state: 'ERROR',
       message: tr('orderPanel.payworldTimeout', 'Payworld payment timeout. Please try again.'),
@@ -577,7 +579,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       details: null,
     });
 
-    await fetch(`/api/payworld/cancel/${encodeURIComponent(activeSessionId)}`, { method: 'POST' }).catch(() => { });
+    await fetch(`${API}/payworld/cancel/${encodeURIComponent(activeSessionId)}`, { method: 'POST' }).catch(() => { });
   };
 
   const payworldStatusTitle = (() => {
@@ -603,11 +605,11 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       cancelPayworldRequestedRef.current = true;
       const activeSessionId = activeCashmaticSessionIdRef.current;
       if (activeSessionId) {
-        await fetch(`/api/cashmatic/cancel/${encodeURIComponent(activeSessionId)}`, { method: 'POST' }).catch(() => { });
+        await fetch(`${API}/cashmatic/cancel/${encodeURIComponent(activeSessionId)}`, { method: 'POST' }).catch(() => { });
       }
       const activePayworldSessionId = activePayworldSessionIdRef.current;
       if (activePayworldSessionId) {
-        await fetch(`/api/payworld/cancel/${encodeURIComponent(activePayworldSessionId)}`, { method: 'POST' }).catch(() => { });
+        await fetch(`${API}/payworld/cancel/${encodeURIComponent(activePayworldSessionId)}`, { method: 'POST' }).catch(() => { });
       }
       setShowPayworldStatusModal(false);
       setPaymentErrorMessage(tr('orderPanel.paymentCancelled', 'Payment cancelled.'));
@@ -621,7 +623,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     if (!targetOrderId) throw new Error('No order selected for printing.');
     const body = { orderId: targetOrderId };
     if (paymentBreakdown && typeof paymentBreakdown === 'object') body.paymentBreakdown = paymentBreakdown;
-    const printRes = await fetch('/api/printers/receipt', {
+    const printRes = await fetch(`${API}/printers/receipt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -641,7 +643,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     }
     const body = { orderIds: targetOrderIds };
     if (paymentBreakdown && typeof paymentBreakdown === 'object') body.paymentBreakdown = paymentBreakdown;
-    const printRes = await fetch('/api/printers/receipt/table', {
+    const printRes = await fetch(`${API}/printers/receipt/table`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -668,7 +670,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   };
 
   const patchOrderItems = async (orderId, nextItems) => {
-    const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
+    const res = await fetch(`${API}/orders/${encodeURIComponent(orderId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: nextItems.map(toApiOrderItem) })
@@ -692,7 +694,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   };
 
   const createPaidSplitOrder = async (sourceItems, paymentBreakdown = null) => {
-    const res = await fetch('/api/orders', {
+    const res = await fetch(`${API}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -954,7 +956,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     if (payConfirmLoading || payDifferentlyDisabled) return;
     const targetTotal = roundCurrency(payableTotalForPaymentModal);
     try {
-      const res = await fetch('/api/payment-methods?active=1');
+      const res = await fetch(`${API}/payment-methods?active=1`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setPaymentErrorMessage(
@@ -1253,7 +1255,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
           disabled={!hasSelection || isSavedTableOrder || lineItemSelectionDisabled}
           aria-label={t('remove')}
         >
-          <img src="/delete.svg" alt="" className="w-8 h-8 [filter:brightness(0)_saturate(100%)_invert(45%)_sepia(70%)_saturate(2000%)_hue-rotate(310deg)]" />
+          <img src={publicAssetUrl('/delete.svg')} alt="" className="w-8 h-8 [filter:brightness(0)_saturate(100%)_invert(45%)_sepia(70%)_saturate(2000%)_hue-rotate(310deg)]" />
         </button>
         <button
           type="button"
@@ -1263,7 +1265,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
           onClick={() => setShowDeleteAllModal(true)}
           aria-label={t('clear')}
         >
-          <img src="/clear.svg" alt="" className="w-8 h-8 [filter:brightness(0)_saturate(100%)_invert(94%)_sepia(20%)_saturate(3000%)_hue-rotate(0deg)]" />
+          <img src={publicAssetUrl('/clear.svg')} alt="" className="w-8 h-8 [filter:brightness(0)_saturate(100%)_invert(94%)_sepia(20%)_saturate(3000%)_hue-rotate(0deg)]" />
         </button>
       </div>
 
@@ -1321,7 +1323,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                   return;
                 }
                 try {
-                  const prodRes = await fetch('/api/printers/production', {
+                  const prodRes = await fetch(`${API}/printers/production`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ orderId: currentOrderId })
@@ -1471,11 +1473,11 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                             {integ === 'manual_cash' ? (
                               <span className="flex items-center justify-center w-[105px] h-[70px] text-4xl font-bold text-amber-600 bg-amber-50/80 rounded">€</span>
                             ) : integ === 'cashmatic' ? (
-                              <img src="/cash.png" alt={m.name} className="max-h-[70px] w-auto object-contain" />
+                              <img src={publicAssetUrl('/cash.png')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
                             ) : integ === 'payworld' ? (
-                              <img src="/payworld.png" alt={m.name} className="max-h-[70px] w-auto object-contain" />
+                              <img src={publicAssetUrl('/payworld.png')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
                             ) : integ === 'generic' ? (
-                              <img src="/card.svg" alt={m.name} className="max-h-[70px] min-w-[105px] w-auto object-contain" />
+                              <img src={publicAssetUrl('/card.svg')} alt={m.name} className="max-h-[70px] min-w-[105px] w-auto object-contain" />
                             ) : (
                               <span className="flex items-center justify-center w-[105px] min-h-[70px] px-2 py-3 text-base font-semibold text-center text-blue-900 bg-blue-50/80 rounded leading-tight">
                                 {m.name}

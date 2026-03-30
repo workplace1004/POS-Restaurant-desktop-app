@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
   activateWebLicense,
@@ -39,17 +39,58 @@ export function LicenseActivationPage({ variant = 'electron', onActivated, devic
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [electronDevice, setElectronDevice] = useState({ fp: null, err: null, loading: false });
+
+  useEffect(() => {
+    if (variant !== 'electron') return undefined;
+    let cancelled = false;
+    setElectronDevice({ fp: null, err: null, loading: true });
+    (async () => {
+      try {
+        const api = window.posLicense;
+        if (api?.getDeviceFingerprint) {
+          const r = await api.getDeviceFingerprint();
+          if (cancelled) return;
+          if (r?.ok && r.deviceFingerprint) {
+            setElectronDevice({ fp: r.deviceFingerprint, err: null, loading: false });
+          } else {
+            setElectronDevice({ fp: null, err: r?.error || 'device_id_failed', loading: false });
+          }
+          return;
+        }
+        const { fetchDeviceFingerprint } = await import('../lib/posWebLicense.js');
+        const fp = await fetchDeviceFingerprint();
+        if (!cancelled) setElectronDevice({ fp, err: null, loading: false });
+      } catch (e) {
+        if (cancelled) return;
+        const code = e instanceof Error ? e.message : 'failed';
+        const err =
+          code === 'agent_unreachable' || code === 'no_hardware_identifiers' || code === 'device_id_failed'
+            ? code
+            : 'failed';
+        setElectronDevice({ fp: null, err, loading: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [variant]);
+
+  const displayFingerprint = variant === 'electron' ? electronDevice.fp : deviceFingerprint;
+  const displayDeviceError = variant === 'electron' ? electronDevice.err : deviceError;
+  const displayDeviceLoading =
+    variant === 'electron' ? electronDevice.loading : !deviceFingerprint && !deviceError;
 
   const copyDeviceId = useCallback(async () => {
-    if (!deviceFingerprint) return;
+    if (!displayFingerprint) return;
     try {
-      await navigator.clipboard.writeText(deviceFingerprint);
+      await navigator.clipboard.writeText(displayFingerprint);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setError(t('license.err.copy_failed'));
     }
-  }, [deviceFingerprint, t]);
+  }, [displayFingerprint, t]);
 
   const runActivation = useCallback(
     async (normalized) => {
@@ -208,34 +249,32 @@ export function LicenseActivationPage({ variant = 'electron', onActivated, devic
         <h1 className="text-center text-xl font-semibold text-pos-text">{t('license.title')}</h1>
         <p className="mt-3 text-center text-sm leading-relaxed text-pos-muted">{lead}</p>
 
-        {variant === 'web' ? (
-          <div className="mt-6 rounded-xl border border-pos-border bg-pos-bg p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-pos-muted">
-              {t('license.deviceIdLabel')}
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-pos-text-dim">{t('license.deviceIdHint')}</p>
-            {deviceError ? (
-              <p className="mt-2 text-sm leading-relaxed text-red-600">
-                {translateDeviceIdentityError(deviceError, t)}
-              </p>
-            ) : deviceFingerprint ? (
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <code className="block flex-1 break-all rounded-lg border border-pos-inputBorder bg-pos-dark px-3 py-2 font-mono text-xs text-pos-text">
-                  {deviceFingerprint}
-                </code>
-                <button
-                  type="button"
-                  onClick={copyDeviceId}
-                  className="shrink-0 rounded-lg border border-pos-border bg-pos-panel px-4 py-2 text-sm font-medium text-pos-text hover:bg-rowHover"
-                >
-                  {copied ? t('license.copied') : t('license.copyDeviceId')}
-                </button>
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-pos-muted">{t('license.loadingDeviceId')}</p>
-            )}
+        <div className="mt-6 rounded-xl border border-pos-border bg-pos-bg p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-pos-muted">
+            {t('license.deviceIdLabel')}
           </div>
-        ) : null}
+          <p className="mt-1 text-xs leading-relaxed text-pos-text-dim">{t('license.deviceIdHint')}</p>
+          {displayDeviceError ? (
+            <p className="mt-2 text-sm leading-relaxed text-red-600">
+              {translateDeviceIdentityError(displayDeviceError, t)}
+            </p>
+          ) : displayFingerprint ? (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code className="block flex-1 break-all rounded-lg border border-pos-inputBorder bg-pos-dark px-3 py-2 font-mono text-xs text-pos-text">
+                {displayFingerprint}
+              </code>
+              <button
+                type="button"
+                onClick={copyDeviceId}
+                className="shrink-0 rounded-lg border border-pos-border bg-pos-panel px-4 py-2 text-sm font-medium text-pos-text hover:bg-rowHover"
+              >
+                {copied ? t('license.copied') : t('license.copyDeviceId')}
+              </button>
+            </div>
+          ) : displayDeviceLoading ? (
+            <p className="mt-2 text-sm text-pos-muted">{t('license.loadingDeviceId')}</p>
+          ) : null}
+        </div>
 
         <input
           ref={fileInputRef}

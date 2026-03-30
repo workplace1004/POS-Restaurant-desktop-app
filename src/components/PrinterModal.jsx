@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Dropdown } from './Dropdown';
 import { KeyboardWithNumpad } from './KeyboardWithNumpad';
 import { useLanguage } from '../contexts/LanguageContext';
+import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 
 const PRINTER_FORM_TYPE_OPTIONS = [
   { value: 'COM', label: 'COM' },
@@ -227,7 +228,7 @@ export function PrinterModal({ open, initialPrinter, onClose, onSave, onNotify }
     setTestLoading(true);
     try {
       const payload = buildApiPrinterPayload();
-      const res = await fetch('/api/printers/test', {
+      const res = await fetch(`${API}/printers/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

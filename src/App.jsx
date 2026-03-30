@@ -26,8 +26,9 @@ import { ControlView } from './components/ControlView';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { usePos } from './hooks/usePos';
 import { KdsPage } from './kds/KdsPage';
+import { POS_API_PREFIX as API, getSocketIoUrl } from './lib/apiOrigin.js';
 
-const API = '/api';
+const SOCKET_URL = getSocketIoUrl();
 const USER_STORAGE_KEY = 'pos-user';
 const VIEW_STORAGE_KEY = 'pos-view';
 const VALID_VIEWS = ['pos', 'control', 'tables', 'kds'];
@@ -59,7 +60,7 @@ function loadStoredUser() {
   }
 }
 
-const socket = io(window.location.origin, { path: '/socket.io' });
+const socket = io(SOCKET_URL, { path: '/socket.io' });
 
 export default function App() {
   const { t } = useLanguage();

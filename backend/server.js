@@ -14,6 +14,9 @@ import { createPayworldService } from './services/payworldService.js';
 
 const prisma = new PrismaClient();
 
+/** KDS admin station (fixed id); login name `admin`, default PIN `1234` — not shown as a normal station tab. */
+const KITCHEN_KDS_ADMIN_ID = 'kitchen-kds-admin';
+
 /** Order lines include product + category (KDS consolidation / grouping). */
 const orderItemsInclude = { include: { product: { include: { category: true } } } };
 
@@ -26,7 +29,7 @@ const io = new Server(httpServer, {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 
 /** Lightweight reachability check for KDS / tablets (no DB). */
 app.get('/api/health', (req, res) => {
@@ -631,6 +634,9 @@ app.patch('/api/kitchens/:id', async (req, res) => {
 
 app.delete('/api/kitchens/:id', async (req, res) => {
   try {
+    if (req.params.id === KITCHEN_KDS_ADMIN_ID) {
+      return res.status(400).json({ error: 'Cannot delete the KDS admin kitchen' });
+    }
     await prisma.kitchen.delete({ where: { id: req.params.id } });
     res.json({ ok: true });
     io.emit('kitchens:updated');
@@ -651,6 +657,22 @@ app.get('/api/discounts', async (req, res) => {
   }
 });
 
+function normalizeDiscountTargetIdsJson(body) {
+  if (body?.targetIdsJson != null && String(body.targetIdsJson).trim() !== '') {
+    try {
+      const p = JSON.parse(String(body.targetIdsJson));
+      return Array.isArray(p) ? JSON.stringify(p.map((x) => String(x)).filter(Boolean)) : null;
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(body?.targetIds)) {
+    const ids = body.targetIds.map((x) => String(x)).filter(Boolean);
+    return ids.length ? JSON.stringify(ids) : null;
+  }
+  return null;
+}
+
 app.post('/api/discounts', async (req, res) => {
   try {
     const body = req.body || {};
@@ -666,6 +688,7 @@ app.post('/api/discounts', async (req, res) => {
         discountOn: body.discountOn != null ? String(body.discountOn) : 'products',
         pieces: body.pieces != null ? String(body.pieces) : null,
         combinable: body.combinable === true,
+        targetIdsJson: normalizeDiscountTargetIdsJson(body),
       }
     });
     res.status(201).json(created);
@@ -688,6 +711,9 @@ app.patch('/api/discounts/:id', async (req, res) => {
     if (body.discountOn !== undefined) data.discountOn = body.discountOn != null ? String(body.discountOn) : null;
     if (body.pieces !== undefined) data.pieces = body.pieces != null ? String(body.pieces) : null;
     if (body.combinable !== undefined) data.combinable = body.combinable === true;
+    if (body.targetIdsJson !== undefined || body.targetIds !== undefined) {
+      data.targetIdsJson = normalizeDiscountTargetIdsJson(body);
+    }
     const updated = await prisma.discount.update({
       where: { id: req.params.id },
       data
@@ -709,6 +735,173 @@ app.delete('/api/discounts/:id', async (req, res) => {
   }
 });
 
+// REST: production messages (Control → preset texts for production tickets)
+app.get('/api/production-messages', async (req, res) => {
+  try {
+    const list = await prisma.productionMessage.findMany({ orderBy: { sortOrder: 'asc' } });
+    res.json(list);
+  } catch (err) {
+    console.error('GET /api/production-messages', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch production messages' });
+  }
+});
+
+app.post('/api/production-messages', async (req, res) => {
+  try {
+    const text = String(req.body?.text ?? '').trim();
+    if (!text) return res.status(400).json({ error: 'text required' });
+    const agg = await prisma.productionMessage.aggregate({ _max: { sortOrder: true } });
+    const sortOrder = (agg._max.sortOrder ?? -1) + 1;
+    const created = await prisma.productionMessage.create({ data: { text, sortOrder } });
+    res.status(201).json(created);
+  } catch (err) {
+    console.error('POST /api/production-messages', err);
+    res.status(500).json({ error: err.message || 'Failed to create production message' });
+  }
+});
+
+app.patch('/api/production-messages/:id', async (req, res) => {
+  try {
+    const textRaw = req.body?.text;
+    if (textRaw === undefined) return res.status(400).json({ error: 'text required' });
+    const text = String(textRaw).trim() || 'Message';
+    const updated = await prisma.productionMessage.update({
+      where: { id: req.params.id },
+      data: { text }
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error('PATCH /api/production-messages/:id', err);
+    res.status(500).json({ error: err.message || 'Failed to update production message' });
+  }
+});
+
+app.delete('/api/production-messages/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    await prisma.productionMessage.delete({ where: { id } });
+    const rest = await prisma.productionMessage.findMany({ orderBy: { sortOrder: 'asc' } });
+    await prisma.$transaction(
+      rest.map((row, i) =>
+        prisma.productionMessage.update({ where: { id: row.id }, data: { sortOrder: i } })
+      )
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/production-messages/:id', err);
+    res.status(500).json({ error: err.message || 'Failed to delete production message' });
+  }
+});
+
+function printerLabelRowToApi(row) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    name: row.name,
+    sizeLabel: row.sizeLabel || row.name,
+    height: row.height ?? undefined,
+    width: row.width ?? undefined,
+    standard: !!row.standard,
+    marginLeft: row.marginLeft ?? 0,
+    marginRight: row.marginRight ?? 0,
+    marginBottom: row.marginBottom ?? 0,
+    marginTop: row.marginTop ?? 0,
+    sortOrder: row.sortOrder ?? 0,
+  };
+}
+
+function parsePrinterLabelMargins(body) {
+  const n = (v) => {
+    const x = Number(v);
+    return Number.isFinite(x) ? Math.trunc(x) : 0;
+  };
+  return {
+    marginLeft: n(body?.marginLeft),
+    marginRight: n(body?.marginRight),
+    marginBottom: n(body?.marginBottom),
+    marginTop: n(body?.marginTop),
+  };
+}
+
+// REST: printer label presets (Control → Labels tab)
+app.get('/api/printer-labels', async (req, res) => {
+  try {
+    const list = await prisma.printerLabel.findMany({ orderBy: { sortOrder: 'asc' } });
+    res.json(list.map(printerLabelRowToApi));
+  } catch (err) {
+    console.error('GET /api/printer-labels', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch printer labels' });
+  }
+});
+
+app.post('/api/printer-labels', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const name = String(body.name ?? '').trim();
+    if (!name) return res.status(400).json({ error: 'name required' });
+    const sizeLabel = body.sizeLabel != null && String(body.sizeLabel).trim() !== '' ? String(body.sizeLabel).trim() : name;
+    const margins = parsePrinterLabelMargins(body);
+    const agg = await prisma.printerLabel.aggregate({ _max: { sortOrder: true } });
+    const sortOrder = (agg._max.sortOrder ?? -1) + 1;
+    const created = await prisma.printerLabel.create({
+      data: {
+        name,
+        sizeLabel,
+        height: body.height != null && String(body.height).trim() !== '' ? String(body.height).trim() : null,
+        width: body.width != null && String(body.width).trim() !== '' ? String(body.width).trim() : null,
+        standard: body.standard === true,
+        ...margins,
+        sortOrder,
+      }
+    });
+    res.status(201).json(printerLabelRowToApi(created));
+  } catch (err) {
+    console.error('POST /api/printer-labels', err);
+    res.status(500).json({ error: err.message || 'Failed to create printer label' });
+  }
+});
+
+app.patch('/api/printer-labels/:id', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const data = {};
+    if (body.name !== undefined) data.name = String(body.name ?? '').trim() || 'Label';
+    if (body.sizeLabel !== undefined) data.sizeLabel = String(body.sizeLabel ?? '').trim() || null;
+    if (body.height !== undefined) data.height = body.height != null && String(body.height).trim() !== '' ? String(body.height).trim() : null;
+    if (body.width !== undefined) data.width = body.width != null && String(body.width).trim() !== '' ? String(body.width).trim() : null;
+    if (body.standard !== undefined) data.standard = body.standard === true;
+    if (body.marginLeft !== undefined || body.marginRight !== undefined || body.marginBottom !== undefined || body.marginTop !== undefined) {
+      const m = parsePrinterLabelMargins({ ...body });
+      Object.assign(data, m);
+    }
+    const updated = await prisma.printerLabel.update({
+      where: { id: req.params.id },
+      data
+    });
+    res.json(printerLabelRowToApi(updated));
+  } catch (err) {
+    console.error('PATCH /api/printer-labels/:id', err);
+    res.status(500).json({ error: err.message || 'Failed to update printer label' });
+  }
+});
+
+app.delete('/api/printer-labels/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    await prisma.printerLabel.delete({ where: { id } });
+    const rest = await prisma.printerLabel.findMany({ orderBy: { sortOrder: 'asc' } });
+    await prisma.$transaction(
+      rest.map((row, i) =>
+        prisma.printerLabel.update({ where: { id: row.id }, data: { sortOrder: i } })
+      )
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/printer-labels/:id', err);
+    res.status(500).json({ error: err.message || 'Failed to delete printer label' });
+  }
+});
+
 // REST: app settings (e.g. language)
 const SETTING_KEY_LANGUAGE = 'language';
 const SETTING_KEY_CREDIT_CARD = 'pos_credit_card';
@@ -723,6 +916,7 @@ const KDS_LINE_STATUS = new Set(['received', 'started', 'finished']);
 const SETTING_KEY_FUNCTION_BUTTONS_LAYOUT = 'function_buttons_layout';
 const SETTING_KEY_TABLE_LAYOUTS = 'table_layouts';
 const SETTING_KEY_DEVICE_SETTINGS = 'device_settings';
+const SETTING_KEY_PRINTER_LABELS = 'pos_printer_labels';
 const FUNCTION_BUTTON_LAYOUT_ALLOWED_IDS = [
   'tables',
   'weborders',
@@ -1265,6 +1459,58 @@ app.put('/api/settings/rfid-reader', async (req, res) => {
   } catch (err) {
     console.error('PUT /api/settings/rfid-reader', err);
     res.status(500).json({ error: err.message || 'Failed to save RFID reader setting' });
+  }
+});
+
+app.get('/api/settings/printer-labels', async (req, res) => {
+  try {
+    const defaults = { type: 'production-labels', printer: 'p3' };
+    const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY_PRINTER_LABELS } });
+    if (!row?.value) return res.json(defaults);
+    try {
+      const p = JSON.parse(row.value);
+      res.json({
+        type: typeof p.type === 'string' && p.type ? p.type : defaults.type,
+        printer: typeof p.printer === 'string' && p.printer ? p.printer : defaults.printer,
+      });
+    } catch {
+      res.json(defaults);
+    }
+  } catch (err) {
+    console.error('GET /api/settings/printer-labels', err);
+    res.status(500).json({ error: err.message || 'Failed to get printer labels settings' });
+  }
+});
+
+app.put('/api/settings/printer-labels', async (req, res) => {
+  try {
+    const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY_PRINTER_LABELS } });
+    let cur = { type: 'production-labels', printer: 'p3' };
+    if (row?.value) {
+      try {
+        const p = JSON.parse(row.value);
+        if (p && typeof p === 'object') {
+          cur = {
+            type: typeof p.type === 'string' && p.type ? p.type : cur.type,
+            printer: typeof p.printer === 'string' && p.printer ? p.printer : cur.printer,
+          };
+        }
+      } catch (_) { /* keep cur */ }
+    }
+    const next = {
+      type: req.body?.type != null ? String(req.body.type) : cur.type,
+      printer: req.body?.printer != null ? String(req.body.printer) : cur.printer,
+    };
+    const value = JSON.stringify(next);
+    await prisma.appSetting.upsert({
+      where: { key: SETTING_KEY_PRINTER_LABELS },
+      create: { key: SETTING_KEY_PRINTER_LABELS, value },
+      update: { value },
+    });
+    res.json(next);
+  } catch (err) {
+    console.error('PUT /api/settings/printer-labels', err);
+    res.status(500).json({ error: err.message || 'Failed to save printer labels settings' });
   }
 });
 
@@ -2245,19 +2491,17 @@ async function resolveReceiptPaymentBreakdown(paymentBreakdown, dbTotal) {
   };
 }
 
-async function ensureDefaultPaymentMethods() {
-  const count = await prisma.paymentMethod.count();
-  if (count > 0) return;
-  await prisma.paymentMethod.createMany({
-    data: [
-      { name: 'Cash', integration: 'manual_cash', active: true, sortOrder: 0 },
-      { name: 'Cashmatic', integration: 'cashmatic', active: true, sortOrder: 1 },
-      { name: 'Card (Payworld)', integration: 'payworld', active: true, sortOrder: 2 },
-      { name: 'Bancontact', integration: 'generic', active: true, sortOrder: 3 },
-      { name: 'Visa', integration: 'generic', active: false, sortOrder: 4 },
-    ],
+async function ensureKitchenKdsAdminStation() {
+  const existing = await prisma.kitchen.findUnique({ where: { id: KITCHEN_KDS_ADMIN_ID } });
+  if (existing) return;
+  await prisma.kitchen.create({
+    data: {
+      id: KITCHEN_KDS_ADMIN_ID,
+      name: 'admin',
+      pin: '1234'
+    }
   });
-  serverLog('payment-methods', 'Seeded default payment methods');
+  serverLog('kitchen', 'Created default KDS admin station (kitchen id kitchen-kds-admin, login name admin, PIN 1234)');
 }
 
 function parseTcpTarget(connectionString) {
@@ -3439,9 +3683,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 (async () => {
   try {
-    await ensureDefaultPaymentMethods();
+    await ensureKitchenKdsAdminStation();
   } catch (e) {
-    console.error('ensureDefaultPaymentMethods failed', e);
+    console.error('ensureKitchenKdsAdminStation failed', e);
   }
   httpServer.listen(PORT, HOST, () => {
     const nets = os.networkInterfaces();

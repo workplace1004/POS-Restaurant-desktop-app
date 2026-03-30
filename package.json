@@ -3,15 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "predev": "npm install && npm install --prefix backend && npm install --prefix device && npm run generate --prefix backend && npm run migrate --prefix backend && npm run seed --prefix backend",
     "dev": "concurrently -k -n backend,device,vite \"npm run dev --prefix backend\" \"npm run dev --prefix device\" \"vite\"",
     "device-agent": "node ../device-agent/server.mjs",
     "build": "vite build",
     "build:electron": "vite build --base ./",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron:debug": "cross-env ELECTRON_OPEN_DEVTOOLS=1 electron --inspect=9229 .",
+    "electron:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env ELECTRON_USE_DEV_SERVER=1 electron .\"",
+    "electron:build": "npm run build:electron && electron-builder"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "socket.io-client": "^4.7.5"
@@ -20,8 +26,29 @@
     "concurrently": "^9.1.2",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
-    "vite": "^5.4.10"
+    "vite": "^5.4.10",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.cloudpos.desktop",
+    "productName": "CloudPOS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
   }
 }
