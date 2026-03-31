@@ -8,6 +8,17 @@ declare global {
         error?: string;
         message?: string;
       }>;
+      importLicenseBundle: (bundle: {
+        licenseKey: string;
+        license: Record<string, unknown>;
+        signature: string;
+      }) => Promise<{
+        ok: boolean;
+        error?: string;
+        message?: string;
+      }>;
+      getLicenseStorePath: () => Promise<string>;
+      removeLicense: () => Promise<{ ok: boolean; error?: string; message?: string }>;
       getLicenseStatus: () => Promise<{
         valid: boolean;
         reason: string;

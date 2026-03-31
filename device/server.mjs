@@ -28,9 +28,11 @@ function norm(s) {
 
 /**
  * Canonical material from baseboard (motherboard) + system product DMI/WMI.
- * Hashed to a 64-char hex fingerprint for license binding.
+ * `deviceFingerprint` — SHA-256 hex (64 chars): this is the **Device ID** used for license binding
+ *   and must be pasted into the license issuer. Not the same as the DMI system UUID string.
+ * `motherboardUuid` — raw `sys.uuid` from systeminformation (BIOS/DMI “system UUID”); informational only.
  */
-async function computeDeviceFingerprint() {
+async function computeDeviceIdentity() {
   const [bb, sys] = await Promise.all([si.baseboard(), si.system()]);
 
   const bbs = norm(bb.serial);
@@ -61,7 +63,10 @@ async function computeDeviceFingerprint() {
     syss
   ].join('|');
 
-  return crypto.createHash('sha256').update(raw, 'utf8').digest('hex');
+  const deviceFingerprint = crypto.createHash('sha256').update(raw, 'utf8').digest('hex');
+  const motherboardUuid = String(sys.uuid || '').trim() || null;
+
+  return { deviceFingerprint, motherboardUuid };
 }
 
 const app = express();
@@ -69,8 +74,8 @@ app.use(cors({ origin: true }));
 
 app.get('/device-id', async (req, res) => {
   try {
-    const deviceFingerprint = await computeDeviceFingerprint();
-    res.json({ ok: true, deviceFingerprint });
+    const { deviceFingerprint, motherboardUuid } = await computeDeviceIdentity();
+    res.json({ ok: true, deviceFingerprint, motherboardUuid });
   } catch (e) {
     const code = e?.message;
     console.error('[device-agent]', e);

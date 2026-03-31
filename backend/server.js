@@ -2009,10 +2009,15 @@ app.get('/api/orders/in-waiting/count', async (req, res) => {
 });
 
 // REST: users (for login screen and control view)
+function normalizeUserRole(role) {
+  const r = String(role || '').toLowerCase().trim();
+  return r === 'admin' ? 'admin' : 'waiter';
+}
+
 app.get('/api/users', async (req, res) => {
   try {
     const users = await prisma.user.findMany({ orderBy: { name: 'asc' } });
-    res.json(users.map((u) => ({ id: u.id, name: u.name, label: u.name })));
+    res.json(users.map((u) => ({ id: u.id, name: u.name, label: u.name, role: normalizeUserRole(u.role) })));
   } catch (err) {
     console.error('GET /api/users', err);
     res.status(500).json({ error: err.message || 'Failed to fetch users' });
@@ -2023,7 +2028,7 @@ app.get('/api/users/:id', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ id: user.id, name: user.name, label: user.name, pin: user.pin });
+    res.json({ id: user.id, name: user.name, label: user.name, pin: user.pin, role: normalizeUserRole(user.role) });
   } catch (err) {
     console.error('GET /api/users/:id', err);
     res.status(500).json({ error: err.message || 'Failed to fetch user details' });
@@ -2032,15 +2037,20 @@ app.get('/api/users/:id', async (req, res) => {
 
 app.post('/api/users', async (req, res) => {
   try {
-    const { name, pin } = req.body;
+    const { name, pin, role } = req.body;
     const created = await prisma.user.create({
       data: {
         name: name != null && String(name).trim() !== '' ? String(name).trim() : 'New user',
-        role: 'waiter',
+        role: normalizeUserRole(role),
         pin: pin != null ? String(pin) : '1234'
       }
     });
-    res.status(201).json({ id: created.id, name: created.name, label: created.name });
+    res.status(201).json({
+      id: created.id,
+      name: created.name,
+      label: created.name,
+      role: normalizeUserRole(created.role)
+    });
   } catch (err) {
     console.error('POST /api/users', err);
     res.status(500).json({ error: err.message || 'Failed to create user' });
@@ -2050,12 +2060,13 @@ app.post('/api/users', async (req, res) => {
 app.patch('/api/users/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const { name, pin } = req.body;
+    const { name, pin, role } = req.body;
     const data = {};
     if (name !== undefined) data.name = String(name).trim() || 'New user';
     if (pin !== undefined) data.pin = String(pin);
+    if (role !== undefined) data.role = normalizeUserRole(role);
     const updated = await prisma.user.update({ where: { id }, data });
-    res.json({ id: updated.id, name: updated.name, label: updated.name });
+    res.json({ id: updated.id, name: updated.name, label: updated.name, role: normalizeUserRole(updated.role) });
   } catch (err) {
     console.error('PATCH /api/users/:id', err);
     res.status(500).json({ error: err.message || 'Failed to update user' });
@@ -2083,7 +2094,12 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user || user.pin !== String(pin)) {
       return res.status(401).json({ error: 'Wrong PIN' });
     }
-    res.json({ id: user.id, name: user.name, label: user.name });
+    res.json({
+      id: user.id,
+      name: user.name,
+      label: user.name,
+      role: normalizeUserRole(user.role)
+    });
   } catch (err) {
     console.error('POST /api/auth/login', err);
     res.status(500).json({ error: err.message || 'Login failed' });

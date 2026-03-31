@@ -73,7 +73,15 @@ async function getDeviceFingerprintResult() {
     if (j.error === 'no_hardware_identifiers') return { ok: false, error: 'no_hardware_identifiers' };
     return { ok: false, error: 'device_id_failed' };
   }
-  return { ok: true, deviceFingerprint: String(j.deviceFingerprint).toLowerCase() };
+  const motherboardUuid =
+    j.motherboardUuid != null && String(j.motherboardUuid).trim() !== ''
+      ? String(j.motherboardUuid).trim()
+      : null;
+  return {
+    ok: true,
+    deviceFingerprint: String(j.deviceFingerprint).toLowerCase(),
+    motherboardUuid
+  };
 }
 
 async function fetchDeviceFingerprint() {
@@ -122,6 +130,7 @@ let licenseIpcRegistered = false;
 function registerLicenseIpc() {
   if (licenseIpcRegistered) return;
   licenseIpcRegistered = true;
+  ipcMain.handle('pos-license:license-store-path', () => LICENSE_STORE());
   ipcMain.handle('pos-license:device-fingerprint', () => getDeviceFingerprintResult());
   ipcMain.handle('pos-license:status', async () => {
     const pem = pemFromEnv();
@@ -190,6 +199,60 @@ function registerLicenseIpc() {
       return { ok: false, error: 'bad_signature', message: 'License signature verification failed' };
     }
     await writeStoredBundle(bundle);
+    broadcastToAll('pos-license:updated', {});
+    return { ok: true };
+  });
+
+  ipcMain.handle('pos-license:import-bundle', async (_evt, bundle) => {
+    if (!bundle || typeof bundle !== 'object') {
+      return { ok: false, error: 'invalid_bundle', message: 'Invalid license file' };
+    }
+    const { licenseKey: rawKey, license, signature } = bundle;
+    if (!license || typeof license !== 'object' || typeof signature !== 'string' || !signature.trim()) {
+      return { ok: false, error: 'invalid_bundle', message: 'Invalid license file' };
+    }
+    const key = normalizeLicenseKey(rawKey);
+    if (!key) {
+      return { ok: false, error: 'invalid_bundle', message: 'Invalid license key in file' };
+    }
+    let deviceFingerprint;
+    try {
+      deviceFingerprint = await fetchDeviceFingerprint();
+    } catch (e) {
+      const code = e instanceof Error ? e.message : 'device_id_failed';
+      return { ok: false, error: code, message: code };
+    }
+    const pem = pemFromEnv();
+    if (!pem.includes('BEGIN')) {
+      return { ok: false, error: 'no_public_key', message: 'License public key missing in app' };
+    }
+    const packed = { licenseKey: key, license, signature };
+    if (String(license.deviceFingerprint || '').toLowerCase() !== deviceFingerprint) {
+      return { ok: false, error: 'device_mismatch', message: 'This license file is for another device' };
+    }
+    if (!verifyBundle(deviceFingerprint, license, signature, pem)) {
+      return {
+        ok: false,
+        error: 'bad_signature',
+        message: 'License signature verification failed'
+      };
+    }
+    await writeStoredBundle(packed);
+    broadcastToAll('pos-license:updated', {});
+    return { ok: true };
+  });
+
+  ipcMain.handle('pos-license:remove', async () => {
+    const p = LICENSE_STORE();
+    try {
+      await fs.promises.unlink(p);
+    } catch (e) {
+      if (e && e.code === 'ENOENT') {
+        broadcastToAll('pos-license:updated', {});
+        return { ok: true };
+      }
+      return { ok: false, error: 'unlink_failed', message: e instanceof Error ? e.message : 'Failed to remove license file' };
+    }
     broadcastToAll('pos-license:updated', {});
     return { ok: true };
   });

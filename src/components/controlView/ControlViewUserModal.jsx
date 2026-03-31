@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { KeyboardWithNumpad } from '../KeyboardWithNumpad';
+
+const USER_ROLE_OPTIONS = [
+  { value: 'admin', labelKey: 'control.userModal.roleAdmin', fallback: 'Admin' },
+  { value: 'waiter', labelKey: 'control.userModal.roleWaiter', fallback: 'Waiter' }
+];
 
 // User modal privilege avatars: blue, green, yellow, red, gray, dark gray, orange, magenta, pink
 const USER_PRIVILEGE_AVATAR_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#9ca3af', '#4b5563', '#f97316', '#d946ef', '#f472b6'];
@@ -42,6 +47,28 @@ export function ControlViewUserModal({
   savingUser,
   handleSaveUser
 }) {
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const roleDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!roleMenuOpen) return undefined;
+    const onDoc = (e) => {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target)) {
+        setRoleMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [roleMenuOpen]);
+
+  useEffect(() => {
+    if (!showUserModal) setRoleMenuOpen(false);
+  }, [showUserModal]);
+
+  useEffect(() => {
+    setRoleMenuOpen(false);
+  }, [userModalTab]);
+
   if (!showUserModal) return null;
 
   const userModalKeyboardValue =
@@ -89,19 +116,70 @@ export function ControlViewUserModal({
                   />
                 </div>
                 <div className="flex items-center">
-                  <label className="text-pos-text text-sm font-medium shrink-0 min-w-[100px] max-w-[100px]" htmlFor="user-modal-role">
+                  <label className="text-pos-text text-sm font-medium shrink-0 min-w-[100px] max-w-[100px]" id="user-modal-role-label">
                     {tr('control.userModal.role', 'Role')}:
                   </label>
-                  <select
-                    id="user-modal-role"
-                    value={userRole === 'admin' ? 'admin' : 'waiter'}
-                    onChange={(e) => setUserRole(e.target.value)}
-                    onFocus={() => setUserModalActiveField(null)}
-                    className="px-4 py-3 rounded-lg max-w-[180px] bg-pos-panel border border-pos-border text-pos-text focus:outline-none focus:border-green-500 text-sm cursor-pointer"
-                  >
-                    <option value="admin">{tr('control.userModal.roleAdmin', 'Admin')}</option>
-                    <option value="waiter">{tr('control.userModal.roleWaiter', 'Waiter')}</option>
-                  </select>
+                  <div className="relative max-w-[200px] w-full" ref={roleDropdownRef}>
+                    <button
+                      type="button"
+                      id="user-modal-role"
+                      aria-labelledby="user-modal-role-label"
+                      aria-haspopup="listbox"
+                      aria-expanded={roleMenuOpen}
+                      onClick={() => {
+                        setRoleMenuOpen((o) => !o);
+                        setUserModalActiveField(null);
+                      }}
+                      className={`flex w-full min-h-[44px] items-center justify-between gap-2 px-4 py-3 rounded-lg bg-pos-panel text-pos-text text-sm text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 border ${
+                        roleMenuOpen ? 'border-green-500' : 'border-pos-border focus:border-green-500'
+                      }`}
+                    >
+                      <span className="truncate">
+                        {userRole === 'admin'
+                          ? tr('control.userModal.roleAdmin', 'Admin')
+                          : tr('control.userModal.roleWaiter', 'Waiter')}
+                      </span>
+                      <svg
+                        className={`w-4 h-4 shrink-0 text-pos-text/80 transition-transform ${roleMenuOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        aria-hidden
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {roleMenuOpen && (
+                      <ul
+                        role="listbox"
+                        aria-labelledby="user-modal-role-label"
+                        className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-green-500 bg-pos-panel py-1 shadow-xl ring-1 ring-black/20"
+                      >
+                        {USER_ROLE_OPTIONS.map((opt) => {
+                          const selected = (userRole === 'admin' ? 'admin' : 'waiter') === opt.value;
+                          return (
+                            <li key={opt.value} role="option" aria-selected={selected}>
+                              <button
+                                type="button"
+                                className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                                  selected
+                                    ? 'bg-blue-600 text-white'
+                                    : 'text-pos-text hover:bg-pos-bg active:bg-green-500/25'
+                                }`}
+                                onClick={() => {
+                                  setUserRole(opt.value);
+                                  setRoleMenuOpen(false);
+                                  setUserModalActiveField(null);
+                                }}
+                              >
+                                {tr(opt.labelKey, opt.fallback)}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex flex-col gap-4">

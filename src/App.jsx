@@ -118,7 +118,7 @@ export default function App() {
     setView(nextView);
     try {
       localStorage.setItem(VIEW_STORAGE_KEY, nextView);
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -154,7 +154,7 @@ export default function App() {
   const [quantityInput, setQuantityInput] = useState('');
   const [showInWaitingButton, setShowInWaitingButton] = useState(false);
   const UA_TIMEZONE = 'Europe/Kyiv';
-const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { timeZone: UA_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false }));
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { timeZone: UA_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false }));
   const {
     categories,
     products,
@@ -207,6 +207,30 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (!user?.id || user.role != null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API}/users/${user.id}`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled || data?.role == null) return;
+        setUser((prev) => {
+          if (!prev || prev.id !== user.id) return prev;
+          const next = { ...prev, role: data.role };
+          try {
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(next));
+          } catch { }
+          return next;
+        });
+      } catch { }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role]);
+
   const refreshDeviceSettings = useCallback(() => {
     try {
       const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_device_settings');
@@ -235,7 +259,7 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
             refreshDeviceSettings();
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     })();
   }, [refreshDeviceSettings]);
 
@@ -351,7 +375,7 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
     }
     try {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(loggedInUser));
-    } catch {}
+    } catch { }
   };
 
   const handleLogout = () => {
@@ -360,7 +384,7 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
     setIsPosBootstrapReady(false);
     try {
       localStorage.removeItem(USER_STORAGE_KEY);
-    } catch {}
+    } catch { }
   };
 
   const handleSelectTable = useCallback(

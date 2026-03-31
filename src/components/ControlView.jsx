@@ -571,11 +571,20 @@ function IconLanguage({ className }) {
   );
 }
 
+function IconTrash({ className }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  );
+}
+
 function SidebarIcon({ id, className }) {
   if (id === 'monitor') return <IconMonitor className={className} />;
   if (id === 'chart') return <IconChart className={className} />;
   if (id === 'users') return <IconUsers className={className} />;
   if (id === 'language') return <IconLanguage className={className} />;
+  if (id === 'trash') return <IconTrash className={className} />;
   return null;
 }
 
@@ -584,6 +593,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [controlSidebarId, setControlSidebarId] = useState('personalize');
+  /** Waiters may only use Language in Control; users without role (legacy session) are restricted. */
+  const isWaiterControlUser = currentUser?.role !== 'admin';
+  const effectiveControlSidebarId = isWaiterControlUser ? 'language' : controlSidebarId;
   const [appLanguage, setAppLanguage] = useState(() => (LANGUAGE_OPTIONS.some((o) => o.value === lang) ? lang : 'en'));
   const [savingAppLanguage, setSavingAppLanguage] = useState(false);
   const [topNavId, setTopNavId] = useState('categories-products');
@@ -1465,9 +1477,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, [topNavId, subNavId, paymentTypes, updatePaymentTypesScrollState]);
 
   useEffect(() => {
-    if (controlSidebarId !== 'users') return;
+    if (effectiveControlSidebarId !== 'users') return;
     updateUsersScrollState();
-  }, [controlSidebarId, users, updateUsersScrollState]);
+  }, [effectiveControlSidebarId, users, updateUsersScrollState]);
 
   useEffect(() => {
     if (topNavId !== 'tables') return;
@@ -1827,8 +1839,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, []);
 
   useEffect(() => {
-    if (controlSidebarId === 'users') fetchUsers();
-  }, [controlSidebarId, fetchUsers]);
+    if (effectiveControlSidebarId === 'users') fetchUsers();
+  }, [effectiveControlSidebarId, fetchUsers]);
 
   const fetchSubproducts = useCallback(async (groupId) => {
     if (!groupId) {
@@ -4579,7 +4591,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, [topNavId, subNavId]);
 
   useEffect(() => {
-    if (controlSidebarId !== 'reports' || reportTabId !== 'settings') return;
+    if (effectiveControlSidebarId !== 'reports' || reportTabId !== 'settings') return;
     try {
       const raw = typeof localStorage !== 'undefined' && localStorage.getItem('pos_report_settings');
       if (raw) {
@@ -4587,7 +4599,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         if (s && typeof s === 'object') setReportSettings((prev) => ({ ...prev, ...s }));
       }
     } catch (_) { }
-  }, [controlSidebarId, reportTabId]);
+  }, [effectiveControlSidebarId, reportTabId]);
 
   const handleSavePriceDisplay = () => {
     setSavingPriceDisplay(true);
@@ -4926,6 +4938,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         if (res.ok && updated) {
           setUsers((prev) => prev.map((u) => (u.id === editingUserId ? { ...u, ...updated } : u)));
           closeUserModal();
+          fetchUsers();
         }
       } else {
         const res = await fetch(`${API}/users`, {
@@ -4941,6 +4954,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         if (res.ok && created) {
           setUsers((prev) => [...prev, created].sort((a, b) => (a.name || '').localeCompare(b.name || '')));
           closeUserModal();
+          fetchUsers();
         }
       }
     } finally {
@@ -5393,26 +5407,73 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   }, [kitchenProductsKitchen, kitchenProductsLinked, closeKitchenProductsModal, fetchKitchens]);
 
+  const handleRemoveLicense = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.posLicense?.removeLicense) return;
+    if (
+      !window.confirm(
+        tr(
+          'control.removeLicenseConfirm',
+          'Remove the license from this device? You will need to activate again.'
+        )
+      )
+    ) {
+      return;
+    }
+    try {
+      const r = await window.posLicense.removeLicense();
+      if (r?.ok) {
+        showToast('success', tr('control.licenseRemoved', 'License removed.'));
+      } else {
+        showToast('error', r?.message || tr('control.licenseRemoveFailed', 'Could not remove license.'));
+      }
+    } catch (e) {
+      showToast(
+        'error',
+        e instanceof Error ? e.message : tr('control.licenseRemoveFailed', 'Could not remove license.')
+      );
+    }
+  }, [tr, showToast]);
+
+  const showRemoveLicenseButton =
+    typeof window !== 'undefined' && !!window.posLicense?.removeLicense && !isWaiterControlUser;
+
   return (
     <div className="relative h-full w-full min-h-0">
       <div className="flex h-full bg-pos-bg text-pos-text">
       {/* Control left sidebar */}
       <aside className="w-1/5 shrink-0 flex flex-col bg-pos-panel border-r border-pos-border">
         <nav className="flex flex-col gap-0.5 flex-1 p-3">
-          {CONTROL_SIDEBAR_ITEMS.map((item) => (
+          {CONTROL_SIDEBAR_ITEMS.map((item) => {
+            const sidebarDisabled = isWaiterControlUser && item.id !== 'language';
+            return (
+              <button
+                key={item.id}
+                type="button"
+                disabled={sidebarDisabled}
+                className={`flex items-center gap-3 px-2 py-3 rounded-lg text-left text-md transition-colors ${effectiveControlSidebarId === item.id
+                  ? 'bg-pos-bg text-pos-text font-medium'
+                  : 'text-pos-muted active:bg-green-500 active:text-pos-text'
+                  } ${sidebarDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (sidebarDisabled) return;
+                  setControlSidebarId(item.id);
+                }}
+              >
+                <SidebarIcon id={item.icon} className="w-6 h-6 shrink-0" />
+                {tr(`control.sidebar.${item.id}`, item.label)}
+              </button>
+            );
+          })}
+          {showRemoveLicenseButton ? (
             <button
-              key={item.id}
               type="button"
-              className={`flex items-center gap-3 px-2 py-3 rounded-lg text-left text-md transition-colors ${controlSidebarId === item.id
-                ? 'bg-pos-bg text-pos-text font-medium'
-                : 'text-pos-muted active:bg-green-500 active:text-pos-text'
-                }`}
-              onClick={() => setControlSidebarId(item.id)}
+              className="mt-1 flex w-full items-center gap-3 px-2 py-3 rounded-lg text-left text-md text-rose-500 transition-colors active:bg-green-500 active:text-pos-text"
+              onClick={handleRemoveLicense}
             >
-              <SidebarIcon id={item.icon} className="w-6 h-6 shrink-0" />
-              {tr(`control.sidebar.${item.id}`, item.label)}
+              <SidebarIcon id="trash" className="w-6 h-6 shrink-0" />
+              {tr('control.sidebar.removeLicense', 'Remove license')}
             </button>
-          ))}
+          ) : null}
         </nav>
         <div className="p-4 w-full flex flex-col items-center gap-2">
           {currentUser && (
@@ -5493,7 +5554,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           categories,
           categoriesListRef,
           categoriesLoading,
-          controlSidebarId,
+          controlSidebarId: effectiveControlSidebarId,
           creditCardType,
           discounts,
           discountsListRef,

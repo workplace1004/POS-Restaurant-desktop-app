@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('posLicense', {
   getDeviceFingerprint: () => ipcRenderer.invoke('pos-license:device-fingerprint'),
   activateLicense: (licenseKey) => ipcRenderer.invoke('pos-license:activate', licenseKey),
+  importLicenseBundle: (bundle) => ipcRenderer.invoke('pos-license:import-bundle', bundle),
+  getLicenseStorePath: () => ipcRenderer.invoke('pos-license:license-store-path'),
+  removeLicense: () => ipcRenderer.invoke('pos-license:remove'),
   getLicenseStatus: () => ipcRenderer.invoke('pos-license:status'),
   onLicenseInvalidated: (cb) => {
     const listener = (_e, detail) => cb(detail);
