@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
+import { ProductLabelsModal } from './ProductLabelsModal';
+import { DiscountModal } from './DiscountModal';
 
 const DEVICE_SETTINGS_STORAGE_KEY = 'pos_device_settings';
 const OPTION_BUTTON_SLOT_COUNT = 28;
@@ -70,6 +72,8 @@ export function Footer({ customersActive = false, onCustomersClick, showSubtotal
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showExtraBcModal, setShowExtraBcModal] = useState(false);
   const [showPriceGroupModal, setShowPriceGroupModal] = useState(false);
+  const [showProductLabelsModal, setShowProductLabelsModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [priceGroups, setPriceGroups] = useState([]);
   const [priceGroupsLoading, setPriceGroupsLoading] = useState(false);
   const [extraBcInput, setExtraBcInput] = useState('');
@@ -116,6 +120,14 @@ export function Footer({ customersActive = false, onCustomersClick, showSubtotal
     }
     if (id === 'prijs-groep') {
       setShowPriceGroupModal(true);
+      return;
+    }
+    if (id === 'product-labels') {
+      setShowProductLabelsModal(true);
+      return;
+    }
+    if (id === 'discount') {
+      setShowDiscountModal(true);
       return;
     }
     if (id === 'klanten') onCustomersClick?.();
@@ -376,6 +388,8 @@ export function Footer({ customersActive = false, onCustomersClick, showSubtotal
           </div>
         </div>
       ) : null}
+      <ProductLabelsModal open={showProductLabelsModal} onClose={() => setShowProductLabelsModal(false)} />
+      <DiscountModal open={showDiscountModal} onClose={() => setShowDiscountModal(false)} />
     </footer>
   );
 }

@@ -1576,6 +1576,36 @@ app.get('/api/orders', async (req, res) => {
   res.json(orders);
 });
 
+// REST: order history (paid orders, newest settlement first)
+app.get('/api/orders/history', async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { status: 'paid' },
+      include: { items: orderItemsInclude, table: true, customer: true, user: true, payments: true },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
+    });
+    res.json(orders);
+  } catch (err) {
+    console.error('GET /api/orders/history', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch order history' });
+  }
+});
+
+// REST: single order by id (full detail)
+app.get('/api/orders/:id', async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: { items: orderItemsInclude, table: true, customer: true, user: true, payments: true }
+    });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    console.error('GET /api/orders/:id', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch order' });
+  }
+});
+
 // REST: create order
 app.post('/api/orders', async (req, res) => {
   const { tableId, items } = req.body;
@@ -1976,21 +2006,6 @@ app.get('/api/orders/in-planning/count', async (req, res) => {
 app.get('/api/orders/in-waiting/count', async (req, res) => {
   const count = await prisma.order.count({ where: { status: 'in_waiting' } });
   res.json({ count });
-});
-
-// REST: order history (paid orders, newest settlement first)
-app.get('/api/orders/history', async (req, res) => {
-  try {
-    const orders = await prisma.order.findMany({
-      where: { status: 'paid' },
-      include: { table: true, customer: true },
-      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
-    });
-    res.json(orders);
-  } catch (err) {
-    console.error('GET /api/orders/history', err);
-    res.status(500).json({ error: err.message || 'Failed to fetch order history' });
-  }
 });
 
 // REST: users (for login screen and control view)

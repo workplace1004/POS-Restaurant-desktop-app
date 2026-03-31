@@ -2286,6 +2286,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         const err = await res.json().catch(() => null);
         throw new Error(err?.error || tr('control.productSubproducts.saveFailed', 'Failed to save product subproducts'));
       }
+      // Reflect linked-subproducts state immediately in the products list UI.
+      setProductHasSubproductsById((prev) => ({
+        ...prev,
+        [productSubproductsProduct.id]: linksPayload.length > 0
+      }));
       showToast('success', tr('control.productSubproducts.saved', 'Product subproducts saved.'));
       closeProductSubproductsModal();
     } catch (err) {
@@ -6462,7 +6467,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     <p className="text-pos-muted text-xl py-4 text-center">{tr('control.products.emptyInCategory', 'No products in this category yet.')}</p>
                   ) : (
                     <ul className="w-full flex flex-col">
-                      {filteredProducts.map((product) => (
+                      {filteredProducts.map((product) => {
+                        const hasSubproducts = !!productHasSubproductsById[product.id];
+                        return (
                         <li
                           key={product.id}
                           className={`flex items-center w-full justify-between px-4 py-2 border-y border-pos-panel text-pos-text text-sm cursor-pointer ${selectedProductId === product.id ? 'bg-pos-panel/70' : 'bg-pos-bg'}`}
@@ -6471,10 +6478,10 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           <span className="min-w-[30%] text-left font-medium truncate" title={product.name}>
                             {product.name}
                           </span>
-                          <span className="flex-shrink-0 min-w-[30%] text-center text-pos-muted text-sm">
+                          <span className={`flex-shrink-0 min-w-[30%] text-center text-sm ${hasSubproducts ? 'text-white' : 'text-pos-muted'}`}>
                             <button
                               type="button"
-                              className={`px-2 py-1 rounded text-sm active:text-pos-text active:bg-green-500 ${productHasSubproductsById[product.id] ? 'text-white font-medium' : 'text-pos-muted'}`}
+                              className={`px-2 py-1 rounded text-sm active:text-pos-text active:bg-green-500 ${hasSubproducts ? 'text-white font-medium' : 'text-pos-muted'}`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openProductSubproductsModal(product);
@@ -6502,7 +6509,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             </button>
                           </div>
                         </li>
-                      ))}
+                      );
+                      })}
                     </ul>
                   )}
                 </div>
