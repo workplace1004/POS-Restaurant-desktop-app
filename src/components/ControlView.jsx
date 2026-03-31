@@ -31,6 +31,7 @@ import {
 } from './controlView/controlViewUtils.js';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
+import { LoadingSpinner } from './LoadingSpinner';
 import { publicAssetUrl, resolveMediaSrc } from '../lib/publicAssetUrl.js';
 
 /** Seeded KDS admin credential (same id as `seed.js`); hidden from Configuration → Kitchen list. */
@@ -587,6 +588,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [savingAppLanguage, setSavingAppLanguage] = useState(false);
   const [topNavId, setTopNavId] = useState('categories-products');
   const [subNavId, setSubNavId] = useState('Price Groups');
+  const [controlBootstrapReady, setControlBootstrapReady] = useState(false);
   const [reportTabId, setReportTabId] = useState('financial');
   const [reportGenerateUntil, setReportGenerateUntil] = useState('current-time');
   const [periodicReportStartTime, setPeriodicReportStartTime] = useState('00:00');
@@ -1145,10 +1147,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   }, [showToast]);
 
-  useEffect(() => {
-    fetchPaymentTypes();
-  }, [fetchPaymentTypes]);
-
   const updateManageGroupsPaginationState = useCallback(() => {
     const el = manageGroupsListRef.current;
     if (!el) {
@@ -1637,66 +1635,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     });
     return () => cancelAnimationFrame(id);
   }, [showProductModal, productTab, extraPricesRows.length, syncExtraPricesScrollEdges]);
-
-  useEffect(() => {
-    let alive = true;
-    const loadSavedPositioningLayout = async () => {
-      try {
-        const res = await fetch(`${API}/settings/product-positioning-layout`);
-        const data = await res.json().catch(() => null);
-        const value = data?.value;
-        if (alive && value && typeof value === 'object') {
-          setPositioningLayoutByCategory(value);
-          return;
-        }
-      } catch {
-        // fallback to local draft when api is unavailable
-      }
-      try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_layout') : null;
-        if (alive && raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') setPositioningLayoutByCategory(parsed);
-        }
-      } catch {
-        // ignore broken local positioning data
-      }
-    };
-    loadSavedPositioningLayout();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    const loadSavedPositioningColors = async () => {
-      try {
-        const res = await fetch(`${API}/settings/product-positioning-colors`);
-        const data = await res.json().catch(() => null);
-        const value = data?.value;
-        if (alive && value && typeof value === 'object') {
-          setPositioningColorByCategory(value);
-          return;
-        }
-      } catch {
-        // fallback to local draft when api is unavailable
-      }
-      try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_colors') : null;
-        if (alive && raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') setPositioningColorByCategory(parsed);
-        }
-      } catch {
-        // ignore broken local color data
-      }
-    };
-    loadSavedPositioningColors();
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   useEffect(() => {
     try {
@@ -4092,10 +4030,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   }, []);
 
-  useEffect(() => {
-    fetchPrintersFromDb();
-  }, [fetchPrintersFromDb]);
-
   const openNewPrinterModal = () => {
     setEditingPrinterId(null);
     setShowPrinterModal(true);
@@ -5169,6 +5103,84 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadSavedPositioningLayout = async () => {
+      try {
+        const res = await fetch(`${API}/settings/product-positioning-layout`);
+        const data = await res.json().catch(() => null);
+        const value = data?.value;
+        if (!cancelled && value && typeof value === 'object') {
+          setPositioningLayoutByCategory(value);
+          return;
+        }
+      } catch {
+        // fallback to local draft when api is unavailable
+      }
+      try {
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_layout') : null;
+        if (!cancelled && raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') setPositioningLayoutByCategory(parsed);
+        }
+      } catch {
+        // ignore broken local positioning data
+      }
+    };
+    const loadSavedPositioningColors = async () => {
+      try {
+        const res = await fetch(`${API}/settings/product-positioning-colors`);
+        const data = await res.json().catch(() => null);
+        const value = data?.value;
+        if (!cancelled && value && typeof value === 'object') {
+          setPositioningColorByCategory(value);
+          return;
+        }
+      } catch {
+        // fallback to local draft when api is unavailable
+      }
+      try {
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_colors') : null;
+        if (!cancelled && raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') setPositioningColorByCategory(parsed);
+        }
+      } catch {
+        // ignore broken local color data
+      }
+    };
+    (async () => {
+      try {
+        await Promise.all([
+          fetchPaymentTypes(),
+          fetchPriceGroups(),
+          fetchCategories(),
+          fetchTableLocations(),
+          fetchUsers(),
+          fetchSubproductGroups(),
+          fetchKitchens(),
+          fetchPrintersFromDb(),
+          loadSavedPositioningLayout(),
+          loadSavedPositioningColors()
+        ]);
+      } finally {
+        if (!cancelled) setControlBootstrapReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fetchPaymentTypes,
+    fetchPriceGroups,
+    fetchCategories,
+    fetchTableLocations,
+    fetchUsers,
+    fetchSubproductGroups,
+    fetchKitchens,
+    fetchPrintersFromDb
+  ]);
+
+  useEffect(() => {
     if (topNavId !== 'categories-products' || subNavId !== 'Kitchen') return;
     fetchKitchens();
   }, [topNavId, subNavId, fetchKitchens]);
@@ -5373,7 +5385,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, [kitchenProductsKitchen, kitchenProductsLinked, closeKitchenProductsModal, fetchKitchens]);
 
   return (
-    <div className="flex h-full bg-pos-bg text-pos-text">
+    <div className="relative h-full w-full min-h-0">
+      <div className="flex h-full bg-pos-bg text-pos-text">
       {/* Control left sidebar */}
       <aside className="w-1/5 shrink-0 flex flex-col bg-pos-panel border-r border-pos-border">
         <nav className="flex flex-col gap-0.5 flex-1 p-3">
@@ -7324,6 +7337,12 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         onConfirm={handleLogoutConfirm}
         message={tr('logoutConfirm', 'Are you sure you want to log out?')}
       />
+      </div>
+      {!controlBootstrapReady && (
+        <div className="absolute inset-0 z-[200] flex items-center justify-center bg-pos-bg">
+          <LoadingSpinner label={tr('control.loadingConfiguration', 'Loading configuration...')} />
+        </div>
+      )}
     </div>
   );
 }

@@ -62,6 +62,8 @@ export default function App() {
   const [selectedRoomName, setSelectedRoomName] = useState(null);
   const [roomCount, setRoomCount] = useState(null);
   const [isOpeningTables, setIsOpeningTables] = useState(false);
+  const [isPosBootstrapReady, setIsPosBootstrapReady] = useState(false);
+  const posSessionBootstrappedRef = useRef(false);
 
   const isElectronApp = typeof window !== 'undefined' && !!window.posLicense;
   const [electronLicensePhase, setElectronLicensePhase] = useState(() =>
@@ -165,7 +167,6 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
     fetchInWaitingCount,
     tables,
     fetchWeborders,
-    loading,
     addItemToOrder,
     removeOrderItem,
     updateOrderItemQuantity,
@@ -176,6 +177,7 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
     removeAllOrders,
     fetchCategories,
     fetchProducts,
+    loadPosFullCatalog,
     fetchOrders,
     fetchWebordersCount,
     fetchInPlanningCount,
@@ -235,18 +237,62 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
     })();
   }, [refreshDeviceSettings]);
 
+  const runPosBootstrap = useCallback(async () => {
+    await Promise.all([
+      fetchOrders(),
+      fetchWebordersCount(),
+      fetchInPlanningCount(),
+      fetchInWaitingCount(),
+      fetchTables(),
+      fetchSavedPositioningLayout(),
+      fetchSavedPositioningColors(),
+      fetchSavedFunctionButtonsLayout(),
+      fetchRoomCount(),
+      loadPosFullCatalog()
+    ]);
+  }, [
+    fetchOrders,
+    fetchWebordersCount,
+    fetchInPlanningCount,
+    fetchInWaitingCount,
+    fetchTables,
+    fetchSavedPositioningLayout,
+    fetchSavedPositioningColors,
+    fetchSavedFunctionButtonsLayout,
+    fetchRoomCount,
+    loadPosFullCatalog
+  ]);
+
   useEffect(() => {
-    fetchCategories();
-    fetchOrders();
-    fetchWebordersCount();
-    fetchInPlanningCount();
-    fetchInWaitingCount();
-    fetchTables();
-    fetchSavedPositioningLayout();
-    fetchSavedPositioningColors();
-    fetchSavedFunctionButtonsLayout();
-    fetchRoomCount();
-  }, [fetchCategories, fetchOrders, fetchWebordersCount, fetchInPlanningCount, fetchInWaitingCount, fetchTables, fetchSavedPositioningLayout, fetchSavedPositioningColors, fetchSavedFunctionButtonsLayout, fetchRoomCount]);
+    if (!user) {
+      posSessionBootstrappedRef.current = false;
+      setIsPosBootstrapReady(false);
+      return;
+    }
+    if (view !== 'pos') {
+      setIsPosBootstrapReady(true);
+      return;
+    }
+    if (posSessionBootstrappedRef.current) {
+      setIsPosBootstrapReady(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setIsPosBootstrapReady(false);
+      try {
+        await runPosBootstrap();
+      } finally {
+        if (!cancelled) {
+          posSessionBootstrappedRef.current = true;
+          setIsPosBootstrapReady(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, view, runPosBootstrap]);
 
   useEffect(() => {
     if (selectedCategoryId) fetchProducts(selectedCategoryId);
@@ -308,6 +354,8 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
 
   const handleLogout = () => {
     setUser(null);
+    posSessionBootstrappedRef.current = false;
+    setIsPosBootstrapReady(false);
     try {
       localStorage.removeItem(USER_STORAGE_KEY);
     } catch {}
@@ -423,6 +471,14 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
         socket={socket}
         currentUser={user}
       />
+    );
+  }
+
+  if (!isPosBootstrapReady) {
+    return (
+      <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-pos-bg">
+        <LoadingSpinner label={t('loadingPos')} />
+      </div>
     );
   }
 

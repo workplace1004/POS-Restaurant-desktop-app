@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 const FUNCTION_BUTTON_SLOT_COUNT = 4;
 const FUNCTION_BUTTON_ALLOWED_IDS = [
@@ -43,6 +43,9 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const productsByCategoryIdRef = useRef({});
+  const subproductsByProductIdRef = useRef(new Map());
+
   const safeJson = (res) => res.json().catch(() => null);
   const roundCurrency = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -50,16 +53,107 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
     const res = await fetch(`${API}/categories`);
     const data = await safeJson(res);
     if (Array.isArray(data)) {
-      setCategories(data);
-      if (data.length && !selectedCategoryId) setSelectedCategoryId(data[0].id);
+      for (const cat of data) {
+        const cid = cat?.id;
+        if (cid && Array.isArray(cat.products)) {
+          productsByCategoryIdRef.current[cid] = cat.products;
+        }
+      }
+      setCategories(data.map(({ products: _p, ...c }) => c));
+      if (data.length) {
+        setSelectedCategoryId((prev) => (prev != null && prev !== '' ? prev : data[0].id));
+      }
     }
   }, [API]);
 
   const fetchProducts = useCallback(async (categoryId) => {
     if (!categoryId) return;
+    const cached = productsByCategoryIdRef.current[categoryId];
+    if (cached) {
+      setProducts(cached);
+      return;
+    }
     const res = await fetch(`${API}/categories/${categoryId}/products`);
     const data = await safeJson(res);
-    if (Array.isArray(data)) setProducts(data);
+    const list = Array.isArray(data) ? data : [];
+    productsByCategoryIdRef.current[categoryId] = list;
+    setProducts(list);
+  }, [API]);
+
+  /**
+   * POS bootstrap: all categories, all products per category (API returns nested products on /categories),
+   * then all subproducts per product (batched) cached for instant category switches and subproduct modal.
+   */
+  const loadPosFullCatalog = useCallback(async () => {
+    productsByCategoryIdRef.current = {};
+    subproductsByProductIdRef.current = new Map();
+
+    const res = await fetch(`${API}/categories`);
+    const data = await safeJson(res);
+    if (!Array.isArray(data) || !data.length) {
+      setCategories([]);
+      setProducts([]);
+      setSelectedCategoryId(null);
+      return;
+    }
+
+    const stripProducts = (cat) => {
+      if (!cat || typeof cat !== 'object') return cat;
+      const { products: _nested, ...rest } = cat;
+      return rest;
+    };
+
+    for (const cat of data) {
+      const cid = cat?.id;
+      if (!cid) continue;
+      if (Array.isArray(cat.products) && cat.products.length > 0) {
+        productsByCategoryIdRef.current[cid] = cat.products;
+      }
+    }
+
+    const firstId = data[0].id;
+    setSelectedCategoryId(firstId);
+
+    for (const cat of data) {
+      const cid = cat?.id;
+      if (!cid) continue;
+      if (productsByCategoryIdRef.current[cid] == null) {
+        const pres = await fetch(`${API}/categories/${cid}/products`);
+        const pdata = await safeJson(pres);
+        productsByCategoryIdRef.current[cid] = Array.isArray(pdata) ? pdata : [];
+      }
+    }
+
+    setCategories(data.map(stripProducts));
+    setProducts(productsByCategoryIdRef.current[firstId] || []);
+
+    const allProductIds = [];
+    const seen = new Set();
+    for (const cid of Object.keys(productsByCategoryIdRef.current)) {
+      for (const p of productsByCategoryIdRef.current[cid]) {
+        const pid = p?.id;
+        if (pid != null && !seen.has(pid)) {
+          seen.add(pid);
+          allProductIds.push(pid);
+        }
+      }
+    }
+
+    const SUB_CHUNK = 25;
+    for (let i = 0; i < allProductIds.length; i += SUB_CHUNK) {
+      const chunk = allProductIds.slice(i, i + SUB_CHUNK);
+      await Promise.all(
+        chunk.map(async (productId) => {
+          try {
+            const sres = await fetch(`${API}/products/${productId}/subproducts`);
+            const sdata = await safeJson(sres);
+            subproductsByProductIdRef.current.set(productId, Array.isArray(sdata) ? sdata : []);
+          } catch {
+            subproductsByProductIdRef.current.set(productId, []);
+          }
+        })
+      );
+    }
   }, [API]);
 
   const fetchOrders = useCallback(async () => {
@@ -107,9 +201,14 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   const fetchSubproductsForProduct = useCallback(
     async (productId) => {
       if (!productId) return [];
+      if (subproductsByProductIdRef.current.has(productId)) {
+        return subproductsByProductIdRef.current.get(productId);
+      }
       const res = await fetch(`${API}/products/${productId}/subproducts`);
       const data = await safeJson(res);
-      return Array.isArray(data) ? data : [];
+      const list = Array.isArray(data) ? data : [];
+      subproductsByProductIdRef.current.set(productId, list);
+      return list;
     },
     [API]
   );
@@ -508,6 +607,7 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
     removeAllOrders,
     fetchCategories,
     fetchProducts,
+    loadPosFullCatalog,
     fetchOrders,
     fetchWebordersCount,
     fetchInPlanningCount,
