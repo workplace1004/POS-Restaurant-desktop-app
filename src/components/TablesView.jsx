@@ -11,10 +11,6 @@ const TABLE_POSITIONS_STORAGE_KEY = 'pos.tables.positions';
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
 const TABLE_PAID_HIGHLIGHT_WINDOW_MS = 15 * 60 * 1000;
 
-const ZOOM_MIN = 50;
-const ZOOM_MAX = 150;
-const ZOOM_STEP = 10;
-
 export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, selectedTableId = null, onSelectTable, onBack, time, api = POS_API_PREFIX }) {
   const { t } = useLanguage();
   const canvasRef = useRef(null);
@@ -25,7 +21,6 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
   const [positionsReady, setPositionsReady] = useState(false);
   const [lastPaidAtByTableId, setLastPaidAtByTableId] = useState({});
   const [selectedRoomIndex, setSelectedRoomIndex] = useState(0);
-  const [zoom, setZoom] = useState(100);
   const [showRoomsModal, setShowRoomsModal] = useState(false);
 
   useEffect(() => {
@@ -213,35 +208,12 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
   return (
     <div className="flex flex-col h-full bg-[#b0b0b0] text-pos-text">
       <div className="px-4 py-5 bg-pos-bg flex justify-between items-center text-2xl gap-4">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="w-10 h-10 rounded-lg border border-pos-border bg-pos-panel active:bg-green-500 text-xl font-bold"
-            onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
-            aria-label="Zoom out"
-          >
-            −
-          </button>
-          <span className="min-w-[3ch] text-center text-lg">{zoom}%</span>
-          <button
-            type="button"
-            className="w-10 h-10 rounded-lg border border-pos-border bg-pos-panel active:bg-green-500 text-xl font-bold"
-            onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
-            aria-label="Zoom in"
-          >
-            +
-          </button>
-        </div>
+        <div />
         {time != null ? <span className="text-3xl">{time}</span> : null}
       </div>
 
       <div className="flex-1 overflow-hidden p-6 bg-pos-bg">
-        <div
-          style={{
-            transform: `scale(${zoom / 100})`,
-            transformOrigin: '0 0'
-          }}
-        >
+        <div>
           <div
             ref={canvasRef}
             className="relative w-full"

@@ -430,10 +430,6 @@ const TABLE_LOCATION_BACKGROUND_OPTIONS = [
   { value: 'blue', labelKey: 'control.tables.backgroundBlue', fallback: 'Blue' }
 ];
 
-const SET_TABLES_ZOOM_MIN = 50;
-const SET_TABLES_ZOOM_MAX = 150;
-const SET_TABLES_ZOOM_STEP = 10;
-
 const TABLE_TEMPLATE_OPTIONS = [
   { id: '4table', src: '/4table.svg', chairs: 4, width: 130, height: 155 },
   { id: '5table', src: '/5table.svg', chairs: 5, width: 145, height: 173 },
@@ -1019,8 +1015,23 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [setTablesSelectedFlowerPotIndex, setSetTablesSelectedFlowerPotIndex] = useState(null);
   const [showSetTableTypeModal, setShowSetTableTypeModal] = useState(false);
   const [showSetBoardColorModal, setShowSetBoardColorModal] = useState(false);
+  const [showSetTablesNumberModal, setShowSetTablesNumberModal] = useState(false);
+  const [showSetTablesNameModal, setShowSetTablesNameModal] = useState(false);
+  const [setTablesNumberValue, setSetTablesNumberValue] = useState('');
+  const [setTablesNameValue, setSetTablesNameValue] = useState('');
+  const [setTablesNameSelectionStart, setSetTablesNameSelectionStart] = useState(0);
+  const [setTablesNameSelectionEnd, setSetTablesNameSelectionEnd] = useState(0);
+  const setTablesNumberCommitRef = useRef(null);
   const setTablesCanvasRef = useRef(null);
-  const [setTablesCanvasZoom, setSetTablesCanvasZoom] = useState(100);
+  const setTablesCanvasZoom = 100;
+  const setTablesDragRef = useRef({
+    active: false,
+    type: null, // 'table' | 'board' | 'flowerPot'
+    tableId: null,
+    index: null,
+    offsetX: 0,
+    offsetY: 0
+  });
 
   const [templateTheme, setTemplateTheme] = useState(() => {
     try {
@@ -3165,6 +3176,117 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const selectedSetBoard = selectedSetBoardIndex != null ? boards[selectedSetBoardIndex] : null;
   const selectedSetFlowerPotIndex = setTablesSelectedFlowerPotIndex != null && setTablesSelectedFlowerPotIndex >= 0 && setTablesSelectedFlowerPotIndex < flowerPots.length ? setTablesSelectedFlowerPotIndex : null;
   const selectedSetFlowerPot = selectedSetFlowerPotIndex != null ? flowerPots[selectedSetFlowerPotIndex] : null;
+
+  const openSetTablesNumberModal = useCallback((value, onCommit) => {
+    setSetTablesNumberValue(String(safeNumberInputValue(value, 0)));
+    setTablesNumberCommitRef.current = onCommit;
+    setShowSetTablesNumberModal(true);
+  }, []);
+  const closeSetTablesNumberModal = useCallback(() => {
+    setShowSetTablesNumberModal(false);
+    setTablesNumberCommitRef.current = null;
+  }, []);
+  const applySetTablesNumberModal = useCallback(() => {
+    const raw = String(setTablesNumberValue ?? '').trim();
+    const parsed = Number(raw);
+    const safe = Number.isFinite(parsed) ? parsed : 0;
+    if (typeof setTablesNumberCommitRef.current === 'function') setTablesNumberCommitRef.current(safe);
+    closeSetTablesNumberModal();
+  }, [closeSetTablesNumberModal, setTablesNumberValue]);
+  const appendSetTablesNumberKey = useCallback((key) => {
+    setSetTablesNumberValue((prev) => `${String(prev ?? '')}${String(key)}`);
+  }, []);
+  const backspaceSetTablesNumberKey = useCallback(() => {
+    setSetTablesNumberValue((prev) => String(prev ?? '').slice(0, -1));
+  }, []);
+  const clearSetTablesNumberKey = useCallback(() => {
+    setSetTablesNumberValue('');
+  }, []);
+  const openSetTablesNameModal = useCallback(() => {
+    if (!selectedSetTable) return;
+    const name = String(selectedSetTable?.name ?? '');
+    setSetTablesNameValue(name);
+    setSetTablesNameSelectionStart(name.length);
+    setSetTablesNameSelectionEnd(name.length);
+    setShowSetTablesNameModal(true);
+  }, [selectedSetTable]);
+  const closeSetTablesNameModal = useCallback(() => {
+    setShowSetTablesNameModal(false);
+  }, []);
+  const applySetTablesNameModal = useCallback(() => {
+    updateSelectedSetTable({ name: setTablesNameValue });
+    setShowSetTablesNameModal(false);
+  }, [setTablesNameValue]);
+
+  const readSetTablesPointerPosition = useCallback((clientX, clientY) => {
+    const canvasEl = setTablesCanvasRef.current;
+    if (!canvasEl) return { x: 0, y: 0 };
+    const rect = canvasEl.getBoundingClientRect();
+    const zoomFactor = Math.max(0.01, (Number(setTablesCanvasZoom) || 100) / 100);
+    return {
+      x: (clientX - rect.left) / zoomFactor,
+      y: (clientY - rect.top) / zoomFactor
+    };
+  }, [setTablesCanvasZoom]);
+
+  const startSetItemDrag = useCallback((event, payload) => {
+    const point = readSetTablesPointerPosition(event.clientX, event.clientY);
+    setTablesDragRef.current = {
+      active: true,
+      type: payload.type,
+      tableId: payload.tableId ?? null,
+      index: payload.index ?? null,
+      offsetX: point.x - (Number(payload.x) || 0),
+      offsetY: point.y - (Number(payload.y) || 0)
+    };
+  }, [readSetTablesPointerPosition]);
+
+  useEffect(() => {
+    if (!showSetTablesModal) return undefined;
+    const onPointerMove = (event) => {
+      const drag = setTablesDragRef.current;
+      if (!drag.active) return;
+      const point = readSetTablesPointerPosition(event.clientX, event.clientY);
+      const x = point.x - drag.offsetX;
+      const y = point.y - drag.offsetY;
+      setSetTablesDraft((prev) => {
+        if (!prev || typeof prev !== 'object') return prev;
+        if (drag.type === 'table' && drag.tableId != null) {
+          return clampSetTablesDraftToFloor({
+            ...prev,
+            tables: (Array.isArray(prev.tables) ? prev.tables : []).map((t) => (
+              t.id === drag.tableId ? { ...t, x, y } : t
+            ))
+          });
+        }
+        if (drag.type === 'board' && drag.index != null) {
+          const nextBoards = [...(Array.isArray(prev.boards) ? prev.boards : [])];
+          if (drag.index < 0 || drag.index >= nextBoards.length) return prev;
+          nextBoards[drag.index] = { ...nextBoards[drag.index], x, y };
+          return clampSetTablesDraftToFloor({ ...prev, boards: nextBoards });
+        }
+        if (drag.type === 'flowerPot' && drag.index != null) {
+          const nextFlowerPots = [...(Array.isArray(prev.flowerPots) ? prev.flowerPots : [])];
+          if (drag.index < 0 || drag.index >= nextFlowerPots.length) return prev;
+          nextFlowerPots[drag.index] = { ...nextFlowerPots[drag.index], x, y };
+          return clampSetTablesDraftToFloor({ ...prev, flowerPots: nextFlowerPots });
+        }
+        return prev;
+      });
+    };
+    const onPointerUp = () => {
+      if (!setTablesDragRef.current.active) return;
+      setTablesDragRef.current.active = false;
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [readSetTablesPointerPosition, showSetTablesModal]);
 
   const updateSelectedSetTable = (patch) => {
     if (!setTablesSelectedTableId) return;
@@ -7770,7 +7892,21 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           top: `${Math.max(0, layoutEditorReadTableY(table))}px`,
                           transform: `rotate(${safeNumberInputValue(table.rotation, 0)}deg)`,
                           zIndex: 20,
+                          touchAction: 'none',
                           ...sizeStyle
+                        }}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSetTablesSelectedTableId(table.id);
+                          setSetTablesSelectedBoardIndex(null);
+                          setSetTablesSelectedFlowerPotIndex(null);
+                          startSetItemDrag(e, {
+                            type: 'table',
+                            tableId: table.id,
+                            x: layoutEditorReadTableX(table),
+                            y: layoutEditorReadTableY(table)
+                          });
                         }}
                         onClick={() => {
                           setSetTablesSelectedTableId(table.id);
@@ -7800,7 +7936,21 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             transform: `rotate(${Number(board.rotation) || 0}deg)`,
                             zIndex: 10,
                             backgroundColor: board.color || '#facc15',
-                            opacity: 0.55
+                            opacity: 0.55,
+                            touchAction: 'none'
+                          }}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSetTablesSelectedTableId(null);
+                            setSetTablesSelectedBoardIndex(idx);
+                            setSetTablesSelectedFlowerPotIndex(null);
+                            startSetItemDrag(e, {
+                              type: 'board',
+                              index: idx,
+                              x: Number(board.x) || 0,
+                              y: Number(board.y) || 0
+                            });
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -7824,7 +7974,21 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             width: `${Math.max(10, Number(fp.width) || 10)}px`,
                             height: `${Math.max(10, Number(fp.height) || 10)}px`,
                             transform: `rotate(${Number(fp.rotation) || 0}deg)`,
-                            zIndex: 30
+                            zIndex: 30,
+                            touchAction: 'none'
+                          }}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSetTablesSelectedTableId(null);
+                            setSetTablesSelectedBoardIndex(null);
+                            setSetTablesSelectedFlowerPotIndex(idx);
+                            startSetItemDrag(e, {
+                              type: 'flowerPot',
+                              index: idx,
+                              x: Number(fp.x) || 0,
+                              y: Number(fp.y) || 0
+                            });
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -7838,25 +8002,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       );
                     })}
                 </div>
-                <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-pos-border bg-pos-panel p-1 shadow-lg">
-                  <button
-                    type="button"
-                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
-                    onClick={() => setSetTablesCanvasZoom((z) => Math.max(SET_TABLES_ZOOM_MIN, z - SET_TABLES_ZOOM_STEP))}
-                    aria-label="Zoom out"
-                  >
-                    −
-                  </button>
-                  <span className="min-w-[3ch] text-center text-sm text-pos-text px-1">{setTablesCanvasZoom}%</span>
-                  <button
-                    type="button"
-                    className="w-9 h-9 rounded-md border border-pos-border bg-pos-bg active:bg-green-500 text-pos-text text-xl font-bold flex items-center justify-center"
-                    onClick={() => setSetTablesCanvasZoom((z) => Math.min(SET_TABLES_ZOOM_MAX, z + SET_TABLES_ZOOM_STEP))}
-                    aria-label="Zoom in"
-                  >
-                    +
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -7869,8 +8014,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                     <input
                       type="text"
                       value={selectedSetTable?.name || ''}
-                      onChange={(e) => updateSelectedSetTable({ name: e.target.value })}
-                      className="min-w-[100px] max-w-[160px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                      readOnly
+                      onClick={openSetTablesNameModal}
+                      className="min-w-[120px] max-w-[120px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                     />
                   </div>
 
@@ -7897,7 +8043,16 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             const safe = Number.isFinite(nextVal) ? nextVal : 0;
                             updateSelectedSetTable({ [field.key]: safe });
                           }}
-                          className="min-w-[60px] max-w-[60px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetTable
+                              ? field.key === 'x'
+                                ? layoutEditorReadTableX(selectedSetTable)
+                                : layoutEditorReadTableY(selectedSetTable)
+                              : 0,
+                            (safe) => updateSelectedSetTable({ [field.key]: safe })
+                          )}
+                          className="min-w-[80px] max-w-[80px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                         />
                         <button
                           type="button"
@@ -7946,6 +8101,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, safe) });
                             else updateSelectedSetTable({ height: Math.max(40, safe) });
                           }}
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetTable ? selectedSetTable[field.key] : 0,
+                            (safe) => {
+                              if (field.key === 'width') updateSelectedSetTable({ width: Math.max(60, safe) });
+                              else updateSelectedSetTable({ height: Math.max(40, safe) });
+                            }
+                          )}
                           className="min-w-[80px] max-w-[80px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                         />
                         <button
@@ -7999,6 +8162,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
                             updateSelectedSetTable({ rotation: clamped });
                           }}
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetTable?.rotation ?? 0,
+                            (safe) => updateSelectedSetTable({ rotation: Math.min(360, Math.max(0, safe)) })
+                          )}
                           className="min-w-[56px] max-w-[64px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
                         />
                       </div>
@@ -8034,11 +8202,16 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             const safe = Number.isFinite(nextVal) ? nextVal : 0;
                             updateSelectedSetBoard({ [field.key]: safe });
                           }}
-                          className="min-w-[60px] max-w-[60px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetBoard[field.key],
+                            (safe) => updateSelectedSetBoard({ [field.key]: safe })
+                          )}
+                          className="min-w-[80px] max-w-[80px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                         />
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetBoard[field.key]) || 0;
                             updateSelectedSetBoard({ [field.key]: current - 10 });
@@ -8048,7 +8221,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         </button>
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetBoard[field.key]) || 0;
                             updateSelectedSetBoard({ [field.key]: current + 10 });
@@ -8077,11 +8250,19 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, safe) });
                             else updateSelectedSetBoard({ height: Math.max(10, safe) });
                           }}
-                          className="min-w-[60px] max-w-[60px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetBoard[field.key],
+                            (safe) => {
+                              if (field.key === 'width') updateSelectedSetBoard({ width: Math.max(10, safe) });
+                              else updateSelectedSetBoard({ height: Math.max(10, safe) });
+                            }
+                          )}
+                          className="min-w-[80px] max-w-[80px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                         />
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetBoard[field.key]) || 0;
                             const nextVal = current - 10;
@@ -8093,7 +8274,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         </button>
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetBoard[field.key]) || 0;
                             const nextVal = current + 10;
@@ -8129,6 +8310,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
                           updateSelectedSetBoard({ rotation: clamped });
                         }}
+                        readOnly
+                        onClick={() => openSetTablesNumberModal(
+                          selectedSetBoard.rotation,
+                          (safe) => updateSelectedSetBoard({ rotation: Math.min(360, Math.max(0, safe)) })
+                        )}
                         className="min-w-[56px] max-w-[64px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
                       />
                     </div>
@@ -8137,7 +8323,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
               ) : null}
 
               {selectedSetFlowerPot ? (
-                <div className="flex flex-row flex-wrap items-start gap-5 text-pos-text pt-1">
+                <div className="flex flex-row flex-wrap items-start gap-5 text-pos-text">
                   {/* Vertical: flower pot x, flower pot y */}
                   <div className="flex flex-col gap-2 shrink-0">
                     {[
@@ -8154,11 +8340,16 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             const safe = Number.isFinite(nextVal) ? nextVal : 0;
                             updateSelectedSetFlowerPot({ [field.key]: safe });
                           }}
-                          className="min-w-[60px] max-w-[60px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetFlowerPot[field.key],
+                            (safe) => updateSelectedSetFlowerPot({ [field.key]: safe })
+                          )}
+                          className="min-w-[80px] max-w-[80px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                         />
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetFlowerPot[field.key]) || 0;
                             updateSelectedSetFlowerPot({ [field.key]: current - 10 });
@@ -8168,7 +8359,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         </button>
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetFlowerPot[field.key]) || 0;
                             updateSelectedSetFlowerPot({ [field.key]: current + 10 });
@@ -8197,11 +8388,19 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, safe) });
                             else updateSelectedSetFlowerPot({ height: Math.max(10, safe) });
                           }}
-                          className="min-w-[60px] max-w-[60px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
+                          readOnly
+                          onClick={() => openSetTablesNumberModal(
+                            selectedSetFlowerPot[field.key],
+                            (safe) => {
+                              if (field.key === 'width') updateSelectedSetFlowerPot({ width: Math.max(10, safe) });
+                              else updateSelectedSetFlowerPot({ height: Math.max(10, safe) });
+                            }
+                          )}
+                          className="min-w-[80px] max-w-[80px] px-1 py-2 rounded bg-pos-panel border border-pos-border text-pos-text"
                         />
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetFlowerPot[field.key]) || 0;
                             const nextVal = current - 10;
@@ -8213,7 +8412,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                         </button>
                         <button
                           type="button"
-                          className="w-8 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
+                          className="w-10 h-10 px-3 rounded bg-pos-panel border border-pos-border active:bg-green-500"
                           onClick={() => {
                             const current = Number(selectedSetFlowerPot[field.key]) || 0;
                             const nextVal = current + 10;
@@ -8249,12 +8448,123 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           const clamped = Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
                           updateSelectedSetFlowerPot({ rotation: clamped });
                         }}
+                        readOnly
+                        onClick={() => openSetTablesNumberModal(
+                          selectedSetFlowerPot.rotation,
+                          (safe) => updateSelectedSetFlowerPot({ rotation: Math.min(360, Math.max(0, safe)) })
+                        )}
                         className="min-w-[56px] max-w-[64px] px-2 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-left"
                       />
                     </div>
                   </div>
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSetTablesNumberModal && showSetTablesModal && topNavId === 'tables' && (
+        <div className="fixed inset-0 z-[62] flex items-center justify-center bg-black/70 p-4" onClick={closeSetTablesNumberModal}>
+          <div className="w-full max-w-[560px] bg-pos-bg rounded-xl border border-pos-border shadow-2xl p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3">
+              <input
+                type="text"
+                value={setTablesNumberValue}
+                readOnly
+                className="w-full px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-xl text-center"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C'].map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="h-12 rounded bg-pos-panel border border-pos-border text-pos-text text-xl active:bg-green-500"
+                  onClick={() => (k === 'C' ? clearSetTablesNumberKey() : appendSetTablesNumberKey(k))}
+                >
+                  {k}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="h-12 rounded bg-pos-panel border border-pos-border text-pos-text text-xl active:bg-green-500"
+                onClick={() => appendSetTablesNumberKey('0')}
+                aria-label="Zero"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                className="h-12 rounded bg-pos-panel border border-pos-border text-pos-text text-xl active:bg-green-500"
+                onClick={backspaceSetTablesNumberKey}
+                aria-label="Backspace"
+              >
+                ←
+              </button>
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500"
+                onClick={closeSetTablesNumberModal}
+              >
+                {tr('cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg bg-green-600 text-white active:bg-green-500"
+                onClick={applySetTablesNumberModal}
+              >
+                {tr('ok', 'OK')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSetTablesNameModal && showSetTablesModal && topNavId === 'tables' && (
+        <div className="fixed inset-0 z-[63] flex items-center justify-center bg-black/70 p-4" onClick={closeSetTablesNameModal}>
+          <div className="w-full max-w-[760px] bg-pos-bg rounded-xl border border-pos-border shadow-2xl p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3">
+              <input
+                type="text"
+                value={setTablesNameValue}
+                onChange={(e) => setSetTablesNameValue(e.target.value)}
+                onSelect={(e) => {
+                  const el = e.target;
+                  setSetTablesNameSelectionStart(el.selectionStart ?? 0);
+                  setSetTablesNameSelectionEnd(el.selectionEnd ?? 0);
+                }}
+                className="w-full px-3 py-2 rounded bg-pos-panel border border-pos-border text-pos-text text-xl"
+                autoFocus
+              />
+            </div>
+            <SmallKeyboardWithNumpad
+              value={setTablesNameValue}
+              onChange={setSetTablesNameValue}
+              selectionStart={setTablesNameSelectionStart}
+              selectionEnd={setTablesNameSelectionEnd}
+              onSelectionChange={(start, end) => {
+                setSetTablesNameSelectionStart(start);
+                setSetTablesNameSelectionEnd(end);
+              }}
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500"
+                onClick={closeSetTablesNameModal}
+              >
+                {tr('cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg bg-green-600 text-white active:bg-green-500"
+                onClick={applySetTablesNameModal}
+              >
+                {tr('ok', 'OK')}
+              </button>
             </div>
           </div>
         </div>
