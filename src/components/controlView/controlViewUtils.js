@@ -1,12 +1,17 @@
-import {
-  FUNCTION_BUTTON_SLOT_COUNT,
-  FUNCTION_BUTTON_ITEM_IDS,
-  OPTION_BUTTON_SLOT_COUNT,
-  OPTION_BUTTON_ITEM_IDS,
-  OPTION_BUTTON_LOCKED_ID,
-  DEFAULT_OPTION_BUTTON_LAYOUT,
-  TABLE_TEMPLATE_OPTIONS
-} from './constants.js';
+const FUNCTION_BUTTON_SLOT_COUNT = 4;
+const OPTION_BUTTON_SLOT_COUNT = 28;
+const OPTION_BUTTON_LOCKED_ID = 'meer';
+const DEFAULT_OPTION_BUTTON_LAYOUT = [
+  'extra-bc-bedrag', '', 'bc-refund', 'stock-retour', 'product-labels', '', '',
+  'ticket-afdrukken', '', 'tegoed', 'tickets-optellen', '', 'product-info', 'personeel-ticket',
+  'productie-bericht', 'prijs-groep', 'discount', 'kadobon', 'various', 'plu', 'product-zoeken',
+  'lade', 'klanten', 'historiek', 'subtotaal', 'terugname', '', 'meer'
+];
+const TABLE_TEMPLATE_OPTIONS = [
+  { id: '4table', chairs: 4, width: 130, height: 155 },
+  { id: '5table', chairs: 5, width: 145, height: 173 },
+  { id: '6table', chairs: 6, width: 150, height: 179 }
+];
 
 /** Set tables modal: layout bounds match the fixed editor canvas (see ControlView chrome). */
 export const SET_TABLES_LAYOUT_CANVAS_WIDTH = 979;
@@ -66,7 +71,6 @@ export function normalizeFunctionButtonSlots(value) {
   for (let i = 0; i < FUNCTION_BUTTON_SLOT_COUNT; i += 1) {
     const candidate = String(value[i] || '').trim();
     if (!candidate) continue;
-    if (!FUNCTION_BUTTON_ITEM_IDS.includes(candidate)) continue;
     if (used.has(candidate)) continue;
     next[i] = candidate;
     used.add(candidate);
@@ -81,7 +85,6 @@ export function normalizeOptionButtonSlots(value) {
   for (let i = 0; i < OPTION_BUTTON_SLOT_COUNT; i += 1) {
     const candidate = String(value[i] || '').trim();
     if (!candidate) continue;
-    if (!OPTION_BUTTON_ITEM_IDS.includes(candidate)) continue;
     if (used.has(candidate)) continue;
     next[i] = candidate;
     used.add(candidate);

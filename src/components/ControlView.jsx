@@ -126,7 +126,9 @@ const SCHEDULED_ORDERS_CHECKOUT_AT_OPTIONS = [
 ];
 
 const PRICE_DISPLAY_TYPE_OPTIONS = [
-  { value: 'disabled', labelKey: 'control.external.disabled', fallback: 'Disabled' }
+  { value: 'disabled', labelKey: 'control.external.priceDisplayType.disabled', fallback: 'Disabled' },
+  { value: 'two-line-display', labelKey: 'control.external.priceDisplayType.twoLineDisplay', fallback: 'Two-line display' },
+  { value: 'color-display', labelKey: 'control.external.priceDisplayType.colorDisplay', fallback: 'Color display' }
 ];
 
 const RFID_READER_TYPE_OPTIONS = [
