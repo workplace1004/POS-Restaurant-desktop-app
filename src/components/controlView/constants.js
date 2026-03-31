@@ -232,6 +232,9 @@ export const DEFAULT_REPORT_SETTINGS = Object.fromEntries(
   })
 );
 
+/** Printers list page size in Control → External Devices → Printer → General. */
+export const PRINTERS_PAGE_SIZE = 7;
+
 export const DEFAULT_PRINTERS = [
   { id: 'p1', name: 'RP4xx Series 200DPI TSC', isDefault: false, sortOrder: 0 },
   { id: 'p2', name: 'ip printer', isDefault: true, sortOrder: 1 },

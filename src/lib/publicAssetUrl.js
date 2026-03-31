@@ -1,16 +1,36 @@
+import { POS_BACKEND_ORIGIN } from './apiOrigin.js';
+
+const base = String(import.meta.env.BASE_URL || '/');
+
+function fileLikeAppProtocol() {
+  if (typeof window === 'undefined') return false;
+  const p = window.location?.protocol;
+  return p === 'file:' || p === 'app:' || p === 'electron:';
+}
+
 /**
- * Resolve paths like `/delete.svg` (Vite `public/`) for both `http` dev and `file://` (Electron).
- * Absolute `/…` under file:// would otherwise become `file:///delete.svg` and fail.
+ * Files from `public/` (copied next to `index.html` in `dist/`).
+ * Root-relative `/x.svg` breaks under `file://`; this prefixes `import.meta.env.BASE_URL`.
  */
-export function publicAssetUrl(absPath) {
-  const raw = String(absPath ?? '').trim();
-  if (!raw) return '';
-  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
-  const pathOnly = raw.startsWith('/') ? raw.slice(1) : raw;
-  if (!pathOnly) return '';
-  try {
-    return new URL(pathOnly, window.location.href).href;
-  } catch {
-    return raw.startsWith('/') ? raw : `/${pathOnly}`;
+export function publicAssetUrl(path) {
+  const p = String(path ?? '').trim();
+  if (!p) return p;
+  if (/^(https?:|data:|blob:)/i.test(p)) return p;
+  const tail = p.startsWith('/') ? p.slice(1) : p;
+  const prefix = base.endsWith('/') ? base : `${base}/`;
+  return `${prefix}${tail}`;
+}
+
+/**
+ * Absolute paths from the API (e.g. product photos as `/uploads/...`) — resolve to the POS backend when the UI is `file://`.
+ */
+export function resolveMediaSrc(src) {
+  const s = String(src ?? '').trim();
+  if (!s) return s;
+  if (/^(https?:|data:|blob:)/i.test(s)) return s;
+  if (s.startsWith('//')) return s;
+  if (s.startsWith('/') && fileLikeAppProtocol()) {
+    return `${POS_BACKEND_ORIGIN}${s}`;
   }
+  return s;
 }

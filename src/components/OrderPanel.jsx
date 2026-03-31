@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
-import { useLanguage } from '../contexts/LanguageContext';
 import { InWaitingNameModal } from './InWaitingNameModal';
 import { InPlanningDateTimeModal } from './InPlanningDateTimeModal';
 
@@ -1473,9 +1473,9 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                             {integ === 'manual_cash' ? (
                               <span className="flex items-center justify-center w-[105px] h-[70px] text-4xl font-bold text-amber-600 bg-amber-50/80 rounded">€</span>
                             ) : integ === 'cashmatic' ? (
-                              <img src={publicAssetUrl('/cash.png')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
+                              <img src={publicAssetUrl('/cashmatic.svg')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
                             ) : integ === 'payworld' ? (
-                              <img src={publicAssetUrl('/payworld.png')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
+                              <img src={publicAssetUrl('/payworld.svg')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
                             ) : integ === 'generic' ? (
                               <img src={publicAssetUrl('/card.svg')} alt={m.name} className="max-h-[70px] min-w-[105px] w-auto object-contain" />
                             ) : (

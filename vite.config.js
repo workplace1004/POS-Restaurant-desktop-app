@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  // Relative base so Electron `loadFile(dist/index.html)` resolves JS/CSS and `./foo.svg` from `public/`.
+  base: './',
   plugins: [react()],
   server: {
     host: '0.0.0.0',

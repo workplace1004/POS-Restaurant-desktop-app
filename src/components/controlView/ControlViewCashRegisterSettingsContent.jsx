@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { PaginationArrows } from '../PaginationArrows';
 
-export function ControlViewCashRegisterContent({
+/** Top nav "Cash Register Settings" — template theme, payment types, modal-tab hints. */
+export function ControlViewCashRegisterSettingsContent({
   tr,
   subNavId,
   templateTheme,
@@ -25,6 +26,13 @@ export function ControlViewCashRegisterContent({
     () => [...paymentTypes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
     [paymentTypes]
   );
+
+  /** API may send `false`, `0`, or `"0"` for inactive; omit/`undefined` counts as active. */
+  const isPaymentTypeListActive = (pt) => {
+    const a = pt?.active;
+    if (a === false || a === 0 || a === '0') return false;
+    return true;
+  };
 
   const handleSaveTemplate = () => {
     setSavingTemplateSettings(true);
@@ -73,7 +81,7 @@ export function ControlViewCashRegisterContent({
 
   if (subNavId === 'Payment types') {
     return (
-      <div className="relative min-h-[650px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
+      <div className="relative min-h-[630px] rounded-xl border border-pos-border bg-pos-panel/30 p-4 pb-[60px]">
         <div className="flex items-center w-full justify-center mb-2">
           <button
             type="button"
@@ -92,7 +100,7 @@ export function ControlViewCashRegisterContent({
           <>
             <div
               ref={paymentTypesListRef}
-              className="max-h-[510px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              className="max-h-[500px] overflow-y-auto rounded-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               onScroll={updatePaymentTypesScrollState}
             >
               <ul className="w-full flex flex-col">
@@ -130,12 +138,48 @@ export function ControlViewCashRegisterContent({
                     </span>
                     <button
                       type="button"
-                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 max-w-[120px] truncate"
+                      className="p-2 rounded shrink-0 inline-flex items-center justify-center min-w-[2.25rem] min-h-[2.25rem] active:bg-green-500"
                       onClick={() => togglePaymentTypeActive(pt.id)}
+                      aria-label={
+                        isPaymentTypeListActive(pt)
+                          ? tr('control.paymentTypes.deactivate', 'Deactivate')
+                          : tr('control.paymentTypes.activate', 'Activate')
+                      }
+                      title={
+                        isPaymentTypeListActive(pt)
+                          ? tr('control.paymentTypes.deactivate', 'Deactivate')
+                          : tr('control.paymentTypes.activate', 'Activate')
+                      }
                     >
-                      {pt.active !== false
-                        ? tr('control.paymentTypes.deactivate', 'Deactivate')
-                        : tr('control.paymentTypes.activate', 'Activate')}
+                      <svg
+                        className="w-5 h-5 shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="9"
+                          fill="none"
+                          strokeWidth={isPaymentTypeListActive(pt) ? 2 : 2.5}
+                          className={
+                            isPaymentTypeListActive(pt)
+                              ? 'stroke-green-500'
+                              : 'stroke-pos-text-dim'
+                          }
+                        />
+                        {isPaymentTypeListActive(pt) ? (
+                          <path
+                            fill="none"
+                            strokeWidth={2.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="stroke-green-500"
+                            d="M8 12.2l2.4 2.2 5.2-5.6"
+                          />
+                        ) : null}
+                      </svg>
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
                       <button

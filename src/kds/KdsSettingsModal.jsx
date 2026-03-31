@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { useLanguage } from '../contexts/LanguageContext';
+import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 
 const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English' },

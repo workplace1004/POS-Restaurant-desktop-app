@@ -5,9 +5,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "predev": "npm install && npm install --prefix backend && npm install --prefix device && npm run generate --prefix backend && npm run migrate --prefix backend && npm run seed --prefix backend",
-    "dev": "concurrently -k -n backend,device,vite \"npm run dev --prefix backend\" \"npm run dev --prefix device\" \"vite\"",
-    "device-agent": "node ../device-agent/server.mjs",
+    "dev": "vite",
     "build": "vite build",
     "build:electron": "vite build --base ./",
     "preview": "vite preview",

@@ -14,21 +14,12 @@ import { InWaitingModal } from './components/InWaitingModal';
 import { HistoryModal } from './components/HistoryModal';
 import { LoginScreen } from './components/LoginScreen';
 import { LicenseActivationPage } from './components/LicenseActivationPage';
-import {
-  fetchDeviceFingerprint,
-  loadStoredWebLicense,
-  saveStoredWebLicense,
-  verifyWebLicenseBundle,
-  loadWebLicenseFileFromOpfs,
-  parseLicenseImportFromArrayBuffer
-} from './lib/posWebLicense.js';
 import { ControlView } from './components/ControlView';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { usePos } from './hooks/usePos';
 import { KdsPage } from './kds/KdsPage';
-import { POS_API_PREFIX as API, getSocketIoUrl } from './lib/apiOrigin.js';
+import { POS_API_PREFIX as API, POS_SOCKET_ORIGIN } from './lib/apiOrigin.js';
 
-const SOCKET_URL = getSocketIoUrl();
 const USER_STORAGE_KEY = 'pos-user';
 const VIEW_STORAGE_KEY = 'pos-view';
 const VALID_VIEWS = ['pos', 'control', 'tables', 'kds'];
@@ -60,7 +51,7 @@ function loadStoredUser() {
   }
 }
 
-const socket = io(SOCKET_URL, { path: '/socket.io' });
+const socket = io(POS_SOCKET_ORIGIN, { path: '/socket.io' });
 
 export default function App() {
   const { t } = useLanguage();
@@ -77,11 +68,6 @@ export default function App() {
     isElectronApp ? 'loading' : 'ready'
   );
   const [electronLicenseOk, setElectronLicenseOk] = useState(() => !isElectronApp);
-
-  const [webLicensePhase, setWebLicensePhase] = useState(() => (isElectronApp ? 'ready' : 'loading'));
-  const [webLicenseOk, setWebLicenseOk] = useState(() => isElectronApp);
-  const [webDeviceFp, setWebDeviceFp] = useState(null);
-  const [webDeviceErr, setWebDeviceErr] = useState(null);
 
   useEffect(() => {
     if (!isElectronApp) return undefined;
@@ -112,58 +98,6 @@ export default function App() {
       cancelled = true;
       offInv?.();
       offUp?.();
-    };
-  }, [isElectronApp]);
-
-  useEffect(() => {
-    if (isElectronApp) return undefined;
-    let cancelled = false;
-    (async () => {
-      setWebLicensePhase('loading');
-      setWebDeviceErr(null);
-      try {
-        const fp = await fetchDeviceFingerprint();
-        if (cancelled) return;
-        setWebDeviceFp(fp);
-        let bundle = null;
-        const opfsBuf = await loadWebLicenseFileFromOpfs();
-        if (opfsBuf) {
-          const imp = await parseLicenseImportFromArrayBuffer(opfsBuf);
-          if (imp.ok && imp.license && imp.signature) {
-            bundle = {
-              licenseKey: imp.licenseKey,
-              license: imp.license,
-              signature: imp.signature
-            };
-          }
-        }
-        if (!bundle) {
-          const stored = loadStoredWebLicense();
-          if (stored?.licenseKey && stored?.license && stored?.signature) bundle = stored;
-        }
-        if (bundle) {
-          const pemRaw = import.meta.env.VITE_LICENSE_RSA_PUBLIC_KEY_PEM;
-          const pem =
-            pemRaw && String(pemRaw).trim()
-              ? String(pemRaw).replace(/\\n/g, '\n')
-              : '';
-          let ok = false;
-          if (pem.includes('BEGIN')) {
-            ok = await verifyWebLicenseBundle(bundle, fp, pem);
-          }
-          if (!cancelled && ok) {
-            saveStoredWebLicense(bundle);
-            setWebLicenseOk(true);
-          }
-        }
-      } catch (e) {
-        if (!cancelled) setWebDeviceErr(e instanceof Error ? e.message : 'failed');
-      } finally {
-        if (!cancelled) setWebLicensePhase('ready');
-      }
-    })();
-    return () => {
-      cancelled = true;
     };
   }, [isElectronApp]);
 
@@ -433,28 +367,7 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
   }
 
   if (isElectronApp && !electronLicenseOk) {
-    return (
-      <LicenseActivationPage variant="electron" onActivated={() => setElectronLicenseOk(true)} />
-    );
-  }
-
-  if (!isElectronApp && webLicensePhase === 'loading') {
-    return (
-      <div className="flex min-h-screen min-h-[100dvh] w-full items-center justify-center bg-pos-bg">
-        <LoadingSpinner label={t('license.checking')} />
-      </div>
-    );
-  }
-
-  if (!isElectronApp && !webLicenseOk) {
-    return (
-      <LicenseActivationPage
-        variant="web"
-        deviceFingerprint={webDeviceFp}
-        deviceError={webDeviceErr}
-        onActivated={() => setWebLicenseOk(true)}
-      />
-    );
+    return <LicenseActivationPage onActivated={() => setElectronLicenseOk(true)} />;
   }
 
   if (!user) {

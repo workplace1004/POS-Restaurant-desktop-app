@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { useLanguage } from '../contexts/LanguageContext';
+import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { KdsHeader } from './KdsHeader';
 import { KdsSettingsModal } from './KdsSettingsModal';
 import { ConsolidationSidebar } from './ConsolidationSidebar';

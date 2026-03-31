@@ -1,37 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { publicAssetUrl } from '../lib/publicAssetUrl.js';
-
-/** Empty category / no categories illustration for main product panel */
-function NoCategoriesIcon({ className }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 96 96"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M20 28h22l6 8h30a6 6 0 016 6v36a6 6 0 01-6 6H26a6 6 0 01-6-6V34a6 6 0 016-6z"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-        opacity="0.45"
-      />
-      <path
-        d="M26 44h44M26 56h32M26 68h24"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="5 5"
-        opacity="0.35"
-      />
-      <circle cx="68" cy="36" r="16" stroke="currentColor" strokeWidth="2.5" opacity="0.5" />
-      <path d="M60 36h16M68 28v16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
-    </svg>
-  );
-}
+import { resolveMediaSrc } from '../lib/publicAssetUrl.js';
 
 export function ProductArea({
   products,
@@ -285,17 +254,8 @@ export function ProductArea({
       <main className="flex-1 flex flex-col min-w-0 p-4 bg-pos-bg py-2">
         <div className="p-1 overflow-auto flex-1">
           {!layoutForCategory ? (
-            <div className="col-span-full flex flex-col items-center justify-center gap-5 text-pos-muted min-h-[min(50vh,280px)] py-10 px-4">
-              {categories.length === 0 ? (
-                <>
-                  <NoCategoriesIcon className="w-28 h-28 shrink-0 text-pos-muted" />
-                  <p className="text-lg text-center text-pos-surface max-w-md leading-snug">
-                    {t('noCategoriesMessage')}
-                  </p>
-                </>
-              ) : (
-                <p className="text-lg text-center text-pos-surface">{t('selectCategoryToSeeProducts')}</p>
-              )}
+            <div className="col-span-full flex items-center justify-center text-pos-surface text-lg min-h-[100px] max-h-[100px]">
+              {t('selectCategoryToSeeProducts')}
             </div>
           ) : (
             <div className="grid grid-cols-6 gap-1 content-start text-lg">
@@ -326,7 +286,7 @@ export function ProductArea({
                   >
                     {product.kassaPhotoPath ? (
                       <img
-                        src={publicAssetUrl(product.kassaPhotoPath)}
+                        src={resolveMediaSrc(product.kassaPhotoPath)}
                         alt={product.name}
                         className="max-w-[45px] absolute top-0 left-0 mt-1 ml-1 min-w-[45px] max-h-[45px] min-h-[45px] object-cover rounded"
                       />
@@ -387,7 +347,7 @@ export function ProductArea({
                         onClick={() => handleSubproductPress(sp)}
                       >
                         {sp.kioskPicture ? (
-                          <img src={sp.kioskPicture} alt={sp.name} className="w-10 h-10 object-cover rounded" />
+                          <img src={resolveMediaSrc(sp.kioskPicture)} alt={sp.name} className="w-10 h-10 object-cover rounded" />
                         ) : null}
                         <div className="flex flex-col items-center justify-center">
                           <span className="text-sm font-medium truncate w-full text-center">{sp.name}</span>

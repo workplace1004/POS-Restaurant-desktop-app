@@ -1,37 +1,40 @@
 /**
- * HTTP origin for the POS backend (Express + Socket.IO). Empty in the browser means same origin.
- * Electron loads the UI from file:// — set VITE_API_ORIGIN (e.g. http://127.0.0.1:5000) or rely on
- * the file:// fallback below when the backend runs on the default port.
+ * REST API base path (no trailing slash).
+ * - Browser + Vite dev: default `/api` (proxied to backend in vite.config.js).
+ * - Electron packaged (file://): `http://127.0.0.1:5000/api` so fetch reaches the local backend.
+ * Override with VITE_API_URL (e.g. http://localhost:5000/api).
  */
-function defaultOriginForFileProtocol() {
+const trimmed = (v) => String(v ?? '').trim();
+
+/** HTTP origin of the POS backend (Socket.IO, file:// fallback). */
+export const POS_BACKEND_ORIGIN = 'http://127.0.0.1:5000';
+
+const fromEnv = trimmed(import.meta.env?.VITE_API_URL);
+
+function isFileOrCustomPageProtocol() {
+  if (typeof window === 'undefined') return false;
+  const p = window.location?.protocol;
+  return p === 'file:' || p === 'app:' || p === 'electron:';
+}
+
+export const POS_API_PREFIX = (() => {
+  if (fromEnv !== '') return fromEnv.replace(/\/$/, '');
+  if (isFileOrCustomPageProtocol()) return `${POS_BACKEND_ORIGIN}/api`;
+  return '/api';
+})();
+
+/**
+ * Origin for socket.io-client. Under Vite, same host proxies /socket.io; file:// must use the backend host.
+ */
+export const POS_SOCKET_ORIGIN = (() => {
   if (typeof window === 'undefined') return '';
-  try {
-    if (window.location.protocol === 'file:') return 'http://127.0.0.1:5000';
-  } catch {
-    /* ignore */
+  if (fromEnv !== '') {
+    try {
+      return new URL(fromEnv.replace(/\/$/, '')).origin;
+    } catch {
+      return POS_BACKEND_ORIGIN;
+    }
   }
-  return '';
-}
-
-const fromEnv = String(import.meta.env.VITE_API_ORIGIN ?? '')
-  .trim()
-  .replace(/\/$/, '');
-
-/** @returns {string} Origin without trailing slash, or '' for same-origin. */
-export function getPosBackendOrigin() {
-  if (fromEnv) return fromEnv;
-  return defaultOriginForFileProtocol();
-}
-
-/** `/api` or `http://host:port/api` for standalone / Electron. */
-export const POS_API_PREFIX = getPosBackendOrigin() ? `${getPosBackendOrigin()}/api` : '/api';
-
-/** Origin URL for socket.io-client (no path). */
-export function getSocketIoUrl() {
-  const o = getPosBackendOrigin();
-  if (o) return o;
-  if (typeof window !== 'undefined' && window.location?.origin && !window.location.origin.startsWith('file')) {
-    return window.location.origin;
-  }
-  return defaultOriginForFileProtocol() || (typeof window !== 'undefined' ? window.location.origin : '');
-}
+  if (isFileOrCustomPageProtocol()) return POS_BACKEND_ORIGIN;
+  return window.location.origin;
+})();

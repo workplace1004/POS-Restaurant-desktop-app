@@ -3,6 +3,7 @@ import { Dropdown } from './Dropdown';
 import { KeyboardWithNumpad } from './KeyboardWithNumpad';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
+import { safeNumberInputValue } from './controlView/controlViewUtils.js';
 
 const PRINTER_FORM_TYPE_OPTIONS = [
   { value: 'COM', label: 'COM' },
@@ -137,7 +138,10 @@ export function PrinterModal({ open, initialPrinter, onClose, onSave, onNotify }
       setBaudrate(initialPrinter.baudrate || '9600');
       setCharacters(initialPrinter.characters || '48');
       setStandard(!!initialPrinter.standard);
-      setNumberOfPrints(Number(initialPrinter.numberOfPrints) || 1);
+      {
+        const nop = Number(initialPrinter.numberOfPrints);
+        setNumberOfPrints(Number.isFinite(nop) && nop >= 1 ? Math.floor(nop) : 1);
+      }
       setProductionTicketSize(initialPrinter.productionTicketSize || 'normal');
       setVatTicketSize(initialPrinter.vatTicketSize || 'normal');
       setSpaceBetweenProducts(initialPrinter.spaceBetweenProducts || 'none');
@@ -386,9 +390,40 @@ export function PrinterModal({ open, initialPrinter, onClose, onSave, onNotify }
                 <div className="flex items-center gap-3">
                   <label className="block min-w-[100px] max-w-[100px] font-medium text-gray-200">{tr('printerModal.numberOfPrints', 'Number of prints')} :</label>
                   <div className="flex items-center gap-2">
-                    <button type="button" className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium" onClick={() => setNumberOfPrints((n) => Math.max(1, n - 1))}>−</button>
-                    <input type="number" min={1} value={numberOfPrints} onChange={(e) => setNumberOfPrints(Math.max(1, Number(e.target.value) || 1))} className="w-16 px-2 py-2 bg-pos-panel border border-gray-300 rounded text-gray-200 text-center h-[40px]" />
-                    <button type="button" className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium" onClick={() => setNumberOfPrints((n) => n + 1)}>+</button>
+                    <button
+                      type="button"
+                      className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium"
+                      onClick={() =>
+                        setNumberOfPrints((n) => {
+                          const cur = Number.isFinite(n) ? n : 1;
+                          return Math.max(1, cur - 1);
+                        })
+                      }
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={safeNumberInputValue(numberOfPrints, 1)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setNumberOfPrints(Number.isFinite(v) ? Math.max(1, Math.floor(v)) : 1);
+                      }}
+                      className="w-16 px-2 py-2 bg-pos-panel border border-gray-300 rounded text-gray-200 text-center h-[40px]"
+                    />
+                    <button
+                      type="button"
+                      className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium"
+                      onClick={() =>
+                        setNumberOfPrints((n) => {
+                          const cur = Number.isFinite(n) ? n : 1;
+                          return cur + 1;
+                        })
+                      }
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
@@ -428,9 +463,40 @@ export function PrinterModal({ open, initialPrinter, onClose, onSave, onNotify }
                 <div className="flex items-center gap-3">
                   <label className="block min-w-[100px] max-w-[100px] font-medium text-gray-200">{tr('printerModal.numberOfPrints', 'Number of prints')} :</label>
                   <div className="flex items-center gap-2">
-                    <button type="button" className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium" onClick={() => setNumberOfPrints((n) => Math.max(1, n - 1))}>−</button>
-                    <input type="number" min={1} value={numberOfPrints} onChange={(e) => setNumberOfPrints(Math.max(1, Number(e.target.value) || 1))} className="w-16 px-2 py-2 bg-pos-panel border border-gray-300 rounded text-gray-200 text-center h-[40px]" />
-                    <button type="button" className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium" onClick={() => setNumberOfPrints((n) => n + 1)}>+</button>
+                    <button
+                      type="button"
+                      className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium"
+                      onClick={() =>
+                        setNumberOfPrints((n) => {
+                          const cur = Number.isFinite(n) ? n : 1;
+                          return Math.max(1, cur - 1);
+                        })
+                      }
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={safeNumberInputValue(numberOfPrints, 1)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setNumberOfPrints(Number.isFinite(v) ? Math.max(1, Math.floor(v)) : 1);
+                      }}
+                      className="w-16 px-2 py-2 bg-pos-panel border border-gray-300 rounded text-gray-200 text-center h-[40px]"
+                    />
+                    <button
+                      type="button"
+                      className="p-2 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 font-medium"
+                      onClick={() =>
+                        setNumberOfPrints((n) => {
+                          const cur = Number.isFinite(n) ? n : 1;
+                          return cur + 1;
+                        })
+                      }
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>

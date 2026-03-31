@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
-import { useLanguage } from '../contexts/LanguageContext';
 import { TableShapeSvg, getTableFill } from './TableShapeSvg';
 import { LoadingSpinner } from './LoadingSpinner';
 
@@ -10,12 +10,6 @@ const TABLE_GAP = 24;
 const TABLE_POSITIONS_STORAGE_KEY = 'pos.tables.positions';
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
 const TABLE_PAID_HIGHLIGHT_WINDOW_MS = 15 * 60 * 1000;
-
-const TABLE_TEMPLATE_OPTIONS = [
-  { id: '4table', src: '/4table.svg' },
-  { id: '5table', src: '/5table.svg' },
-  { id: '6table', src: '/6table.svg' }
-];
 
 const ZOOM_MIN = 50;
 const ZOOM_MAX = 150;
@@ -190,7 +184,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
     return Math.max(400, maxY + TABLE_SIZE + TABLE_GAP);
   }, [positions]);
 
-  const layoutCanvasHeight = layout?.floorHeight ? Math.max(400, Number(layout.floorHeight)) : 654;
+  const layoutCanvasHeight = layout?.floorHeight ? Math.max(400, Number(layout.floorHeight)) : 614;
   const layoutCanvasWidth = layout?.floorWidth ? Math.max(400, Number(layout.floorWidth)) : 2048;
 
   const handleNextRoom = () => {
@@ -233,10 +227,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
         {time != null ? <span className="text-3xl">{time}</span> : null}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto p-4 bg-pos-bg flex items-center justify-center">
-        <div
-          className="min-w-[980px] max-w-[980px] min-h-[580px] max-h-[580px] w-[980px] h-[580px] overflow-auto shrink-0 bg-pos-bg"
-        >
+      <div className="flex-1 overflow-hidden p-6 bg-pos-bg">
         <div
           style={{
             transform: `scale(${zoom / 100})`,
@@ -247,8 +238,9 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
             ref={canvasRef}
             className="relative w-full"
             style={{
-              minHeight: useLayoutMode ? `${layoutCanvasHeight}px` : `${contentHeight}px`,
-              ...(useLayoutMode ? { minWidth: `${layoutCanvasWidth}px` } : {})
+              minHeight: useLayoutMode ? `${layoutCanvasHeight-40}px` : `${contentHeight-100}px`,
+              maxHeight: useLayoutMode ? `${layoutCanvasHeight-40}px` : `${contentHeight-100}px`,
+              ...(useLayoutMode ? { minWidth: `${layoutCanvasWidth}px`, maxWidth: `${layoutCanvasWidth}px` } : {})
             }}
           >
           {useLayoutMode ? (
@@ -365,7 +357,20 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                   } cursor-pointer`}
                   style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
                 >
-                  <img src={publicAssetUrl('/table.png')} alt={`${t('table')} ${tableNumber}`} className="w-full h-full object-contain" />
+                  <TableShapeSvg
+                    templateType={
+                      table?.templateType === '6table' || table?.templateType === '5table' || table?.templateType === '4table'
+                        ? table.templateType
+                        : Number(table?.chairs) >= 6
+                          ? '6table'
+                          : Number(table?.chairs) >= 5
+                            ? '5table'
+                            : '4table'
+                    }
+                    tableFill={getTableFill(hasOpenOrders, wasPaidRecently)}
+                    className="w-full h-full object-contain pointer-events-none"
+                    idPrefix={`room-${id}`}
+                  />
                   {tableColorOverlay ? <span className={`absolute inset-0 pointer-events-none ${tableColorOverlay}`} aria-hidden /> : null}
                   <span
                     className={`absolute inset-0 flex items-center justify-center text-[40px] font-bold -mt-10 pointer-events-none ${tableNumberColorClass}`}
@@ -377,7 +382,6 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
             })
           )}
           </div>
-        </div>
         </div>
       </div>
 

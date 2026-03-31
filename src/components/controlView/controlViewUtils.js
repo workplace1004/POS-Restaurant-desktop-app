@@ -8,6 +8,57 @@ import {
   TABLE_TEMPLATE_OPTIONS
 } from './constants.js';
 
+/** Set tables modal: layout bounds match the fixed editor canvas (see ControlView chrome). */
+export const SET_TABLES_LAYOUT_CANVAS_WIDTH = 979;
+export const SET_TABLES_LAYOUT_CANVAS_HEIGHT = 614;
+
+/** Parse x/y from layout JSON (supports left/top, posX/posY, comma decimals). */
+export function parseLayoutCoord(value) {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const s = String(value).trim().replace(/\s/g, '').replace(',', '.');
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Read table X for editor / canvas (canonical x plus legacy keys; skip null/empty so `left` still applies). */
+export function layoutEditorReadTableX(table) {
+  if (!table || typeof table !== 'object') return 0;
+  for (const v of [table.x, table.left, table.posX, table.position?.x]) {
+    if (v != null && v !== '') return parseLayoutCoord(v);
+  }
+  return 0;
+}
+
+/** Read table Y for editor / canvas (canonical y plus legacy keys). */
+export function layoutEditorReadTableY(table) {
+  if (!table || typeof table !== 'object') return 0;
+  for (const v of [table.y, table.top, table.posY, table.position?.y]) {
+    if (v != null && v !== '') return parseLayoutCoord(v);
+  }
+  return 0;
+}
+
+function hasExplicitTableX(table) {
+  if (table == null || typeof table !== 'object') return false;
+  if (Object.prototype.hasOwnProperty.call(table, 'x')) return true;
+  if (Object.prototype.hasOwnProperty.call(table, 'left')) return true;
+  if (Object.prototype.hasOwnProperty.call(table, 'posX')) return true;
+  const pos = table.position;
+  if (pos != null && typeof pos === 'object' && Object.prototype.hasOwnProperty.call(pos, 'x')) return true;
+  return false;
+}
+
+function hasExplicitTableY(table) {
+  if (table == null || typeof table !== 'object') return false;
+  if (Object.prototype.hasOwnProperty.call(table, 'y')) return true;
+  if (Object.prototype.hasOwnProperty.call(table, 'top')) return true;
+  if (Object.prototype.hasOwnProperty.call(table, 'posY')) return true;
+  const pos = table.position;
+  if (pos != null && typeof pos === 'object' && Object.prototype.hasOwnProperty.call(pos, 'y')) return true;
+  return false;
+}
+
 export function normalizeFunctionButtonSlots(value) {
   if (!Array.isArray(value)) return Array(FUNCTION_BUTTON_SLOT_COUNT).fill('');
   const next = Array(FUNCTION_BUTTON_SLOT_COUNT).fill('');
@@ -41,18 +92,14 @@ export function normalizeOptionButtonSlots(value) {
   return next;
 }
 
-export function createDefaultBoard(table, color = '#facc15') {
-  const tableW = Math.max(60, Number(table?.width) || 120);
-  const tableH = Math.max(40, Number(table?.height) || 80);
-  const boardW = Math.max(120, Math.round(tableW + 40));
-  const boardH = Math.max(120, Math.round(tableH + 40));
+export function createDefaultBoard(_table, color = '#facc15') {
   return {
     id: `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     color,
-    x: 0,
-    y: 0,
-    width: boardW,
-    height: boardH,
+    x: 100,
+    y: 100,
+    width: 30,
+    height: 180,
     rotation: 0
   };
 }
@@ -61,8 +108,8 @@ export function normalizeBoardToItem(b, defaultColor = '#facc15') {
   return {
   id: b?.id && typeof b.id === 'string' ? b.id : `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
   color: typeof b?.color === 'string' && b.color.trim() ? b.color.trim() : defaultColor,
-  x: Number(b?.x) || 0,
-  y: Number(b?.y) || 0,
+  x: parseLayoutCoord(b?.x ?? b?.left ?? b?.posX),
+  y: parseLayoutCoord(b?.y ?? b?.top ?? b?.posY),
   width: Math.max(10, Number(b?.width) || 120),
   height: Math.max(10, Number(b?.height) || 120),
   rotation: Number(b?.rotation) || 0
@@ -72,8 +119,8 @@ export function normalizeBoardToItem(b, defaultColor = '#facc15') {
 export function createDefaultFlowerPot() {
   return {
     id: `flowerpot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    x: 0,
-    y: 0,
+    x: 200,
+    y: 200,
     width: 60,
     height: 72,
     rotation: 0
@@ -83,8 +130,8 @@ export function createDefaultFlowerPot() {
 export function normalizeFlowerPotToItem(fp) {
   return {
     id: fp?.id && typeof fp.id === 'string' ? fp.id : `flowerpot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    x: Number(fp?.x) || 0,
-    y: Number(fp?.y) || 0,
+    x: parseLayoutCoord(fp?.x ?? fp?.left ?? fp?.posX),
+    y: parseLayoutCoord(fp?.y ?? fp?.top ?? fp?.posY),
     width: Math.max(10, Number(fp?.width) || 60),
     height: Math.max(10, Number(fp?.height) || 72),
     rotation: Number(fp?.rotation) || 0
@@ -98,7 +145,7 @@ export function createDefaultLayoutTable(index = 1, templateType = '4table') {
     name: `T-${String(index).padStart(2, '0')}`,
     x: 120 + (index - 1) * 180,
     y: 120 + ((index - 1) % 3) * 120,
-    width: tpl.width,
+    width: tpl.width, 
     height: tpl.height,
     chairs: tpl.chairs,
     rotation: 0,
@@ -112,11 +159,16 @@ export function createDefaultLayoutTable(index = 1, templateType = '4table') {
 export function normalizeLayoutEditorDraft(raw, locationName = 'Restaurant') {
   const hasTablesArray = Array.isArray(raw?.tables);
   const tables = Array.isArray(raw?.tables)
-    ? raw.tables.map((table, index) => ({
+    ? raw.tables.map((table, index) => {
+        const xParsed = parseLayoutCoord(table?.x ?? table?.left ?? table?.posX ?? table?.position?.x);
+        const yParsed = parseLayoutCoord(table?.y ?? table?.top ?? table?.posY ?? table?.position?.y);
+        const defaultX = 120 + index * 180;
+        const defaultY = 120 + (index % 3) * 120;
+        return {
         id: String(table?.id || `tbl-${index + 1}`),
         name: String(table?.name || `T-${String(index + 1).padStart(2, '0')}`),
-        x: Number(table?.x) || 0,
-        y: Number(table?.y) || 0,
+        x: hasExplicitTableX(table) ? xParsed : defaultX,
+        y: hasExplicitTableY(table) ? yParsed : defaultY,
         width: Math.max(60, Number(table?.width) || 120),
         height: Math.max(40, Number(table?.height) || 80),
         chairs: Math.max(0, Number(table?.chairs) || 4),
@@ -147,14 +199,23 @@ export function normalizeLayoutEditorDraft(raw, locationName = 'Restaurant') {
             : table?.flowerPot && typeof table.flowerPot === 'object'
               ? [normalizeFlowerPotToItem(table.flowerPot)]
               : []
-      }))
+        };
+      })
     : [];
   return {
     floorName: String(raw?.floorName || locationName || 'Restaurant'),
-    floorWidth: Math.min(979, Math.max(400, Number(raw?.floorWidth) ?? 979)),
-    floorHeight: Number(raw?.floorHeight) ?? 595.5,
+    floorWidth: SET_TABLES_LAYOUT_CANVAS_WIDTH,
+    floorHeight: SET_TABLES_LAYOUT_CANVAS_HEIGHT,
     bookingCapacity: Math.max(0, Number(raw?.bookingCapacity) || 0),
     floors: Math.max(1, Number(raw?.floors) || 1),
     tables: hasTablesArray ? tables : [createDefaultLayoutTable(1)]
   };
+}
+
+/** Coerce values for controlled `<input type="number" />` / `range` (React warns if `value` is NaN). */
+export function safeNumberInputValue(value, fallback = 0) {
+  const fb = Number(fallback);
+  const safeFb = Number.isFinite(fb) ? fb : 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : safeFb;
 }
