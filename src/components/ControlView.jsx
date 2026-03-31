@@ -499,9 +499,7 @@ const createDefaultLayoutTable = (index = 1, templateType = '4table') => {
     chairs: tpl.chairs,
     rotation: 0,
     round: false,
-    templateType: tpl.id,
-    boards: [],
-    flowerPots: []
+    templateType: tpl.id
   };
 };
 
@@ -520,33 +518,37 @@ function clampSetTablesDraftToFloor(draft) {
     const maxY = Math.max(0, canvasH - th);
     const nx = Math.min(Math.max(0, x), maxX);
     const ny = Math.min(Math.max(0, y), maxY);
-    const boards = (Array.isArray(table.boards) ? table.boards : []).map((b) => {
-      const bw = Math.max(10, Number(b.width) || 10);
-      const bh = Math.max(10, Number(b.height) || 10);
-      const bx = Math.min(Math.max(0, Number(b.x) || 0), Math.max(0, canvasW - bw));
-      const by = Math.min(Math.max(0, Number(b.y) || 0), Math.max(0, canvasH - bh));
-      return { ...b, x: bx, y: by };
-    });
-    const flowerPots = (Array.isArray(table.flowerPots) ? table.flowerPots : []).map((fp) => {
-      const fw = Math.max(10, Number(fp.width) || 10);
-      const fh = Math.max(10, Number(fp.height) || 10);
-      const fx = Math.min(Math.max(0, Number(fp.x) || 0), Math.max(0, canvasW - fw));
-      const fy = Math.min(Math.max(0, Number(fp.y) || 0), Math.max(0, canvasH - fh));
-      return { ...fp, x: fx, y: fy };
-    });
-    return { ...table, x: nx, y: ny, boards, flowerPots };
+    return { ...table, x: nx, y: ny };
+  };
+  const clampOneBoard = (b) => {
+    const bw = Math.max(10, Number(b?.width) || 10);
+    const bh = Math.max(10, Number(b?.height) || 10);
+    const bx = Math.min(Math.max(0, Number(b?.x) || 0), Math.max(0, canvasW - bw));
+    const by = Math.min(Math.max(0, Number(b?.y) || 0), Math.max(0, canvasH - bh));
+    return { ...b, x: bx, y: by, width: bw, height: bh };
+  };
+  const clampOneFlowerPot = (fp) => {
+    const fw = Math.max(10, Number(fp?.width) || 10);
+    const fh = Math.max(10, Number(fp?.height) || 10);
+    const fx = Math.min(Math.max(0, Number(fp?.x) || 0), Math.max(0, canvasW - fw));
+    const fy = Math.min(Math.max(0, Number(fp?.y) || 0), Math.max(0, canvasH - fh));
+    return { ...fp, x: fx, y: fy, width: fw, height: fh };
   };
 
   return {
     ...draft,
     floorWidth: canvasW,
     floorHeight: canvasH,
-    tables: (Array.isArray(draft.tables) ? draft.tables : []).map(clampOneTable)
+    tables: (Array.isArray(draft.tables) ? draft.tables : []).map(clampOneTable),
+    boards: (Array.isArray(draft.boards) ? draft.boards : []).map(clampOneBoard),
+    flowerPots: (Array.isArray(draft.flowerPots) ? draft.flowerPots : []).map(clampOneFlowerPot)
   };
 }
 
 const normalizeLayoutEditorDraft = (raw, locationName = 'Restaurant') => {
   const hasTablesArray = Array.isArray(raw?.tables);
+  const hasTopLevelBoards = Array.isArray(raw?.boards);
+  const hasTopLevelFlowerPots = Array.isArray(raw?.flowerPots);
   const tables = Array.isArray(raw?.tables)
     ? raw.tables.map((table, index) => ({
       id: String(table?.id || `tbl-${index + 1}`),
@@ -560,31 +562,35 @@ const normalizeLayoutEditorDraft = (raw, locationName = 'Restaurant') => {
       round: !!table?.round,
       templateType: TABLE_TEMPLATE_OPTIONS.some((tpl) => tpl.id === table?.templateType)
         ? table.templateType
-        : ((Number(table?.chairs) || 4) >= 6 ? '6table' : (Number(table?.chairs) || 4) >= 5 ? '5table' : '4table'),
-      boards: (() => {
-        if (Array.isArray(table?.boards) && table.boards.length > 0) {
-          return table.boards.map((b) => normalizeBoardToItem(b));
-        }
-        if (table?.board && typeof table.board === 'object') {
-          return [normalizeBoardToItem(table.board)];
-        }
-        if (typeof table?.boardColor === 'string' && table.boardColor.trim()) {
-          return [normalizeBoardToItem(createDefaultBoard(table, table.boardColor.trim()))];
-        }
-        return [];
-      })(),
-      flowerPots: Array.isArray(table?.flowerPots) && table.flowerPots.length > 0
-        ? table.flowerPots.map((fp) => normalizeFlowerPotToItem(fp))
-        : (table?.flowerPot && typeof table.flowerPot === 'object' ? [normalizeFlowerPotToItem(table.flowerPot)] : [])
+        : ((Number(table?.chairs) || 4) >= 6 ? '6table' : (Number(table?.chairs) || 4) >= 5 ? '5table' : '4table')
     }))
     : [];
+  const legacyBoards = Array.isArray(raw?.tables)
+    ? raw.tables.flatMap((table) => {
+      if (Array.isArray(table?.boards) && table.boards.length > 0) return table.boards.map((b) => normalizeBoardToItem(b));
+      if (table?.board && typeof table.board === 'object') return [normalizeBoardToItem(table.board)];
+      if (typeof table?.boardColor === 'string' && table.boardColor.trim()) return [normalizeBoardToItem(createDefaultBoard(table, table.boardColor.trim()))];
+      return [];
+    })
+    : [];
+  const legacyFlowerPots = Array.isArray(raw?.tables)
+    ? raw.tables.flatMap((table) => (
+      Array.isArray(table?.flowerPots) && table.flowerPots.length > 0
+        ? table.flowerPots.map((fp) => normalizeFlowerPotToItem(fp))
+        : (table?.flowerPot && typeof table.flowerPot === 'object' ? [normalizeFlowerPotToItem(table.flowerPot)] : [])
+    ))
+    : [];
+  const boards = hasTopLevelBoards ? raw.boards.map((b) => normalizeBoardToItem(b)) : legacyBoards;
+  const flowerPots = hasTopLevelFlowerPots ? raw.flowerPots.map((fp) => normalizeFlowerPotToItem(fp)) : legacyFlowerPots;
   const base = {
     floorName: String(raw?.floorName || locationName || 'Restaurant'),
     floorWidth: SET_TABLES_LAYOUT_CANVAS_WIDTH,
     floorHeight: SET_TABLES_LAYOUT_CANVAS_HEIGHT,
     bookingCapacity: Math.max(0, Number(raw?.bookingCapacity) || 0),
     floors: Math.max(1, Number(raw?.floors) || 1),
-    tables: hasTablesArray ? tables : [createDefaultLayoutTable(1)]
+    tables: hasTablesArray ? tables : [createDefaultLayoutTable(1)],
+    boards,
+    flowerPots
   };
   return clampSetTablesDraftToFloor(base);
 };
@@ -3153,8 +3159,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   };
 
   const selectedSetTable = setTablesDraft.tables.find((table) => table.id === setTablesSelectedTableId) || null;
-  const boards = selectedSetTable?.boards ?? [];
-  const flowerPots = selectedSetTable?.flowerPots ?? [];
+  const boards = Array.isArray(setTablesDraft.boards) ? setTablesDraft.boards : [];
+  const flowerPots = Array.isArray(setTablesDraft.flowerPots) ? setTablesDraft.flowerPots : [];
   const selectedSetBoardIndex = setTablesSelectedBoardIndex != null && setTablesSelectedBoardIndex >= 0 && setTablesSelectedBoardIndex < boards.length ? setTablesSelectedBoardIndex : null;
   const selectedSetBoard = selectedSetBoardIndex != null ? boards[selectedSetBoardIndex] : null;
   const selectedSetFlowerPotIndex = setTablesSelectedFlowerPotIndex != null && setTablesSelectedFlowerPotIndex >= 0 && setTablesSelectedFlowerPotIndex < flowerPots.length ? setTablesSelectedFlowerPotIndex : null;
@@ -3174,31 +3180,31 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   };
 
   const updateSelectedSetBoard = (patch) => {
-    if (!setTablesSelectedTableId || selectedSetBoardIndex == null) return;
+    if (selectedSetBoardIndex == null) return;
     setSetTablesDraft((prev) =>
       clampSetTablesDraftToFloor({
         ...prev,
-        tables: prev.tables.map((table) => {
-          if (table.id !== setTablesSelectedTableId || !Array.isArray(table.boards) || selectedSetBoardIndex >= table.boards.length) return table;
-          const nextBoards = [...table.boards];
+        boards: (() => {
+          const nextBoards = [...(Array.isArray(prev.boards) ? prev.boards : [])];
+          if (selectedSetBoardIndex >= nextBoards.length) return nextBoards;
           nextBoards[selectedSetBoardIndex] = { ...nextBoards[selectedSetBoardIndex], ...patch };
-          return { ...table, boards: nextBoards };
-        })
+          return nextBoards;
+        })()
       })
     );
   };
 
   const updateSelectedSetFlowerPot = (patch) => {
-    if (!setTablesSelectedTableId || selectedSetFlowerPotIndex == null) return;
+    if (selectedSetFlowerPotIndex == null) return;
     setSetTablesDraft((prev) =>
       clampSetTablesDraftToFloor({
         ...prev,
-        tables: prev.tables.map((table) => {
-          if (table.id !== setTablesSelectedTableId || !Array.isArray(table.flowerPots) || selectedSetFlowerPotIndex >= table.flowerPots.length) return table;
-          const nextFlowerPots = [...table.flowerPots];
+        flowerPots: (() => {
+          const nextFlowerPots = [...(Array.isArray(prev.flowerPots) ? prev.flowerPots : [])];
+          if (selectedSetFlowerPotIndex >= nextFlowerPots.length) return nextFlowerPots;
           nextFlowerPots[selectedSetFlowerPotIndex] = { ...nextFlowerPots[selectedSetFlowerPotIndex], ...patch };
-          return { ...table, flowerPots: nextFlowerPots };
-        })
+          return nextFlowerPots;
+        })()
       })
     );
   };
@@ -3218,66 +3224,61 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   };
 
   const handleAddBoard = () => {
-    if (!setTablesSelectedTableId) return;
     setShowSetBoardColorModal(true);
   };
 
   const handleRemoveBoard = () => {
-    if (!setTablesSelectedTableId) return;
+    if (selectedSetBoardIndex == null) return;
     setSetTablesDraft((prev) => {
-      const table = prev.tables.find((t) => t.id === setTablesSelectedTableId);
-      if (!table || !Array.isArray(table.boards) || table.boards.length === 0) return prev;
-      const idx = selectedSetBoardIndex != null && selectedSetBoardIndex < table.boards.length ? selectedSetBoardIndex : table.boards.length - 1;
-      const nextBoards = table.boards.filter((_, i) => i !== idx);
+      const prevBoards = Array.isArray(prev.boards) ? prev.boards : [];
+      if (prevBoards.length === 0) return prev;
+      const idx = selectedSetBoardIndex < prevBoards.length ? selectedSetBoardIndex : prevBoards.length - 1;
+      const nextBoards = prevBoards.filter((_, i) => i !== idx);
       return clampSetTablesDraftToFloor({
         ...prev,
-        tables: prev.tables.map((t) => (t.id !== setTablesSelectedTableId ? t : { ...t, boards: nextBoards }))
+        boards: nextBoards
       });
     });
     setSetTablesSelectedBoardIndex(null);
   };
 
   const handleSelectBoardColor = (color) => {
-    if (!setTablesSelectedTableId) return;
     setSetTablesDraft((prev) =>
       clampSetTablesDraftToFloor({
         ...prev,
-        tables: prev.tables.map((table) => {
-          if (table.id !== setTablesSelectedTableId) return table;
-          const newBoard = { ...createDefaultBoard(table, color), color };
-          const nextBoards = [...(Array.isArray(table.boards) ? table.boards : []), newBoard];
-          return { ...table, boards: nextBoards };
-        })
+        boards: [...(Array.isArray(prev.boards) ? prev.boards : []), { ...createDefaultBoard(null, color), color }]
       })
     );
+    setSetTablesSelectedTableId(null);
+    setSetTablesSelectedFlowerPotIndex(null);
+    const nextBoardIndex = boards.length;
+    setSetTablesSelectedBoardIndex(nextBoardIndex);
     setShowSetBoardColorModal(false);
   };
 
   const handleAddFlowerPot = () => {
-    if (!setTablesSelectedTableId) return;
-    setSetTablesDraft((prev) =>
-      clampSetTablesDraftToFloor({
+    setSetTablesDraft((prev) => {
+      const next = clampSetTablesDraftToFloor({
         ...prev,
-        tables: prev.tables.map((table) => {
-          if (table.id !== setTablesSelectedTableId) return table;
-          const newFlowerPot = createDefaultFlowerPot();
-          const nextFlowerPots = [...(Array.isArray(table.flowerPots) ? table.flowerPots : []), newFlowerPot];
-          return { ...table, flowerPots: nextFlowerPots };
-        })
-      })
-    );
+        flowerPots: [...(Array.isArray(prev.flowerPots) ? prev.flowerPots : []), createDefaultFlowerPot()]
+      });
+      return next;
+    });
+    setSetTablesSelectedTableId(null);
+    setSetTablesSelectedBoardIndex(null);
+    setSetTablesSelectedFlowerPotIndex(flowerPots.length);
   };
 
   const handleRemoveFlowerPot = () => {
-    if (!setTablesSelectedTableId) return;
+    if (selectedSetFlowerPotIndex == null) return;
     setSetTablesDraft((prev) => {
-      const table = prev.tables.find((t) => t.id === setTablesSelectedTableId);
-      if (!table || !Array.isArray(table.flowerPots) || table.flowerPots.length === 0) return prev;
-      const idx = selectedSetFlowerPotIndex != null && selectedSetFlowerPotIndex < table.flowerPots.length ? selectedSetFlowerPotIndex : table.flowerPots.length - 1;
-      const nextFlowerPots = table.flowerPots.filter((_, i) => i !== idx);
+      const prevFlowerPots = Array.isArray(prev.flowerPots) ? prev.flowerPots : [];
+      if (prevFlowerPots.length === 0) return prev;
+      const idx = selectedSetFlowerPotIndex < prevFlowerPots.length ? selectedSetFlowerPotIndex : prevFlowerPots.length - 1;
+      const nextFlowerPots = prevFlowerPots.filter((_, i) => i !== idx);
       return clampSetTablesDraftToFloor({
         ...prev,
-        tables: prev.tables.map((t) => (t.id !== setTablesSelectedTableId ? t : { ...t, flowerPots: nextFlowerPots }))
+        flowerPots: nextFlowerPots
       });
     });
     setSetTablesSelectedFlowerPotIndex(null);
@@ -3290,6 +3291,32 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       setSetTablesSelectedTableId(nextTables[0]?.id || null);
       return clampSetTablesDraftToFloor({ ...prev, tables: nextTables });
     });
+  };
+
+  /** Remove selected flower pot, else board, else the whole table. */
+  const handleDeleteSetTablesSelection = () => {
+    const fpCount = flowerPots.length;
+    const boardCount = boards.length;
+    const fpSelected =
+      selectedSetFlowerPotIndex != null && selectedSetFlowerPotIndex >= 0 && selectedSetFlowerPotIndex < fpCount;
+    const boardSelected =
+      selectedSetBoardIndex != null && selectedSetBoardIndex >= 0 && selectedSetBoardIndex < boardCount;
+    if (fpSelected) {
+      handleRemoveFlowerPot();
+      return;
+    }
+    if (boardSelected) {
+      handleRemoveBoard();
+      return;
+    }
+    removeSetTable();
+  };
+
+  const handleClearSetTablesLayout = () => {
+    setSetTablesDraft((prev) => clampSetTablesDraftToFloor({ ...prev, tables: [], boards: [], flowerPots: [] }));
+    setSetTablesSelectedTableId(null);
+    setSetTablesSelectedBoardIndex(null);
+    setSetTablesSelectedFlowerPotIndex(null);
   };
 
   const saveSetTablesLayout = async () => {
@@ -7660,48 +7687,43 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
             <div className="shrink-0 border-b border-pos-border bg-black flex justify-center items-center w-full py-2 overflow-auto text-sm max-h-[min(280px,45%)]">
               <div className="space-y-3 text-pos-text">
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2">
                   <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={addSetTable}>
                     + {tr('control.tables.table', 'table')}
-                  </button>
-                  <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={removeSetTable}>
-                    - {tr('control.tables.table', 'table')}
                   </button>
                   <button
                     type="button"
                     className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
                     onClick={handleAddBoard}
-                    disabled={!setTablesSelectedTableId}
                   >
                     + {tr('control.tables.board', 'board')}
                   </button>
                   <button
                     type="button"
                     className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
-                    onClick={handleRemoveBoard}
-                    disabled={!setTablesSelectedTableId || boards.length === 0}
-                  >
-                    - {tr('control.tables.board', 'board')}
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
                     onClick={handleAddFlowerPot}
-                    disabled={!setTablesSelectedTableId}
                   >
                     + flower pot
                   </button>
                   <button
                     type="button"
-                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
-                    onClick={handleRemoveFlowerPot}
-                    disabled={!setTablesSelectedTableId || flowerPots.length === 0}
+                    className="px-4 py-2 ml-10 rounded bg-rose-500 text-white text-sm font-medium active:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={handleDeleteSetTablesSelection}
+                    disabled={selectedSetTable == null && selectedSetBoard == null && selectedSetFlowerPot == null}
                   >
-                    - flower pot
+                    {tr('control.tables.delete', 'Delete')}
                   </button>
                   <button
                     type="button"
-                    className="px-5 py-2 rounded-lg bg-green-600 text-white active:bg-green-500 text-sm"
+                    className="px-4 py-2 rounded bg-yellow-500 text-black text-sm font-medium active:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={handleClearSetTablesLayout}
+                    disabled={!setTablesDraft.tables?.length}
+                  >
+                    {tr('control.tables.clear', 'Clear')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-5 py-2 ml-10 rounded-lg bg-green-600 text-white active:bg-green-500 text-sm"
                     onClick={saveSetTablesLayout}
                   >
                     {tr('control.save', 'Save')}
@@ -7763,12 +7785,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       </button>
                     );
                   })}
-                  {setTablesDraft.tables.flatMap((table) =>
-                    (Array.isArray(table.boards) ? table.boards : []).map((board, idx) => {
-                      const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedBoardIndex === idx;
+                  {boards.map((board, idx) => {
+                      const isSelected = setTablesSelectedBoardIndex === idx;
                       return (
                         <button
-                          key={board.id || `board-${table.id}-${idx}`}
+                          key={board.id || `board-${idx}`}
                           type="button"
                           className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} active:bg-green-500`}
                           style={{
@@ -7783,20 +7804,18 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSetTablesSelectedTableId(table.id);
+                            setSetTablesSelectedTableId(null);
                             setSetTablesSelectedBoardIndex(idx);
                             setSetTablesSelectedFlowerPotIndex(null);
                           }}
                         />
                       );
-                    })
-                  )}
-                  {setTablesDraft.tables.flatMap((table) =>
-                    (Array.isArray(table.flowerPots) ? table.flowerPots : []).map((fp, idx) => {
-                      const isSelected = setTablesSelectedTableId === table.id && setTablesSelectedFlowerPotIndex === idx;
+                    })}
+                  {flowerPots.map((fp, idx) => {
+                      const isSelected = setTablesSelectedFlowerPotIndex === idx;
                       return (
                         <button
-                          key={fp.id || `flowerpot-${table.id}-${idx}`}
+                          key={fp.id || `flowerpot-${idx}`}
                           type="button"
                           className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} active:bg-green-500`}
                           style={{
@@ -7805,11 +7824,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             width: `${Math.max(10, Number(fp.width) || 10)}px`,
                             height: `${Math.max(10, Number(fp.height) || 10)}px`,
                             transform: `rotate(${Number(fp.rotation) || 0}deg)`,
-                            zIndex: 15
+                            zIndex: 30
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSetTablesSelectedTableId(table.id);
+                            setSetTablesSelectedTableId(null);
                             setSetTablesSelectedBoardIndex(null);
                             setSetTablesSelectedFlowerPotIndex(idx);
                           }}
@@ -7817,8 +7836,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           <img src={publicAssetUrl('/flowerpot.svg')} alt="Flower pot" className="w-full h-full object-contain pointer-events-none" />
                         </button>
                       );
-                    })
-                  )}
+                    })}
                 </div>
                 <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-pos-border bg-pos-panel p-1 shadow-lg">
                   <button

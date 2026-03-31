@@ -107,6 +107,14 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
   const locationId = currentRoom?.id != null ? String(currentRoom.id) : null;
   const layout = locationId && tableLayouts?.[locationId] && typeof tableLayouts[locationId] === 'object' ? tableLayouts[locationId] : null;
   const layoutTables = layout?.tables && Array.isArray(layout.tables) ? layout.tables : [];
+  const layoutBoards = useMemo(() => {
+    if (layout?.boards && Array.isArray(layout.boards)) return layout.boards;
+    return layoutTables.flatMap((layoutTable) => (Array.isArray(layoutTable?.boards) ? layoutTable.boards : []));
+  }, [layout, layoutTables]);
+  const layoutFlowerPots = useMemo(() => {
+    if (layout?.flowerPots && Array.isArray(layout.flowerPots)) return layout.flowerPots;
+    return layoutTables.flatMap((layoutTable) => (Array.isArray(layoutTable?.flowerPots) ? layoutTable.flowerPots : []));
+  }, [layout, layoutTables]);
   const useLayoutMode = layoutTables.length > 0;
 
   const tablesForCurrentRoom = useMemo(() => {
@@ -296,10 +304,9 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                   </button>
                 );
               })}
-              {layoutTables.map((layoutTable) =>
-                (Array.isArray(layoutTable.boards) ? layoutTable.boards : []).map((board) => (
+              {layoutBoards.map((board, idx) => (
                   <div
-                    key={board.id || `board-${layoutTable.id}-${board.x}-${board.y}`}
+                    key={board.id || `board-${idx}-${board.x}-${board.y}`}
                     className="absolute border border-pos-border opacity-75"
                     style={{
                       left: `${Math.max(0, Number(board.x) || 0)}px`,
@@ -311,12 +318,10 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                       backgroundColor: board.color || '#facc15'
                     }}
                   />
-                ))
-              )}
-              {layoutTables.map((layoutTable) =>
-                (Array.isArray(layoutTable.flowerPots) ? layoutTable.flowerPots : []).map((fp) => (
+                ))}
+              {layoutFlowerPots.map((fp, idx) => (
                   <div
-                    key={fp.id || `fp-${layoutTable.id}-${fp.x}-${fp.y}`}
+                    key={fp.id || `fp-${idx}-${fp.x}-${fp.y}`}
                     className="absolute border border-transparent"
                     style={{
                       left: `${Math.max(0, Number(fp.x) || 0)}px`,
@@ -329,8 +334,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                   >
                     <img src={publicAssetUrl('/flowerpot.svg')} alt="" className="w-full h-full object-contain" />
                   </div>
-                ))
-              )}
+                ))}
             </>
           ) : (
             tablesForCurrentRoom.map((table) => {

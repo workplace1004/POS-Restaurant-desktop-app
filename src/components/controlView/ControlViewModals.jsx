@@ -1236,8 +1236,21 @@ export function ControlViewModals(props) {
                   <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={addSetTable}>
                     + {tr('control.tables.table', 'table')}
                   </button>
-                  <button type="button" className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm" onClick={removeSetTable}>
-                    - {tr('control.tables.table', 'table')}
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded bg-rose-500 text-white text-sm font-medium active:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={props.handleDeleteSetTablesSelection ?? (() => {})}
+                    disabled={!setTablesSelectedTableId}
+                  >
+                    {tr('control.tables.delete', 'Delete')}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded bg-yellow-500 text-black text-sm font-medium active:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={props.handleClearSetTablesLayout ?? (() => {})}
+                    disabled={!setTablesDraft?.tables?.length}
+                  >
+                    {tr('control.tables.clear', 'Clear')}
                   </button>
                   <button
                     type="button"
@@ -1250,26 +1263,10 @@ export function ControlViewModals(props) {
                   <button
                     type="button"
                     className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
-                    onClick={handleRemoveBoard}
-                    disabled={!setTablesSelectedTableId || boards.length === 0}
-                  >
-                    - {tr('control.tables.board', 'board')}
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
                     onClick={handleAddFlowerPot}
                     disabled={!setTablesSelectedTableId}
                   >
                     + flower pot
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded border border-pos-border bg-pos-panel active:bg-green-500 text-sm"
-                    onClick={handleRemoveFlowerPot}
-                    disabled={!setTablesSelectedTableId || flowerPots.length === 0}
-                  >
-                    - flower pot
                   </button>
                   <button
                     type="button"
@@ -1419,7 +1416,7 @@ export function ControlViewModals(props) {
                             width: `${Math.max(10, Number(fp.width) || 10)}px`,
                             height: `${Math.max(10, Number(fp.height) || 10)}px`,
                             transform: `rotate(${Number(fp.rotation) || 0}deg)`,
-                            zIndex: 15
+                            zIndex: 30
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
