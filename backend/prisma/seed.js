@@ -29,7 +29,7 @@ async function main() {
     data: {
       id: 'admin',
       name: 'Admin',
-      role: 'waiter',
+      role: 'admin',
       pin: '1234'
     }
   });

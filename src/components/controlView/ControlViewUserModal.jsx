@@ -31,6 +31,8 @@ export function ControlViewUserModal({
   setUserName,
   userPin,
   setUserPin,
+  userRole,
+  setUserRole,
   userModalActiveField,
   setUserModalActiveField,
   userAvatarColorIndex,
@@ -85,6 +87,21 @@ export function ControlViewUserModal({
                     className="px-4 py-3 rounded-lg max-w-[150px] bg-pos-panel border border-pos-border text-pos-text placeholder-pos-muted focus:outline-none focus:border-green-500 text-sm"
                     autoComplete="new-password"
                   />
+                </div>
+                <div className="flex items-center">
+                  <label className="text-pos-text text-sm font-medium shrink-0 min-w-[100px] max-w-[100px]" htmlFor="user-modal-role">
+                    {tr('control.userModal.role', 'Role')}:
+                  </label>
+                  <select
+                    id="user-modal-role"
+                    value={userRole === 'admin' ? 'admin' : 'waiter'}
+                    onChange={(e) => setUserRole(e.target.value)}
+                    onFocus={() => setUserModalActiveField(null)}
+                    className="px-4 py-3 rounded-lg max-w-[180px] bg-pos-panel border border-pos-border text-pos-text focus:outline-none focus:border-green-500 text-sm cursor-pointer"
+                  >
+                    <option value="admin">{tr('control.userModal.roleAdmin', 'Admin')}</option>
+                    <option value="waiter">{tr('control.userModal.roleWaiter', 'Waiter')}</option>
+                  </select>
                 </div>
               </div>
               <div className="flex flex-col gap-4">

@@ -613,6 +613,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [editingUserId, setEditingUserId] = useState(null);
   const [userName, setUserName] = useState('');
   const [userPin, setUserPin] = useState('');
+  const [userRole, setUserRole] = useState('waiter');
   const [savingUser, setSavingUser] = useState(false);
   const [deleteConfirmUserId, setDeleteConfirmUserId] = useState(null);
   const [userModalTab, setUserModalTab] = useState('general');
@@ -4865,6 +4866,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setEditingUserId(null);
     setUserName('');
     setUserPin('');
+    setUserRole('waiter');
     setUserModalTab('general');
     setUserAvatarColorIndex(0);
     setUserModalActiveField(null);
@@ -4876,6 +4878,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setEditingUserId(u.id);
     setUserName(u.name || '');
     setUserPin('');
+    setUserRole(u?.role === 'admin' ? 'admin' : 'waiter');
     setUserModalTab('general');
     setUserAvatarColorIndex(0);
     setUserModalActiveField(null);
@@ -4886,6 +4889,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       if (res.ok && data) {
         setUserName(data.name || '');
         setUserPin(data.pin != null ? String(data.pin) : '');
+        setUserRole(data.role === 'admin' ? 'admin' : 'waiter');
       } else {
         showToast('error', data?.error || 'Failed to load user details');
       }
@@ -4900,6 +4904,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setEditingUserId(null);
     setUserName('');
     setUserPin('');
+    setUserRole('waiter');
     setUserModalTab('general');
     setUserAvatarColorIndex(0);
     setUserModalActiveField(null);
@@ -4910,7 +4915,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setSavingUser(true);
     try {
       if (editingUserId) {
-        const body = { name: userName.trim() || 'New user' };
+        const body = { name: userName.trim() || 'New user', role: userRole === 'admin' ? 'admin' : 'waiter' };
         if (userPin !== '') body.pin = userPin;
         const res = await fetch(`${API}/users/${editingUserId}`, {
           method: 'PATCH',
@@ -4926,7 +4931,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         const res = await fetch(`${API}/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: userName.trim() || 'New user', pin: userPin || '1234' })
+          body: JSON.stringify({
+            name: userName.trim() || 'New user',
+            pin: userPin || '1234',
+            role: userRole === 'admin' ? 'admin' : 'waiter'
+          })
         });
         const created = await res.json();
         if (res.ok && created) {
@@ -5818,6 +5827,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         setUserName={setUserName}
         userPin={userPin}
         setUserPin={setUserPin}
+        userRole={userRole}
+        setUserRole={setUserRole}
         userModalActiveField={userModalActiveField}
         setUserModalActiveField={setUserModalActiveField}
         userAvatarColorIndex={userAvatarColorIndex}

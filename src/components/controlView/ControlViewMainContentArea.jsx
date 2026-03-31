@@ -690,10 +690,15 @@ export function ControlViewMainContentArea({ ctx }) {
                       {[...users].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((u) => (
                         <li
                           key={u.id}
-                          className="flex items-center w-full justify-between px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
+                          className="flex items-center w-full gap-3 px-4 py-2 bg-pos-bg border-y border-pos-panel text-pos-text text-sm"
                         >
-                          <span className="font-medium">{u.name || '—'}</span>
-                          <div className="flex items-center gap-2">
+                          <span className="font-medium min-w-0 max-w-[38%] truncate shrink-0">{u.name || '—'}</span>
+                          <span className="flex-1 text-center text-pos-muted text-sm truncate px-1">
+                            {u?.role === 'admin'
+                              ? tr('control.userModal.roleAdmin', 'Admin')
+                              : tr('control.userModal.roleWaiter', 'Waiter')}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 ml-auto">
                             <button
                               type="button"
                               className="p-2 rounded text-pos-text mr-5 active:text-green-500"

@@ -15,6 +15,7 @@ import { HistoryModal } from './components/HistoryModal';
 import { LoginScreen } from './components/LoginScreen';
 import { LicenseActivationPage } from './components/LicenseActivationPage';
 import { ControlView } from './components/ControlView';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { usePos } from './hooks/usePos';
 import { KdsPage } from './kds/KdsPage';
@@ -149,6 +150,7 @@ export default function App() {
   const [showSubtotalView, setShowSubtotalView] = useState(false);
   const [subtotalBreaks, setSubtotalBreaks] = useState([]); // after each click: item count at which we inserted a subtotal
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
   const [quantityInput, setQuantityInput] = useState('');
   const [showInWaitingButton, setShowInWaitingButton] = useState(false);
   const UA_TIMEZONE = 'Europe/Kyiv';
@@ -490,7 +492,7 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
         onSelectCategory={setSelectedCategoryId}
         currentUser={user}
         onControlClick={() => setViewAndPersist('control')}
-        onLogout={handleLogout}
+        onLogout={() => setShowLogoutConfirmModal(true)}
         time={time}
       />
       <div className="flex flex-col flex-1 min-h-0 w-2/4">
@@ -680,6 +682,15 @@ const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-GB', { 
           </div>
         </div>
       )}
+      <DeleteConfirmModal
+        open={showLogoutConfirmModal}
+        onClose={() => setShowLogoutConfirmModal(false)}
+        onConfirm={() => {
+          setShowLogoutConfirmModal(false);
+          handleLogout();
+        }}
+        message={t('logoutConfirm')}
+      />
     </div>
   );
 }
