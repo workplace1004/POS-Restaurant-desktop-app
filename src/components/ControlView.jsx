@@ -504,30 +504,66 @@ function clampSetTablesDraftToFloor(draft) {
   if (!draft || typeof draft !== 'object') return draft;
   const canvasW = SET_TABLES_LAYOUT_CANVAS_WIDTH;
   const canvasH = SET_TABLES_LAYOUT_CANVAS_HEIGHT;
+  const clampRotatedPosition = (x, y, width, height, rotationDeg) => {
+    const w = Math.max(1, Number(width) || 1);
+    const h = Math.max(1, Number(height) || 1);
+    const rotation = Number(rotationDeg) || 0;
+    const rad = (rotation * Math.PI) / 180;
+    const cx = w / 2;
+    const cy = h / 2;
+    const corners = [
+      [0, 0],
+      [w, 0],
+      [w, h],
+      [0, h]
+    ];
+    let minDx = Number.POSITIVE_INFINITY;
+    let maxDx = Number.NEGATIVE_INFINITY;
+    let minDy = Number.POSITIVE_INFINITY;
+    let maxDy = Number.NEGATIVE_INFINITY;
+    for (const [px, py] of corners) {
+      const dx = px - cx;
+      const dy = py - cy;
+      const rx = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
+      const ry = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
+      minDx = Math.min(minDx, rx);
+      maxDx = Math.max(maxDx, rx);
+      minDy = Math.min(minDy, ry);
+      maxDy = Math.max(maxDy, ry);
+    }
+    const minX = -minDx;
+    const maxX = canvasW - maxDx;
+    const minY = -minDy;
+    const maxY = canvasH - maxDy;
+    return {
+      x: Math.min(Math.max(Number(x) || 0, minX), Math.max(minX, maxX)),
+      y: Math.min(Math.max(Number(y) || 0, minY), Math.max(minY, maxY))
+    };
+  };
 
   const clampOneTable = (table) => {
     const tw = table.round ? Math.max(70, Number(table.width) || 0) : Math.max(60, Number(table.width) || 0);
     const th = table.round ? tw : Math.max(40, Number(table.height) || 0);
     const x = layoutEditorReadTableX(table);
     const y = layoutEditorReadTableY(table);
-    const maxX = Math.max(0, canvasW - tw);
-    const maxY = Math.max(0, canvasH - th);
-    const nx = Math.min(Math.max(0, x), maxX);
-    const ny = Math.min(Math.max(0, y), maxY);
+    const { x: nx, y: ny } = table.round
+      ? {
+        x: Math.min(Math.max(0, x), Math.max(0, canvasW - tw)),
+        y: Math.min(Math.max(0, y), Math.max(0, canvasH - th))
+      }
+      : clampRotatedPosition(x, y, tw, th, Number(table.rotation) || 0);
     return { ...table, x: nx, y: ny };
   };
   const clampOneBoard = (b) => {
     const bw = Math.max(10, Number(b?.width) || 10);
     const bh = Math.max(10, Number(b?.height) || 10);
-    const bx = Math.min(Math.max(0, Number(b?.x) || 0), Math.max(0, canvasW - bw));
-    const by = Math.min(Math.max(0, Number(b?.y) || 0), Math.max(0, canvasH - bh));
+    const { x: bx, y: by } = clampRotatedPosition(Number(b?.x) || 0, Number(b?.y) || 0, bw, bh, Number(b?.rotation) || 0);
     return { ...b, x: bx, y: by, width: bw, height: bh };
   };
   const clampOneFlowerPot = (fp) => {
     const fw = Math.max(10, Number(fp?.width) || 10);
     const fh = Math.max(10, Number(fp?.height) || 10);
-    const fx = Math.min(Math.max(0, Number(fp?.x) || 0), Math.max(0, canvasW - fw));
-    const fy = Math.min(Math.max(0, Number(fp?.y) || 0), Math.max(0, canvasH - fh));
+    const { x: fx, y: fy } = clampRotatedPosition(Number(fp?.x) || 0, Number(fp?.y) || 0, fw, fh, Number(fp?.rotation) || 0);
     return { ...fp, x: fx, y: fy, width: fw, height: fh };
   };
 
@@ -7888,8 +7924,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           : 'rounded-md border-transparent bg-transparent'
                           } ${setTablesSelectedTableId === table.id && selectedSetBoardIndex == null && selectedSetFlowerPotIndex == null ? 'border-4 border-yellow-400' : ''} active:bg-green-500`}
                         style={{
-                          left: `${Math.max(0, layoutEditorReadTableX(table))}px`,
-                          top: `${Math.max(0, layoutEditorReadTableY(table))}px`,
+                          left: `${layoutEditorReadTableX(table)}px`,
+                          top: `${layoutEditorReadTableY(table)}px`,
                           transform: `rotate(${safeNumberInputValue(table.rotation, 0)}deg)`,
                           zIndex: 20,
                           touchAction: 'none',
@@ -7929,8 +7965,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           type="button"
                           className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} active:bg-green-500`}
                           style={{
-                            left: `${Math.max(0, Number(board.x) || 0)}px`,
-                            top: `${Math.max(0, Number(board.y) || 0)}px`,
+                            left: `${Number(board.x) || 0}px`,
+                            top: `${Number(board.y) || 0}px`,
                             width: `${Math.max(10, Number(board.width) || 10)}px`,
                             height: `${Math.max(10, Number(board.height) || 10)}px`,
                             transform: `rotate(${Number(board.rotation) || 0}deg)`,
@@ -7969,8 +8005,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                           type="button"
                           className={`absolute border-2 ${isSelected ? 'border-yellow-300' : 'border-transparent'} active:bg-green-500`}
                           style={{
-                            left: `${Math.max(0, Number(fp.x) || 0)}px`,
-                            top: `${Math.max(0, Number(fp.y) || 0)}px`,
+                            left: `${Number(fp.x) || 0}px`,
+                            top: `${Number(fp.y) || 0}px`,
                             width: `${Math.max(10, Number(fp.width) || 10)}px`,
                             height: `${Math.max(10, Number(fp.height) || 10)}px`,
                             transform: `rotate(${Number(fp.rotation) || 0}deg)`,

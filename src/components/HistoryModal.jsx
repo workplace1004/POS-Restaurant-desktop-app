@@ -18,14 +18,35 @@ export function HistoryModal({ open, onClose, historyOrders = [], onFetchHistory
   const { t } = useLanguage();
   const listRef = useRef(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
 
   useEffect(() => {
     if (open && onFetchHistory) onFetchHistory();
   }, [open, onFetchHistory]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const el = listRef.current;
+    if (!el) return undefined;
+    const updateScrollButtons = () => {
+      const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      setCanScrollUp(el.scrollTop > 0);
+      setCanScrollDown(el.scrollTop < maxScrollTop - 1);
+    };
+    updateScrollButtons();
+    el.addEventListener('scroll', updateScrollButtons);
+    window.addEventListener('resize', updateScrollButtons);
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons);
+      window.removeEventListener('resize', updateScrollButtons);
+    };
+  }, [open, historyOrders]);
+
   const scroll = (dir) => {
     const el = listRef?.current;
-    if (el) el.scrollTop += dir * 60;
+    if (!el) return;
+    el.scrollBy({ top: dir * 120, behavior: 'smooth' });
   };
 
   if (!open) return null;
@@ -92,9 +113,10 @@ export function HistoryModal({ open, onClose, historyOrders = [], onFetchHistory
         <div className="flex justify-around text-2xl gap-2 py-1 border-b border-pos-border bg-pos-bg">
           <button
             type="button"
-            className="p-2 text-pos-text active:bg-green-500 rounded"
+            className={`p-2 text-pos-text rounded ${canScrollUp ? 'active:bg-green-500' : 'opacity-40 cursor-not-allowed'}`}
             onClick={() => scroll(-1)}
             aria-label={t('scrollUp')}
+            disabled={!canScrollUp}
           >
             <svg width="24" height="24" viewBox="0 0 20 20" fill="currentColor">
               <path d="M11 17V5.414l3.293 3.293a.999.999 0 101.414-1.414l-5-5a.999.999 0 00-1.414 0l-5 5a.997.997 0 000 1.414.999.999 0 001.414 0L9 5.414V17a1 1 0 102 0z" />
@@ -102,9 +124,10 @@ export function HistoryModal({ open, onClose, historyOrders = [], onFetchHistory
           </button>
           <button
             type="button"
-            className="p-2 text-pos-text active:bg-green-500 rounded"
+            className={`p-2 text-pos-text rounded ${canScrollDown ? 'active:bg-green-500' : 'opacity-40 cursor-not-allowed'}`}
             onClick={() => scroll(1)}
             aria-label={t('scrollDown')}
+            disabled={!canScrollDown}
           >
             <svg width="24" height="24" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10.707 17.707l5-5a.999.999 0 10-1.414-1.414L11 14.586V3a1 1 0 10-2 0v11.586l-3.293-3.293a.999.999 0 10-1.414 1.414l5 5a.999.999 0 001.414 0z" />

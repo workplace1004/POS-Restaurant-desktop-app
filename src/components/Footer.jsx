@@ -356,7 +356,7 @@ export function Footer({ customersActive = false, onCustomersClick, showSubtotal
                       <button
                         key={group.id}
                         type="button"
-                        className="h-[54px] px-6 rounded bg-white/45 text-3xl text-green-400 active:bg-green-500"
+                        className="h-[40px] px-6 rounded bg-white/45 text-md text-green-400 active:bg-green-500"
                       >
                         {group.name || group.id}
                       </button>
@@ -367,7 +367,7 @@ export function Footer({ customersActive = false, onCustomersClick, showSubtotal
             <div className="flex items-center justify-center">
               <button
                 type="button"
-                className="h-[62px] min-w-[190px] rounded bg-white/45 px-8 text-3xl active:bg-green-500"
+                className="h-[40px] min-w-[190px] rounded bg-white/45 px-8 text-xl active:bg-green-500"
                 onClick={() => setShowPriceGroupModal(false)}
               >
                 {t('cancel')}

@@ -388,6 +388,7 @@ export function CustomersView({
               name="quickSearch"
               value={quickSearch}
               onFocus={setActiveInput}
+              onClick={setActiveInput}
               onChange={(e) => setQuickSearch(e.target.value)}
               placeholder={t('customersSearchPlaceholder')}
               className="py-3 px-3 bg-pos-surface border border-pos-border rounded-md text-pos-text outline-none"
@@ -432,7 +433,10 @@ export function CustomersView({
       )}
 
       <div className="shrink-0 p-0 flex gap-4 w-full justify-center">
-        <KeyboardWithNumpad />
+        <KeyboardWithNumpad
+          value={activeValue}
+          onChange={handleKeyboardChange}
+        />
       </div>
     </div>
   );
