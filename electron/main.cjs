@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const bundleServices = require('./bundleServices.cjs');
+const licenseFileDecrypt = require('./licenseFileDecrypt.cjs');
 
 // Chrome/Edge can attach to the renderer via chrome://inspect → Discover network targets (before app.ready).
 const _rdp = String(process.env.ELECTRON_REMOTE_DEBUG_PORT ?? '').trim();
@@ -11,10 +12,44 @@ if (_rdp && /^\d+$/.test(_rdp)) {
 }
 
 try {
-  // Optional: reuse frontend/.env for VITE_* in main (license + device agent).
+  // Unpackaged dev: frontend/.env next to the repo root (not inside asar).
   require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 } catch {
   /* dotenv optional */
+}
+
+// Packaged installer: license keys are copied to resources/license.env at build time (see scripts/stage-license-env.cjs).
+if (app.isPackaged) {
+  try {
+    const packagedEnv = path.join(process.resourcesPath, 'license.env');
+    if (fs.existsSync(packagedEnv)) {
+      require('dotenv').config({ path: packagedEnv, override: true });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+// Match installer branding: userData → %APPDATA%\RES POS (license, DB, caches). Must run before getPath('userData').
+app.setName('RES POS');
+
+// Windows: Chromium often logs "Unable to move the cache: Access is denied" / GPU cache failures when
+// the default cache dir is locked (AV, second instance, or rename races). Use a dedicated path and
+// skip on-disk GPU shader cache (minor perf tradeoff).
+if (process.platform === 'win32') {
+  try {
+    const userData = app.getPath('userData');
+    const sessionData = path.join(userData, 'chromium-session');
+    const diskCache = path.join(sessionData, 'disk-cache');
+    app.setPath('sessionData', sessionData);
+    fs.mkdirSync(sessionData, { recursive: true });
+    fs.mkdirSync(diskCache, { recursive: true });
+    app.commandLine.appendSwitch('disk-cache-dir', diskCache);
+  } catch {
+    /* ignore */
+  }
+  app.commandLine.appendSwitch('disable-http-cache');
+  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 }
 
 const LICENSE_STORE = () => path.join(app.getPath('userData'), 'pos-electron-license.json');
@@ -61,6 +96,21 @@ function deviceAgentBase() {
   return 'http://127.0.0.1:39471';
 }
 
+function normalizeDeviceFp(s) {
+  return String(s ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+/** License may store v2 (primary) or legacy v1 fingerprint — accept either. */
+function deviceFingerprintMatches(licenseFp, primary, legacy) {
+  const lic = normalizeDeviceFp(licenseFp);
+  if (!lic) return false;
+  if (lic === normalizeDeviceFp(primary)) return true;
+  if (legacy != null && String(legacy).trim() !== '' && lic === normalizeDeviceFp(legacy)) return true;
+  return false;
+}
+
 async function getDeviceFingerprintResult() {
   let res;
   try {
@@ -77,9 +127,14 @@ async function getDeviceFingerprintResult() {
     j.motherboardUuid != null && String(j.motherboardUuid).trim() !== ''
       ? String(j.motherboardUuid).trim()
       : null;
+  const legacy =
+    j.legacyDeviceFingerprint != null && String(j.legacyDeviceFingerprint).trim() !== ''
+      ? String(j.legacyDeviceFingerprint).toLowerCase()
+      : null;
   return {
     ok: true,
-    deviceFingerprint: String(j.deviceFingerprint).toLowerCase(),
+    deviceFingerprint: normalizeDeviceFp(j.deviceFingerprint),
+    legacyDeviceFingerprint: legacy,
     motherboardUuid
   };
 }
@@ -87,12 +142,68 @@ async function getDeviceFingerprintResult() {
 async function fetchDeviceFingerprint() {
   const r = await getDeviceFingerprintResult();
   if (!r.ok) throw new Error(r.error);
+  /** Primary (v2) — sent to activation API and shown as Device ID. */
   return r.deviceFingerprint;
 }
 
-function verifyBundle(deviceFingerprint, license, signatureB64, pem) {
+function extractBundleFromDecryptedPayload(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const { licenseKey, license, signature } = obj;
+  if (!licenseKey || !license || typeof license !== 'object' || typeof signature !== 'string' || !String(signature).trim()) {
+    return null;
+  }
+  return { licenseKey, license, signature: String(signature).trim() };
+}
+
+/**
+ * @param {object} payload - `{ base64 }` from encrypted/binary or JSON file, or legacy `{ licenseKey, license, signature }`
+ */
+function parseImportBundlePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('invalid_bundle');
+  }
+  if (payload.base64 && typeof payload.base64 === 'string') {
+    let buf;
+    try {
+      buf = Buffer.from(payload.base64, 'base64');
+    } catch {
+      throw new Error('invalid_bundle');
+    }
+    if (licenseFileDecrypt.isEncryptedLicenseFile(buf)) {
+      let decrypted;
+      try {
+        decrypted = licenseFileDecrypt.decryptLicenseFileBuffer(buf);
+      } catch (e) {
+        const code = e instanceof Error ? e.message : '';
+        if (code === 'no_decryption_key') throw e;
+        throw new Error('decryption_failed');
+      }
+      const bundle = extractBundleFromDecryptedPayload(decrypted);
+      if (!bundle) throw new Error('invalid_bundle');
+      return bundle;
+    }
+    const utf8 = buf.toString('utf8').trim();
+    if (utf8.startsWith('{')) {
+      let o;
+      try {
+        o = JSON.parse(utf8);
+      } catch {
+        throw new Error('invalid_bundle');
+      }
+      const bundle = extractBundleFromDecryptedPayload(o);
+      if (!bundle) throw new Error('invalid_bundle');
+      return bundle;
+    }
+    throw new Error('invalid_bundle');
+  }
+  const bundle = extractBundleFromDecryptedPayload(payload);
+  if (!bundle) throw new Error('invalid_bundle');
+  return bundle;
+}
+
+function verifyBundle(primaryFingerprint, legacyFingerprint, license, signatureB64, pem) {
   if (!license || !signatureB64 || !pem.includes('BEGIN')) return false;
-  if (String(license.deviceFingerprint || '').toLowerCase() !== deviceFingerprint) return false;
+  if (!deviceFingerprintMatches(license.deviceFingerprint, primaryFingerprint, legacyFingerprint)) return false;
   if (new Date(license.expiresAt).getTime() < Date.now()) return false;
   try {
     const v = crypto.createVerify('RSA-SHA256');
@@ -137,9 +248,10 @@ function registerLicenseIpc() {
     if (!pem.includes('BEGIN')) {
       return { valid: false, reason: 'no_public_key', expiresAt: null, email: null };
     }
-    let deviceFingerprint;
+    let fp;
     try {
-      deviceFingerprint = await fetchDeviceFingerprint();
+      fp = await getDeviceFingerprintResult();
+      if (!fp.ok) throw new Error(fp.error);
     } catch (e) {
       return {
         valid: false,
@@ -152,7 +264,7 @@ function registerLicenseIpc() {
     if (!bundle) {
       return { valid: false, reason: 'no_license', expiresAt: null, email: null };
     }
-    const ok = verifyBundle(deviceFingerprint, bundle.license, bundle.signature, pem);
+    const ok = verifyBundle(fp.deviceFingerprint, fp.legacyDeviceFingerprint, bundle.license, bundle.signature, pem);
     if (!ok) {
       return { valid: false, reason: 'invalid_or_expired', expiresAt: null, email: null };
     }
@@ -194,8 +306,19 @@ function registerLicenseIpc() {
       license: j.license,
       signature: j.signature
     };
+    let fpForVerify;
+    try {
+      fpForVerify = await getDeviceFingerprintResult();
+      if (!fpForVerify.ok) throw new Error(fpForVerify.error);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : 'device_id_failed';
+      return { ok: false, error: code, message: code };
+    }
     const pem = pemFromEnv();
-    if (pem.includes('BEGIN') && !verifyBundle(deviceFingerprint, bundle.license, bundle.signature, pem)) {
+    if (
+      pem.includes('BEGIN') &&
+      !verifyBundle(fpForVerify.deviceFingerprint, fpForVerify.legacyDeviceFingerprint, bundle.license, bundle.signature, pem)
+    ) {
       return { ok: false, error: 'bad_signature', message: 'License signature verification failed' };
     }
     await writeStoredBundle(bundle);
@@ -203,21 +326,66 @@ function registerLicenseIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle('pos-license:import-bundle', async (_evt, bundle) => {
-    if (!bundle || typeof bundle !== 'object') {
+  /** Windows uses the first filter as the initial dropdown selection — All Files must be first. */
+  ipcMain.handle('pos-license:pick-license-file', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const parent = win && !win.isDestroyed() ? win : BrowserWindow.getFocusedWindow();
+    const dialogOpts = {
+      title: 'Open',
+      properties: ['openFile'],
+      filters: [
+        { name: 'All Files', extensions: ['*'] },
+      ]
+    };
+    const { canceled, filePaths } = parent
+      ? await dialog.showOpenDialog(parent, dialogOpts)
+      : await dialog.showOpenDialog(dialogOpts);
+    if (canceled || !filePaths?.[0]) {
+      return { canceled: true };
+    }
+    try {
+      const buf = await fs.promises.readFile(filePaths[0]);
+      return { canceled: false, base64: buf.toString('base64') };
+    } catch (e) {
+      return {
+        canceled: false,
+        error: 'read_failed',
+        message: e instanceof Error ? e.message : 'Could not read file'
+      };
+    }
+  });
+
+  ipcMain.handle('pos-license:import-bundle', async (_evt, payload) => {
+    let bundle;
+    try {
+      bundle = parseImportBundlePayload(payload);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : 'invalid_bundle';
+      if (code === 'no_decryption_key') {
+        return {
+          ok: false,
+          error: 'no_decryption_key',
+          message: 'LICENSE_FILE_ENCRYPTION_KEY / VITE_LICENSE_FILE_ENCRYPTION_KEY missing or invalid (must match license-server).'
+        };
+      }
+      if (code === 'decryption_failed') {
+        return {
+          ok: false,
+          error: 'decryption_failed',
+          message: 'Could not decrypt license file (wrong key or corrupted file).'
+        };
+      }
       return { ok: false, error: 'invalid_bundle', message: 'Invalid license file' };
     }
     const { licenseKey: rawKey, license, signature } = bundle;
-    if (!license || typeof license !== 'object' || typeof signature !== 'string' || !signature.trim()) {
-      return { ok: false, error: 'invalid_bundle', message: 'Invalid license file' };
-    }
     const key = normalizeLicenseKey(rawKey);
     if (!key) {
       return { ok: false, error: 'invalid_bundle', message: 'Invalid license key in file' };
     }
-    let deviceFingerprint;
+    let fp;
     try {
-      deviceFingerprint = await fetchDeviceFingerprint();
+      fp = await getDeviceFingerprintResult();
+      if (!fp.ok) throw new Error(fp.error);
     } catch (e) {
       const code = e instanceof Error ? e.message : 'device_id_failed';
       return { ok: false, error: code, message: code };
@@ -227,10 +395,10 @@ function registerLicenseIpc() {
       return { ok: false, error: 'no_public_key', message: 'License public key missing in app' };
     }
     const packed = { licenseKey: key, license, signature };
-    if (String(license.deviceFingerprint || '').toLowerCase() !== deviceFingerprint) {
+    if (!deviceFingerprintMatches(license.deviceFingerprint, fp.deviceFingerprint, fp.legacyDeviceFingerprint)) {
       return { ok: false, error: 'device_mismatch', message: 'This license file is for another device' };
     }
-    if (!verifyBundle(deviceFingerprint, license, signature, pem)) {
+    if (!verifyBundle(fp.deviceFingerprint, fp.legacyDeviceFingerprint, license, signature, pem)) {
       return {
         ok: false,
         error: 'bad_signature',
@@ -291,6 +459,7 @@ async function createWindow() {
   // 1024×768 = web *content* (HTML viewport). Title bar / menu are NOT inside this size (total window is larger).
   // Without useContentSize, width/height would be the outer frame and the page would be smaller than 1024×768.
   const win = new BrowserWindow({
+    title: 'RES POS',
     width: 1024,
     height: 768,
     useContentSize: true,
@@ -324,7 +493,30 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   registerLicenseIpc();
-  await bundleServices.maybeStartAndWait(app);
+  const svc = await bundleServices.maybeStartAndWait(app);
+  if (app.isPackaged && !svc.started) {
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'RES POS',
+      message: 'Built-in server files are missing.',
+      detail:
+        'Expected folder: resources\\embedded (backend, device, node-runtime). Rebuild the installer on Windows with:\n' +
+        'npm run electron:build\n' +
+        'so scripts/prepare-embedded.cjs can bundle Node and servers.'
+    });
+  } else if (app.isPackaged && svc.started && !svc.ready) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'RES POS',
+      message: 'Local services did not start in time.',
+      detail:
+        'The app needs the built-in database (port 5000) and device agent (port 39471).\n\n' +
+        '• Stop other apps or dev servers using those ports.\n' +
+        '• Allow RES POS through Windows Firewall / antivirus.\n' +
+        '• From Command Prompt run: set ELECTRON_SERVICE_LOG=1 then start RES POS to see errors.\n\n' +
+        'Then restart RES POS.'
+    });
+  }
   await createWindow();
 });
 

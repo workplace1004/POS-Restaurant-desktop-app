@@ -5407,36 +5407,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   }, [kitchenProductsKitchen, kitchenProductsLinked, closeKitchenProductsModal, fetchKitchens]);
 
-  const handleRemoveLicense = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.posLicense?.removeLicense) return;
-    if (
-      !window.confirm(
-        tr(
-          'control.removeLicenseConfirm',
-          'Remove the license from this device? You will need to activate again.'
-        )
-      )
-    ) {
-      return;
-    }
-    try {
-      const r = await window.posLicense.removeLicense();
-      if (r?.ok) {
-        showToast('success', tr('control.licenseRemoved', 'License removed.'));
-      } else {
-        showToast('error', r?.message || tr('control.licenseRemoveFailed', 'Could not remove license.'));
-      }
-    } catch (e) {
-      showToast(
-        'error',
-        e instanceof Error ? e.message : tr('control.licenseRemoveFailed', 'Could not remove license.')
-      );
-    }
-  }, [tr, showToast]);
-
-  const showRemoveLicenseButton =
-    typeof window !== 'undefined' && !!window.posLicense?.removeLicense && !isWaiterControlUser;
-
   return (
     <div className="relative h-full w-full min-h-0">
       <div className="flex h-full bg-pos-bg text-pos-text">
@@ -5464,16 +5434,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
               </button>
             );
           })}
-          {showRemoveLicenseButton ? (
-            <button
-              type="button"
-              className="mt-1 flex w-full items-center gap-3 px-2 py-3 rounded-lg text-left text-md text-rose-500 transition-colors active:bg-green-500 active:text-pos-text"
-              onClick={handleRemoveLicense}
-            >
-              <SidebarIcon id="trash" className="w-6 h-6 shrink-0" />
-              {tr('control.sidebar.removeLicense', 'Remove license')}
-            </button>
-          ) : null}
         </nav>
         <div className="p-4 w-full flex flex-col items-center gap-2">
           {currentUser && (

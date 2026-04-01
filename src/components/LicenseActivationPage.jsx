@@ -1,6 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += 1) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 export function LicenseActivationPage({ onActivated }) {
   const { t } = useLanguage();
   const fileInputRef = useRef(null);
@@ -74,17 +81,8 @@ export function LicenseActivationPage({ onActivated }) {
     }
   }, [deviceFingerprint, deviceLoading, deviceError]);
 
-  const onPickFile = useCallback(() => {
-    setError(null);
-    fileInputRef.current?.click();
-  }, []);
-
-  const onFileChange = useCallback(
-    async (e) => {
-      const file = e.target.files?.[0];
-      e.target.value = '';
-      if (!file) return;
-      setError(null);
+  const importLicenseFromBase64 = useCallback(
+    async (base64) => {
       const api = window.posLicense;
       if (!api?.importLicenseBundle) {
         setError(t('license.err.generic'));
@@ -92,15 +90,7 @@ export function LicenseActivationPage({ onActivated }) {
       }
       setBusy(true);
       try {
-        const text = await file.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          setError(t('license.err.invalid_bundle'));
-          return;
-        }
-        const result = await api.importLicenseBundle(data);
+        const result = await api.importLicenseBundle({ base64 });
         if (result?.ok) {
           setSuccess(true);
           onActivated?.();
@@ -118,6 +108,39 @@ export function LicenseActivationPage({ onActivated }) {
       }
     },
     [onActivated, t]
+  );
+
+  const onPickFile = useCallback(async () => {
+    setError(null);
+    const api = window.posLicense;
+    if (api?.pickLicenseFile) {
+      try {
+        const r = await api.pickLicenseFile();
+        if (r?.canceled) return;
+        if (r?.error) {
+          setError(r.message || t('license.err.generic'));
+          return;
+        }
+        if (r?.base64) await importLicenseFromBase64(r.base64);
+      } catch {
+        setError(t('license.err.generic'));
+      }
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [importLicenseFromBase64, t]);
+
+  const onFileChange = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      setError(null);
+      const buf = await file.arrayBuffer();
+      const base64 = arrayBufferToBase64(buf);
+      await importLicenseFromBase64(base64);
+    },
+    [importLicenseFromBase64]
   );
 
   const deviceIdDisplay = deviceLoading
@@ -158,14 +181,8 @@ export function LicenseActivationPage({ onActivated }) {
           ) : null}
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="sr-only"
-          tabIndex={-1}
-          onChange={onFileChange}
-        />
+        {/** No `accept` — avoids OS dialog defaulting to a restrictive "Custom Files" filter (Electron uses IPC instead). */}
+        <input ref={fileInputRef} type="file" className="sr-only" tabIndex={-1} onChange={onFileChange} />
 
         <div className="mt-6 space-y-4">
           {error ? <p className="text-sm text-red-600">{error}</p> : null}

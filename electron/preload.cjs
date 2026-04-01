@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('posLicense', {
   getDeviceFingerprint: () => ipcRenderer.invoke('pos-license:device-fingerprint'),
   activateLicense: (licenseKey) => ipcRenderer.invoke('pos-license:activate', licenseKey),
   importLicenseBundle: (bundle) => ipcRenderer.invoke('pos-license:import-bundle', bundle),
+  pickLicenseFile: () => ipcRenderer.invoke('pos-license:pick-license-file'),
   getLicenseStorePath: () => ipcRenderer.invoke('pos-license:license-store-path'),
   removeLicense: () => ipcRenderer.invoke('pos-license:remove'),
   getLicenseStatus: () => ipcRenderer.invoke('pos-license:status'),

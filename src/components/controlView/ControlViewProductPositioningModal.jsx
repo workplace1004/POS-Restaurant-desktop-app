@@ -51,18 +51,19 @@ export function ControlViewProductPositioningModal({
   const categoryIndex = categories.findIndex((c) => c.id === positionCategoryId);
   const canPrevCategory = categoryIndex > 0;
   const canNextCategory = categoryIndex >= 0 && categoryIndex < categories.length - 1;
+  /** Swatch order matches product palette: green, orange, blue, red, purple, gold. */
   const COLOR_OPTIONS = [
-    { id: 'green', className: 'bg-[#83c664] text-white' },
-    { id: 'blue', className: 'bg-[#0000ff] text-white' },
-    { id: 'pink', className: 'bg-[#e97c64] text-white' },
-    { id: 'orange', className: 'bg-[#f0961c] text-white' },
-    { id: 'yellow', className: 'bg-[#ff2d3d] text-white' },
-    { id: 'gray', className: 'bg-[#4ab3ff] text-white' },
+    { id: 'green', className: 'bg-[#1F8E41] text-white' },
+    { id: 'orange', className: 'bg-[#B45309] text-white' },
+    { id: 'blue', className: 'bg-[#1D4ED8] text-white' },
+    { id: 'pink', className: 'bg-[#B91C1C] text-white' },
+    { id: 'gray', className: 'bg-[#6D28D9] text-white' },
+    { id: 'yellow', className: 'bg-[#CA8A04] text-white' },
   ];
   const tileClassByColorId = (colorId, fallbackType) => {
     const found = COLOR_OPTIONS.find((c) => c.id === colorId);
     if (found) return found.className;
-    return fallbackType === 'subproduct' ? 'bg-amber-500 text-white' : 'bg-[#83c664] text-white';
+    return fallbackType === 'subproduct' ? 'bg-amber-500 text-white' : 'bg-[#1F8E41] text-white';
   };
   const updateLayout = (nextCells) => {
     if (!positionCategoryId) return;

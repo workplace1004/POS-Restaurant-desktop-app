@@ -3,6 +3,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Dropdown } from './Dropdown';
 
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
+import { publicAssetUrl } from '../lib/publicAssetUrl.js';
 const TOAST_DURATION_MS = 3500;
 const PIN_LEN = 4;
 
@@ -101,12 +102,20 @@ export function LoginScreen({ time, onLogin }) {
     <div className="flex flex-col h-full bg-pos-bg text-pos-text">
       <div className="flex shrink-0 items-center justify-between px-6 py-5 border-b border-pos-border">
         <span className="text-xl font-medium">{time}</span>
-        <span className="text-xl font-semibold text-pos-text">RestaurantPOS</span>
+        <span className="text-xl font-semibold text-pos-text">RES POS</span>
         <div className="w-16" />
       </div>
 
-      <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-6 p-6">
-        <div className="w-full max-w-md">
+      <div className="flex flex-1 min-h-0 flex-col items-center gap-6 p-6">
+        <img
+          src={publicAssetUrl('/logo.png')}
+          alt=""
+          className="max-h-[250px] w-auto max-w-[min(280px,85vw)] object-contain shrink-0"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+        <div className="w-full -mt-10 max-w-md">
           {loading ? (
             <p className="text-pos-muted text-xl text-center py-3">{t('loginLoadingUsers')}</p>
           ) : (

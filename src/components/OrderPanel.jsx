@@ -18,6 +18,22 @@ const formatPaymentAmount = (n) => `€${roundCurrency(n).toFixed(2)}`;
 const TABLE_SAVED_ORDERS_API = `${API}/settings/table-saved-orders`;
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
 
+/** Solid product-palette color for toolbar SVG icons (mask). */
+function toolbarIconMaskStyle(assetPath, hex) {
+  const u = publicAssetUrl(assetPath);
+  return {
+    backgroundColor: hex,
+    maskImage: `url("${u}")`,
+    WebkitMaskImage: `url("${u}")`,
+    maskSize: 'contain',
+    WebkitMaskSize: 'contain',
+    maskRepeat: 'no-repeat',
+    WebkitMaskRepeat: 'no-repeat',
+    maskPosition: 'center',
+    WebkitMaskPosition: 'center',
+  };
+}
+
 function sumAmountsByIntegration(methods, amounts, integration) {
   return methods
     .filter((m) => m.integration === integration)
@@ -1255,7 +1271,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
           disabled={!hasSelection || isSavedTableOrder || lineItemSelectionDisabled}
           aria-label={t('remove')}
         >
-          <img src={publicAssetUrl('/delete.svg')} alt="" className="w-8 h-8 [filter:brightness(0)_saturate(100%)_invert(45%)_sepia(70%)_saturate(2000%)_hue-rotate(310deg)]" />
+          <span className="inline-block w-8 h-8 shrink-0" style={toolbarIconMaskStyle('/delete.svg', '#B91C1C')} aria-hidden />
         </button>
         <button
           type="button"
@@ -1265,7 +1281,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
           onClick={() => setShowDeleteAllModal(true)}
           aria-label={t('clear')}
         >
-          <img src={publicAssetUrl('/clear.svg')} alt="" className="w-8 h-8 [filter:brightness(0)_saturate(100%)_invert(94%)_sepia(20%)_saturate(3000%)_hue-rotate(0deg)]" />
+          <span className="inline-block w-8 h-8 shrink-0" style={toolbarIconMaskStyle('/clear.svg', '#CA8A04')} aria-hidden />
         </button>
       </div>
 
@@ -1405,8 +1421,8 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
             type="button"
             disabled={payDifferentlyDisabled}
             className={`flex-1 py-1 border-none rounded-md min-h-[53px] max-h-[53px] ${payDifferentlyDisabled
-              ? 'bg-green-600/50 text-gray-400 cursor-not-allowed opacity-70'
-              : 'bg-green-600 text-white active:bg-green-500'
+              ? 'bg-[#1F8E41]/50 text-gray-200 cursor-not-allowed opacity-70'
+              : 'bg-[#1F8E41] text-white active:brightness-95'
               }`}
             onClick={() => openPayDifferentlyModal()}
           >
@@ -1416,8 +1432,8 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
             type="button"
             disabled={payDifferentlyDisabled || payConfirmLoading}
             className={`px-4 min-h-[53px] max-h-[53px] border-none rounded-md text-white text-2xl ${payDifferentlyDisabled || payConfirmLoading
-              ? 'bg-[#f0961c]/40 cursor-not-allowed opacity-70'
-              : 'bg-[#f0961c]/90 active:bg-[#c6a97f]'
+              ? 'bg-[#B45309]/40 cursor-not-allowed opacity-70'
+              : 'bg-[#B45309] active:brightness-95'
               }`}
             onClick={() => void handleEuroQuickCashPayment()}
             aria-label={tr('orderPanel.euroCashShortcut', 'Cash payment')}

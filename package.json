@@ -12,7 +12,9 @@
     "electron": "electron .",
     "electron:debug": "cross-env ELECTRON_OPEN_DEVTOOLS=1 electron --inspect=9229 .",
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://127.0.0.1:5173 && cross-env ELECTRON_USE_DEV_SERVER=1 electron .\"",
-    "electron:build": "npm run build:electron && electron-builder"
+    "electron:prepare-embedded": "node scripts/prepare-embedded.cjs",
+    "electron:stage-license-env": "node scripts/stage-license-env.cjs",
+    "electron:build": "npm run build:electron && npm run electron:prepare-embedded && npm run electron:stage-license-env && electron-builder"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -33,8 +35,10 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.cloudpos.desktop",
-    "productName": "CloudPOS",
+    "appId": "com.respos.desktop",
+    "productName": "RES POS",
+    "icon": "public/icon.png",
+    "artifactName": "${productName} Setup ${version}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -43,10 +47,36 @@
       "electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "embedded-staging/backend",
+        "to": "embedded/backend"
+      },
+      {
+        "from": "embedded-staging/device",
+        "to": "embedded/device"
+      },
+      {
+        "from": "embedded-staging/node-runtime",
+        "to": "embedded/node-runtime"
+      },
+      {
+        "from": "embedded-staging/license.env",
+        "to": "license.env"
+      }
+    ],
+    "nsis": {
+      "include": "electron/installer.nsh",
+      "shortcutName": "RES POS",
+      "uninstallDisplayName": "RES POS",
+      "perMachine": true,
+      "allowElevation": true
+    },
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "executableName": "RES POS"
     }
   }
 }
