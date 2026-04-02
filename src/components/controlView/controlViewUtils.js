@@ -95,7 +95,7 @@ export function normalizeOptionButtonSlots(value) {
   return next;
 }
 
-export function createDefaultBoard(_table, color = '#facc15') {
+export function createDefaultBoard(_table, color = '#CA8A04') {
   return {
     id: `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     color,
@@ -107,7 +107,7 @@ export function createDefaultBoard(_table, color = '#facc15') {
   };
 }
 
-export function normalizeBoardToItem(b, defaultColor = '#facc15') {
+export function normalizeBoardToItem(b, defaultColor = '#CA8A04') {
   return {
   id: b?.id && typeof b.id === 'string' ? b.id : `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
   color: typeof b?.color === 'string' && b.color.trim() ? b.color.trim() : defaultColor,

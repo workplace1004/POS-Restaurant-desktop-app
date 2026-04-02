@@ -378,7 +378,7 @@ export const translations = {
     'license.activating': 'Activating…',
     'license.checking': 'Checking license…',
     'license.success': 'License activated.',
-    'license.err.no_public_key': 'License public key is missing in the desktop app. Add license-public.pem to electron/resources.',
+    'license.err.no_public_key': 'License public key is missing in the app environment.',
     'license.err.no_local_license': 'No license found on this device.',
     'license.err.tampered_file': 'License file was modified or corrupted.',
     'license.err.revoked_by_server': 'This license is no longer valid. Contact support.',

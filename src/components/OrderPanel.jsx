@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
@@ -15,8 +15,35 @@ const KEYPAD = [
 const formatSubtotalPrice = (n) => `€ ${Number(n).toFixed(2).replace('.', ',')}`;
 const roundCurrency = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const formatPaymentAmount = (n) => `€${roundCurrency(n).toFixed(2)}`;
+/** Payment tiles in “Pay differently” — files live in `public/` (copied to dist root). */
+const PAY_METHOD_ICON_PNG = {
+  manual_cash: '/cash.png',
+  cashmatic: '/cashmatic.png',
+  payworld: '/payworld.png',
+  generic: '/card.png'
+};
+function payMethodIconSrc(integ) {
+  const key = PAY_METHOD_ICON_PNG[integ] != null ? integ : 'generic';
+  return publicAssetUrl(PAY_METHOD_ICON_PNG[key] || PAY_METHOD_ICON_PNG.generic);
+}
 const TABLE_SAVED_ORDERS_API = `${API}/settings/table-saved-orders`;
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
+
+/** Unique key for a line on the ticket (may span several open orders on one table). */
+function ticketLineKey(orderId, itemId) {
+  return `${String(orderId)}:${String(itemId)}`;
+}
+
+/** Modifier / sub-product row under a ticket line (note index matches getItemNotes order). */
+function ticketSubLineKey(orderId, itemId, noteIndex) {
+  return `${ticketLineKey(orderId, itemId)}#n${noteIndex}`;
+}
+
+function ticketKeyOrderId(key) {
+  const s = String(key);
+  const c = s.indexOf(':');
+  return c >= 0 ? s.slice(0, c) : '';
+}
 
 /** Solid product-palette color for toolbar SVG icons (mask). */
 function toolbarIconMaskStyle(assetPath, hex) {
@@ -71,7 +98,9 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const [fallbackQuantity, setFallbackQuantity] = useState('');
   const displayQuantity = setQuantityInput ? (quantityInput ?? '') : fallbackQuantity;
   const setDisplayQuantity = setQuantityInput || setFallbackQuantity;
-  const [selectedItemIds, setSelectedItemIds] = useState([]);
+  const [selectedLineKeys, setSelectedLineKeys] = useState([]);
+  /** Line ids shown with red strikethrough in the ticket only (does not remove from order). */
+  const [ticketDeleteMarkIds, setTicketDeleteMarkIds] = useState(() => new Set());
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [showInWaitingNameModal, setShowInWaitingNameModal] = useState(false);
   const [showPayNowOrLaterModal, setShowPayNowOrLaterModal] = useState(false);
@@ -107,6 +136,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
   const total = order?.total ?? 0;
   const items = order?.items ?? [];
+  const TICKET_DELETE_MARK_CLASS = 'line-through decoration-2 decoration-red-600 text-red-600';
 
   useEffect(() => {
     if (orderListScrollRef.current && items.length > 0) {
@@ -199,9 +229,6 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     !hasSelectedTable && payableTotal <= 0.009 && fallbackNoTableTotal > 0.009
       ? fallbackNoTableTotal
       : payableTotal;
-  const selectedItems = items.filter((i) => selectedItemIds.includes(i.id));
-  const hasSelection = selectedItemIds.length > 0;
-  const canDecreaseAll = selectedItems.length > 0 && selectedItems.every((i) => (i.quantity ?? 0) > 1);
   const getItemLabel = (item) => item?.product?.name ?? '—';
   const parseNoteToken = (token) => {
     const raw = String(token || '').trim();
@@ -249,7 +276,8 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const customerDisplayName = order?.customer ? (order.customer.companyName || order.customer.name) : null;
   const isViewedFromInWaiting = !!(order?.id && focusedOrderId && order.id === focusedOrderId && order?.status === 'in_waiting');
   const isViewedFromInPlanning = !!(order?.id && focusedOrderId && order.id === focusedOrderId && order?.status === 'in_planning');
-  const lineItemSelectionDisabled = isViewedFromInWaiting || isViewedFromInPlanning;
+  /** +/- quantity only — ticket lines stay clickable for selection, green highlight, and delete mark. */
+  const quantityToolbarDisabled = isViewedFromInWaiting || isViewedFromInPlanning;
   const payDifferentlyDisabled =
     payableTotalForPaymentModal <= 0.009 &&
     !((isViewedFromInWaiting || isViewedFromInPlanning) && hasOrderItems) &&
@@ -276,6 +304,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const { boundaries: batchBoundaries, meta: batchMeta } = isViewedFromInWaiting ? parseBatchData() : { boundaries: [], meta: [] };
   const lastSavedBoundary = batchBoundaries.length > 0 ? batchBoundaries[batchBoundaries.length - 1] : 0;
   const inWaitingButtonDisabled = isViewedFromInWaiting && (order?.items?.length ?? 0) <= lastSavedBoundary;
+
   const normalizeSavedTableOrders = (list) => {
     if (!Array.isArray(list)) return [];
     const byOrderId = new Map();
@@ -314,19 +343,215 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     }
     const serverValue = normalizeSavedTableOrders(data?.value);
     setSavedTableOrders(serverValue);
+    try {
+      const bc = new BroadcastChannel('pos-kds-table-saved');
+      bc.postMessage({ type: 'table-saved' });
+      bc.close();
+    } catch {
+      /* ignore */
+    }
     return serverValue;
   };
 
-  const toggleItemSelection = (id) => {
-    if (isSavedTableOrder || lineItemSelectionDisabled) return;
-    setSelectedItemIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  const toggleAllSubsForItem = (orderId, itemId, noteCount) => {
+    const subs = Array.from({ length: noteCount }, (_, i) => ticketSubLineKey(orderId, itemId, i));
+    setSelectedLineKeys((prev) => {
+      const next = prev.filter((x) => x !== ticketLineKey(orderId, itemId));
+      const allOn = subs.length > 0 && subs.every((sk) => next.includes(sk));
+      if (allOn) return next.filter((x) => !subs.includes(x));
+      return [...next.filter((x) => !subs.includes(x)), ...subs];
+    });
+  };
+
+  const toggleSubLineSelection = (orderId, itemId, noteIdx) => {
+    const subK = ticketSubLineKey(orderId, itemId, noteIdx);
+    setSelectedLineKeys((prev) => {
+      const next = prev.filter((x) => x !== ticketLineKey(orderId, itemId));
+      return next.includes(subK) ? next.filter((x) => x !== subK) : [...next, subK];
+    });
+  };
+
+  const toggleLineSelection = (orderId, itemId, noteCount) => {
+    const lineK = ticketLineKey(orderId, itemId);
+    if (noteCount === 0) {
+      setSelectedLineKeys((prev) => (prev.includes(lineK) ? prev.filter((x) => x !== lineK) : [...prev, lineK]));
+    } else {
+      toggleAllSubsForItem(orderId, itemId, noteCount);
+    }
+  };
+
+  const ticketLinesValidityKey = useMemo(
+    () =>
+      `${isSavedTableOrder ? 1 : 0}|${order?.id ?? ''}|${savedOrdersForSelectedTable
+        .map((o) => `${o?.id}:${(o.items || []).map((it) => `${it?.id}:${String(it?.notes ?? '')}`).join('|')}`)
+        .join(';')}|${!isSavedTableOrder && order?.id ? items.map((it) => `${it?.id}:${String(it?.notes ?? '')}`).join(',') : ''}`,
+    [savedOrdersForSelectedTable, isSavedTableOrder, order?.id, items]
+  );
+
+  const wholeItemTicketSelected = (orderId, item) => {
+    const notes = getItemNotes(item);
+    if (notes.length === 0) return selectedLineKeys.includes(ticketLineKey(orderId, item.id));
+    return notes.every((_, idx) => selectedLineKeys.includes(ticketSubLineKey(orderId, item.id, idx)));
+  };
+
+  const subLineTicketSelected = (orderId, itemId, noteIdx) =>
+    selectedLineKeys.includes(ticketSubLineKey(orderId, itemId, noteIdx));
+
+  const ticketLineMarked = (orderId, item) => {
+    if (ticketDeleteMarkIds.has(ticketLineKey(orderId, item.id))) return true;
+    const notes = getItemNotes(item);
+    if (notes.length === 0) return false;
+    return notes.every((_, idx) => ticketDeleteMarkIds.has(ticketSubLineKey(orderId, item.id, idx)));
+  };
+
+  const ticketSubLineMarked = (orderId, itemId, noteIdx) =>
+    ticketDeleteMarkIds.has(ticketSubLineKey(orderId, itemId, noteIdx));
+
+  const selectionOrderIds = new Set(selectedLineKeys.map((k) => ticketKeyOrderId(k)).filter(Boolean));
+  const orderIdPrefix = order?.id != null ? `${String(order.id)}:` : '';
+
+  const { quantitySelectionValid, selectedItems } = (() => {
+    const oid = order?.id;
+    if (oid == null || selectedLineKeys.length === 0) {
+      return { quantitySelectionValid: false, selectedItems: [] };
+    }
+    const prefix = `${String(oid)}:`;
+    const keys = selectedLineKeys.filter((k) => String(k).startsWith(prefix));
+    if (keys.length === 0 || keys.length !== selectedLineKeys.length) {
+      return { quantitySelectionValid: false, selectedItems: [] };
+    }
+    if (!selectionOrderIds.has(String(oid)) || selectionOrderIds.size !== 1) {
+      return { quantitySelectionValid: false, selectedItems: [] };
+    }
+    let partial = false;
+    const eligibleIds = new Set();
+    const knownKeys = new Set();
+    for (const it of items) {
+      if (it?.id == null) continue;
+      const iid = String(it.id);
+      const lineK = ticketLineKey(oid, iid);
+      const notes = getItemNotes(it);
+      const subKs = notes.map((_, idx) => ticketSubLineKey(oid, iid, idx));
+      subKs.forEach((sk) => knownKeys.add(sk));
+      knownKeys.add(lineK);
+      const hitLine = keys.includes(lineK);
+      const hitSubs = subKs.filter((sk) => keys.includes(sk));
+      if (notes.length === 0) {
+        if (hitLine) eligibleIds.add(iid);
+        continue;
+      }
+      if (hitLine && hitSubs.length > 0) partial = true;
+      else if (hitLine) eligibleIds.add(iid);
+      else if (hitSubs.length > 0) {
+        if (hitSubs.length === notes.length) eligibleIds.add(iid);
+        else partial = true;
+      }
+    }
+    const orphan = keys.some((k) => !knownKeys.has(k));
+    if (partial || orphan) return { quantitySelectionValid: false, selectedItems: [] };
+    return {
+      quantitySelectionValid: true,
+      selectedItems: items.filter((it) => it?.id != null && eligibleIds.has(String(it.id)))
+    };
+  })();
+
+  const hasSelection = selectedLineKeys.length > 0;
+  const canDecreaseAll = selectedItems.length > 0 && selectedItems.every((i) => (i.quantity ?? 0) > 1);
+
+  const renderTicketOrderLine = (orderId, item, keyPrefix) => {
+    if (item?.id == null) return null;
+    const notes = getItemNotes(item);
+    const lineKey = `${keyPrefix}-${item.id}`;
+    const whole = wholeItemTicketSelected(orderId, item);
+    const parentMarked = ticketLineMarked(orderId, item);
+
+    if (notes.length === 0) {
+      return (
+        <button
+          key={lineKey}
+          type="button"
+          className={`flex flex-wrap items-center gap-1 p-2 py-1 text-sm rounded w-full text-left border-0 font-inherit cursor-pointer active:brightness-95 ${
+            whole ? 'bg-[#1F8E41] text-white' : 'bg-transparent text-pos-bg'
+          }`}
+          onClick={() => toggleLineSelection(orderId, item.id, 0)}
+        >
+          <div className="w-full">
+            <div className={`flex items-baseline justify-between ${parentMarked ? TICKET_DELETE_MARK_CLASS : ''}`}>
+              <span className="flex-1 font-semibold">
+                {item.quantity}x {getItemLabel(item)}
+              </span>
+              <span className="font-semibold">€{getItemBaseLinePrice(item).toFixed(2)}</span>
+            </div>
+          </div>
+        </button>
+      );
+    }
+
+    return (
+      <div
+        key={lineKey}
+        className={`flex flex-col gap-0.5 rounded p-2 py-1 text-sm ${whole ? 'bg-[#1F8E41] text-white' : 'text-pos-bg'}`}
+      >
+        <div className={`flex items-baseline justify-between w-full px-0 ${parentMarked ? TICKET_DELETE_MARK_CLASS : ''}`}>
+          <span className="flex-1 font-semibold">
+            {item.quantity}x {getItemLabel(item)}
+          </span>
+          <span className="font-semibold">€{getItemBaseLinePrice(item).toFixed(2)}</span>
+        </div>
+        {notes.map((note, noteIdx) => {
+          const subSel = subLineTicketSelected(orderId, item.id, noteIdx);
+          const subMrk = ticketSubLineMarked(orderId, item.id, noteIdx);
+          const rowGreen = subSel && !whole;
+          return (
+            <button
+              key={`${lineKey}-n-${noteIdx}`}
+              type="button"
+              className={`w-full text-left border-0 font-inherit rounded px-2 py-0.5 pl-6 text-sm cursor-pointer active:brightness-95 ${
+                rowGreen ? 'bg-[#1F8E41] text-white' : whole ? 'bg-transparent text-white' : 'bg-transparent text-pos-bg'
+              } ${subMrk ? TICKET_DELETE_MARK_CLASS : ''}`}
+              onClick={() => toggleSubLineSelection(orderId, item.id, noteIdx)}
+            >
+              <div className="flex items-baseline justify-between w-full opacity-90">
+                <span>▪ {note.label}</span>
+                <span>€{getItemNoteLinePrice(item, note).toFixed(2)}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     );
   };
 
   useEffect(() => {
-    if (lineItemSelectionDisabled) setSelectedItemIds([]);
-  }, [lineItemSelectionDisabled, order?.id]);
+    setSelectedLineKeys([]);
+    setTicketDeleteMarkIds(new Set());
+  }, [order?.id]);
+
+  useEffect(() => {
+    const keys = new Set();
+    const addTicketKeysForItem = (orderId, it) => {
+      if (it?.id == null) return;
+      keys.add(ticketLineKey(orderId, it.id));
+      getItemNotes(it).forEach((_, idx) => keys.add(ticketSubLineKey(orderId, it.id, idx)));
+    };
+    for (const so of savedOrdersForSelectedTable) {
+      for (const it of so.items || []) addTicketKeysForItem(so.id, it);
+    }
+    if (!isSavedTableOrder && order?.id) {
+      for (const it of items) addTicketKeysForItem(order.id, it);
+    }
+    setTicketDeleteMarkIds((prev) => {
+      const next = new Set();
+      for (const k of prev) {
+        if (keys.has(k)) next.add(k);
+      }
+      return next.size === prev.size && [...prev].every((k) => next.has(k)) ? prev : next;
+    });
+    setSelectedLineKeys((prev) => {
+      const next = prev.filter((k) => keys.has(k));
+      return next.length === prev.length && prev.every((k, idx) => k === next[idx]) ? prev : next;
+    });
+  }, [ticketLinesValidityKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -787,7 +1012,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     setSelectedPayment(null);
     setPayModalTargetTotal(0);
     setPayModalKeypadInput('');
-    setSelectedItemIds([]);
+    setSelectedLineKeys([]);
     setDisplayQuantity('');
     setShowDeleteAllModal(false);
     setShowSettlementSubtotalModal(false);
@@ -1067,27 +1292,9 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
           <div ref={orderListScrollRef} className="flex-1 overflow-auto scrollbar-hide p-2">
             {savedOrdersForSelectedTable.map((savedOrder) => (
               <div key={`saved-order-${savedOrder.id}`}>
-                {(savedOrder.items || []).map((item) => (
-                  <div
-                    key={`saved-${savedOrder.id}-${item.id}`}
-                    className="flex flex-wrap items-center gap-1 p-1 text-sm text-pos-bg rounded"
-                  >
-                    <div className="w-full">
-                      <div className="flex items-baseline justify-between">
-                        <span className="flex-1 font-semibold">
-                          {item.quantity}x {getItemLabel(item)}
-                        </span>
-                        <span className="font-semibold">€{getItemBaseLinePrice(item).toFixed(2)}</span>
-                      </div>
-                      {getItemNotes(item).map((note, noteIdx) => (
-                        <div key={`saved-${savedOrder.id}-${item.id}-notes-${noteIdx}`} className="flex items-baseline justify-between pl-6 text-sm opacity-90">
-                          <span>▪ {note.label}</span>
-                          <span>€{getItemNoteLinePrice(item, note).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                {(savedOrder.items || []).map((item, itemIdx) =>
+                  renderTicketOrderLine(savedOrder.id, item, `saved-${savedOrder.id}-${itemIdx}`)
+                )}
                 <div className="pt-1 px-2 text-pos-bg/90">
                   {(() => {
                     const savedMeta = savedOrderMetaById.get(savedOrder.id);
@@ -1114,32 +1321,9 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                   const metaTime = metaEntry.createdAt ? formatOrderTimestamp(metaEntry.createdAt) : formatOrderTimestamp(order?.createdAt);
                   return (
                     <React.Fragment key={`batch-${batchIdx}`}>
-                      {batchItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className={
-                            lineItemSelectionDisabled
-                              ? 'flex flex-wrap items-center gap-1 p-2 py-1 text-sm text-pos-bg rounded cursor-default'
-                              : `flex flex-wrap items-center gap-1 p-2 py-1 text-sm text-pos-bg rounded active:bg-green-500 cursor-pointer ${selectedItemIds.includes(item.id) ? 'bg-green-500' : ''}`
-                          }
-                          onClick={() => {
-                            if (!lineItemSelectionDisabled) toggleItemSelection(item.id);
-                          }}
-                        >
-                          <div className="w-full">
-                            <div className="flex items-baseline justify-between">
-                              <span className="flex-1 font-semibold">{item.quantity}x {getItemLabel(item)}</span>
-                              <span className="font-semibold">€{getItemBaseLinePrice(item).toFixed(2)}</span>
-                            </div>
-                            {getItemNotes(item).map((note, noteIdx) => (
-                              <div key={`${item.id}-notes-${noteIdx}`} className="flex items-baseline justify-between pl-6 text-md opacity-90">
-                                <span>▪ {note.label}</span>
-                                <span>€{getItemNoteLinePrice(item, note).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
+                      {batchItems.map((item, batchItemIdx) =>
+                        renderTicketOrderLine(order.id, item, `b-${batchIdx}-${batchItemIdx}`)
+                      )}
                       <div className="pt-1 px-2 text-pos-bg/90">
                         <div className="flex items-center justify-around text-md font-semibold py-1 pt-0">
                           <span>{metaUserName}</span>
@@ -1150,61 +1334,15 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                     </React.Fragment>
                   );
                 })}
-                {items.slice(lastSavedBoundary).map((item) => (
-                  <div
-                    key={item.id}
-                    className={
-                      lineItemSelectionDisabled
-                        ? 'flex flex-wrap items-center gap-1 p-2 py-1 text-sm text-pos-bg rounded cursor-default'
-                        : `flex flex-wrap items-center gap-1 p-2 py-1 text-sm text-pos-bg rounded active:bg-green-500 cursor-pointer ${selectedItemIds.includes(item.id) ? 'bg-green-500' : ''}`
-                    }
-                    onClick={() => {
-                      if (!lineItemSelectionDisabled) toggleItemSelection(item.id);
-                    }}
-                  >
-                    <div className="w-full">
-                      <div className="flex items-baseline justify-between">
-                        <span className="flex-1 font-semibold">{item.quantity}x {getItemLabel(item)}</span>
-                        <span className="font-semibold">€{getItemBaseLinePrice(item).toFixed(2)}</span>
-                      </div>
-                      {getItemNotes(item).map((note, noteIdx) => (
-                        <div key={`${item.id}-notes-${noteIdx}`} className="flex items-baseline justify-between pl-6 text-md opacity-90">
-                          <span>▪ {note.label}</span>
-                          <span>€{getItemNoteLinePrice(item, note).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                {items.slice(lastSavedBoundary).map((item, tailIdx) =>
+                  renderTicketOrderLine(order.id, item, `tail-${tailIdx}`)
+                )}
               </>
             ) : (
               <>
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className={
-                      lineItemSelectionDisabled
-                        ? 'flex flex-wrap items-center gap-1 p-2 py-1 text-sm text-pos-bg rounded cursor-default'
-                        : `flex flex-wrap items-center gap-1 p-2 py-1 text-sm text-pos-bg rounded active:bg-green-500 cursor-pointer ${selectedItemIds.includes(item.id) ? 'bg-green-500' : ''}`
-                    }
-                    onClick={() => {
-                      if (!lineItemSelectionDisabled) toggleItemSelection(item.id);
-                    }}
-                  >
-                    <div className="w-full">
-                      <div className="flex items-baseline justify-between">
-                        <span className="flex-1 font-semibold">{item.quantity}x {getItemLabel(item)}</span>
-                        <span className="font-semibold">€{getItemBaseLinePrice(item).toFixed(2)}</span>
-                      </div>
-                      {getItemNotes(item).map((note, noteIdx) => (
-                        <div key={`${item.id}-notes-${noteIdx}`} className="flex items-baseline justify-between pl-6 text-md opacity-90">
-                          <span>▪ {note.label}</span>
-                          <span>€{getItemNoteLinePrice(item, note).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                {items.map((item, itemIdx) =>
+                  renderTicketOrderLine(order.id, item, `main-${itemIdx}`)
+                )}
               </>
             ))}
           </div>
@@ -1213,14 +1351,14 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       <div className="flex items-center gap-2 py-1 px-2 border-t border-black/10 text-xl">
         <button
           type="button"
-          disabled={!hasSelection || lineItemSelectionDisabled}
+          disabled={!quantitySelectionValid || quantityToolbarDisabled}
           className={`w-12 h-12 p-0 flex items-center justify-center border-none rounded text-xl ${
-            !hasSelection || isSavedTableOrder || lineItemSelectionDisabled
+            !quantitySelectionValid || quantityToolbarDisabled
               ? 'bg-black/10 opacity-50 cursor-not-allowed'
               : 'bg-black/10 active:bg-green-500'
           }`}
           onClick={() => {
-            if (isSavedTableOrder || lineItemSelectionDisabled) return;
+            if (quantityToolbarDisabled || !quantitySelectionValid) return;
             if (order && selectedItems.length > 0) {
               selectedItems.forEach((item) => {
                 onUpdateItemQuantity?.(order.id, item.id, item.quantity + 1);
@@ -1234,14 +1372,14 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         </button>
         <button
           type="button"
-          disabled={!canDecreaseAll || isSavedTableOrder || lineItemSelectionDisabled}
+          disabled={!quantitySelectionValid || !canDecreaseAll || quantityToolbarDisabled}
           className={`w-12 h-12 p-0 flex items-center justify-center border-none rounded text-3xl ${
-            !canDecreaseAll || isSavedTableOrder || lineItemSelectionDisabled
+            !quantitySelectionValid || !canDecreaseAll || quantityToolbarDisabled
               ? 'bg-black/10 opacity-50 cursor-not-allowed'
               : 'bg-black/10 active:bg-rose-500'
           }`}
           onClick={() => {
-            if (isSavedTableOrder || lineItemSelectionDisabled) return;
+            if (quantityToolbarDisabled || !quantitySelectionValid) return;
             if (order && canDecreaseAll) {
               selectedItems.forEach((item) => {
                 if (item.quantity > 1) {
@@ -1257,18 +1395,26 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         </button>
         <button
           type="button"
-          className={`flex-1 py-2 flex items-center justify-center border-none rounded ${!hasSelection || isSavedTableOrder || lineItemSelectionDisabled
+          className={`flex-1 py-2 flex items-center justify-center border-none rounded ${!hasSelection
             ? 'opacity-50 cursor-not-allowed'
             : 'active:bg-green-500'
             }`}
           onClick={() => {
-            if (isSavedTableOrder || lineItemSelectionDisabled) return;
-            if (order && selectedItemIds.length > 0) {
-              selectedItemIds.forEach((id) => onRemoveItem(order.id, id));
-              setSelectedItemIds([]);
+            if (selectedLineKeys.length > 0) {
+              const keys = [...selectedLineKeys];
+              setSelectedLineKeys([]);
+              setTicketDeleteMarkIds((prev) => {
+                const n = new Set(prev);
+                const allMarked = keys.length > 0 && keys.every((k) => n.has(k));
+                for (const k of keys) {
+                  if (allMarked) n.delete(k);
+                  else n.add(k);
+                }
+                return n;
+              });
             }
           }}
-          disabled={!hasSelection || isSavedTableOrder || lineItemSelectionDisabled}
+          disabled={!hasSelection}
           aria-label={t('remove')}
         >
           <span className="inline-block w-8 h-8 shrink-0" style={toolbarIconMaskStyle('/delete.svg', '#B91C1C')} aria-hidden />
@@ -1351,7 +1497,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                 } catch (prodErr) {
                   console.warn('Production print error:', prodErr?.message);
                 }
-                setSelectedItemIds([]);
+                setSelectedLineKeys([]);
               }}
               disabled={!hasOrderItems}
             >
@@ -1486,14 +1632,22 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                               }`}
                             aria-label={m.name}
                           >
-                            {integ === 'manual_cash' ? (
-                              <span className="flex items-center justify-center w-[105px] h-[70px] text-4xl font-bold text-amber-600 bg-amber-50/80 rounded">€</span>
-                            ) : integ === 'cashmatic' ? (
-                              <img src={publicAssetUrl('/cashmatic.svg')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
-                            ) : integ === 'payworld' ? (
-                              <img src={publicAssetUrl('/payworld.svg')} alt={m.name} className="max-h-[70px] w-auto object-contain" />
-                            ) : integ === 'generic' ? (
-                              <img src={publicAssetUrl('/card.svg')} alt={m.name} className="max-h-[70px] min-w-[105px] w-auto object-contain" />
+                            {integ === 'manual_cash' ||
+                            integ === 'cashmatic' ||
+                            integ === 'payworld' ||
+                            integ === 'generic' ? (
+                              <img
+                                src={payMethodIconSrc(integ)}
+                                alt=""
+                                className="max-h-[70px] min-w-[105px] w-[105px] h-[70px] object-contain"
+                                onError={(e) => {
+                                  const el = e.currentTarget;
+                                  if (integ === 'payworld' && el.dataset.svgFallback !== '1') {
+                                    el.dataset.svgFallback = '1';
+                                    el.src = publicAssetUrl('/payworld.svg');
+                                  }
+                                }}
+                              />
                             ) : (
                               <span className="flex items-center justify-center w-[105px] min-h-[70px] px-2 py-3 text-base font-semibold text-center text-blue-900 bg-blue-50/80 rounded leading-tight">
                                 {m.name}
@@ -2095,22 +2249,18 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                 type="button"
                 className="py-3 px-10 bg-pos-danger text-white rounded text-xl active:bg-green-500"
                 onClick={async () => {
-                  if (isSavedTableOrder) {
-                    setShowDeleteAllModal(false);
-                    return;
-                  }
                   if (hasSelectedTable && order?.id) {
                     const currentItemIds = (order.items || []).map((it) => it.id).filter(Boolean);
                     for (const itemId of currentItemIds) {
                       await onRemoveItem?.(order.id, itemId);
                     }
                     setShowDeleteAllModal(false);
-                    setSelectedItemIds([]);
+                    setSelectedLineKeys([]);
                     return;
                   }
                   await onRemoveAllOrders?.();
                   setShowDeleteAllModal(false);
-                  setSelectedItemIds([]);
+                  setSelectedLineKeys([]);
                 }}
               >
                 {t('ok')}

@@ -137,6 +137,13 @@ app.get('/device-id', async (req, res) => {
   }
 });
 
-app.listen(PORT, '127.0.0.1', () => {
+const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`POS device agent (baseboard/system id) http://127.0.0.1:${PORT}/device-id`);
+});
+server.on('error', (err) => {
+  console.error('[device-agent] listen failed:', err?.message || err, err?.code || '');
+  if (err?.code === 'EADDRINUSE') {
+    console.error(`[device-agent] Port ${PORT} is in use. Set DEVICE_AGENT_PORT to a free port.`);
+  }
+  process.exit(1);
 });

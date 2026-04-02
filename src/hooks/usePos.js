@@ -272,6 +272,10 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   useEffect(() => {
     if (!socket?.on) return;
     const handler = (order) => {
+      if (!order || order.id == null || String(order.id).trim() === '') {
+        fetchOrders();
+        return;
+      }
       setOrders((prev) => {
         const idx = prev.findIndex((o) => o.id === order.id);
         const next = idx >= 0 ? [...prev.slice(0, idx), order, ...prev.slice(idx + 1)] : [order, ...prev];

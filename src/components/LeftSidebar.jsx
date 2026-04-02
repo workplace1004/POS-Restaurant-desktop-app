@@ -115,7 +115,7 @@ export function LeftSidebar({ categories, selectedCategoryId, onSelectCategory, 
               className="bg-transparent border-none text-emerald-500 text-xl font-semibold p-0 active:text-emerald-400"
               onClick={() => onKdsClick()}
             >
-              KDS
+              {t('kds.title')}
             </button>
           ) : null}
           <button

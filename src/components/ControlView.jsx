@@ -329,15 +329,15 @@ const TABLE_TEMPLATE_OPTIONS = [
 ];
 
 const TABLE_BOARD_COLOR_OPTIONS = [
-  '#facc15', // yellow
-  '#22c55e', // green
-  '#3b82f6', // blue
-  '#ef4444', // red
-  '#a855f7', // purple
-  '#ffffff'  // white
+  '#1F8E41', // green
+  '#B45309', // orange
+  '#1D4ED8', // blue
+  '#B91C1C', // red
+  '#6D28D9', // purple
+  '#CA8A04' // gold
 ];
 
-const createDefaultBoard = (_table, color = '#facc15') => ({
+const createDefaultBoard = (_table, color = '#CA8A04') => ({
   id: `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
   color,
   x: 100,
@@ -347,7 +347,7 @@ const createDefaultBoard = (_table, color = '#facc15') => ({
   rotation: 0
 });
 
-const normalizeBoardToItem = (b, defaultColor = '#facc15') => ({
+const normalizeBoardToItem = (b, defaultColor = '#CA8A04') => ({
   id: b?.id && typeof b.id === 'string' ? b.id : `board-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
   color: typeof b?.color === 'string' && b.color.trim() ? b.color.trim() : defaultColor,
   x: Number(b?.x) || 0,
@@ -6070,7 +6070,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                             height: `${Math.max(10, Number(board.height) || 10)}px`,
                             transform: `rotate(${Number(board.rotation) || 0}deg)`,
                             zIndex: 10,
-                            backgroundColor: board.color || '#facc15',
+                            backgroundColor: board.color || '#CA8A04',
                             opacity: 0.55,
                             touchAction: 'none'
                           }}

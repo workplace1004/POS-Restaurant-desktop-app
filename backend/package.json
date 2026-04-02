@@ -20,6 +20,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "axios": "^1.13.6",
+    "bytenode": "^1.5.7",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "prisma": "^5.22.0",

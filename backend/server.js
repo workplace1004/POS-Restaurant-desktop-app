@@ -6,7 +6,6 @@ import { PrismaClient } from '@prisma/client';
 import os from 'os';
 import net from 'net';
 import { execFile } from 'child_process';
-import { SerialPort } from 'serialport';
 import { createCashmaticService } from './services/cashmaticService.js';
 import { createPayworldService } from './services/payworldService.js';
 
@@ -1139,6 +1138,7 @@ app.put('/api/settings/product-positioning-colors', async (req, res) => {
 
 app.get('/api/settings/table-saved-orders', async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY_TABLE_SAVED_ORDER_IDS } });
     if (!row?.value) {
       res.json({ value: [] });
@@ -1157,12 +1157,40 @@ app.put('/api/settings/table-saved-orders', async (req, res) => {
   try {
     const incoming = req.body?.value;
     const safeValue = normalizeSavedTableOrderEntries(incoming);
+
+    const prevRow = await prisma.appSetting.findUnique({ where: { key: SETTING_KEY_TABLE_SAVED_ORDER_IDS } });
+    const prevIds = new Set();
+    if (prevRow?.value) {
+      try {
+        const prevSafe = normalizeSavedTableOrderEntries(JSON.parse(prevRow.value));
+        for (const e of prevSafe) {
+          if (e?.orderId) prevIds.add(String(e.orderId));
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     const serialized = JSON.stringify(safeValue);
     await prisma.appSetting.upsert({
       where: { key: SETTING_KEY_TABLE_SAVED_ORDER_IDS },
       create: { key: SETTING_KEY_TABLE_SAVED_ORDER_IDS, value: serialized },
       update: { value: serialized }
     });
+
+    io.emit('table-saved-orders:updated', { value: safeValue });
+
+    const orderInclude = { items: orderItemsInclude, table: true, customer: true, user: true, payments: true };
+    for (const entry of safeValue) {
+      const oid = entry?.orderId != null ? String(entry.orderId) : '';
+      if (!oid || prevIds.has(oid)) continue;
+      const ord = await prisma.order.findUnique({
+        where: { id: oid },
+        include: orderInclude
+      });
+      if (ord) io.emit('order:updated', ord);
+    }
+
     res.json({ value: safeValue });
   } catch (err) {
     console.error('PUT /api/settings/table-saved-orders', err);
@@ -1569,6 +1597,7 @@ app.put('/api/products/:id/subproduct-links', async (req, res) => {
 
 // REST: orders (current/open/in_waiting/in_planning)
 app.get('/api/orders', async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const orders = await prisma.order.findMany({
     where: { status: { in: ['open', 'in_waiting', 'in_planning'] } },
     include: { items: orderItemsInclude, table: true, customer: true, user: true, payments: true }
@@ -2616,7 +2645,18 @@ function sendTcpPrint(connectionString, payload) {
   });
 }
 
-function sendSerialPrint(connectionString, baudRate, payload) {
+/** Loaded on first serial print only so the API can start if the native addon fails (e.g. missing MSVC runtime on Windows). */
+async function sendSerialPrint(connectionString, baudRate, payload) {
+  let SerialPort;
+  try {
+    ({ SerialPort } = await import('serialport'));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[printer] serialport failed to load:', msg);
+    throw new Error(
+      `Serial printer module failed to load (${msg}). Install Microsoft Visual C++ Redistributable (x64) or use a TCP/network printer.`
+    );
+  }
   const path = parseSerialPath(connectionString);
   const baud = Number.parseInt(String(baudRate || 9600), 10) || 9600;
   const payloadBuffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload || '');
@@ -2667,7 +2707,7 @@ async function sendToPrinter(printer, receiptLines) {
   const connectionString = String(printer?.connectionString || '').trim();
   const payload = buildEscPosPayload(receiptLines);
   if (safeType === 'serial') {
-    return sendSerialPrint(connectionString, printer?.baudRate, payload);
+    return await sendSerialPrint(connectionString, printer?.baudRate, payload);
   }
   if (safeType === 'windows') {
     if (connectionString.startsWith('tcp://')) {
@@ -3711,6 +3751,16 @@ io.on('connection', (socket) => {
 
 const PORT = Number(process.env.PORT || 5000);
 const HOST = process.env.HOST || '0.0.0.0';
+
+httpServer.on('error', (err) => {
+  console.error('[backend] HTTP server error:', err?.message || err);
+  if (err && err.code === 'EADDRINUSE') {
+    console.error(
+      `[backend] Port ${PORT} is already in use. Set env PORT to a free port (e.g. 5040) or stop the other program. On Windows 10/11, "AirPlay Receiver" or other services sometimes use port 5000 — disable in Settings → System → Nearby sharing / AirPlay, or change PORT.`
+    );
+  }
+  process.exit(1);
+});
 
 (async () => {
   try {

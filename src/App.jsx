@@ -13,7 +13,6 @@ import { InPlanningModal } from './components/InPlanningModal';
 import { InWaitingModal } from './components/InWaitingModal';
 import { HistoryModal } from './components/HistoryModal';
 import { LoginScreen } from './components/LoginScreen';
-import { LicenseActivationPage } from './components/LicenseActivationPage';
 import { ControlView } from './components/ControlView';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -65,44 +64,6 @@ export default function App() {
   const [isOpeningTables, setIsOpeningTables] = useState(false);
   const [isPosBootstrapReady, setIsPosBootstrapReady] = useState(false);
   const posSessionBootstrappedRef = useRef(false);
-
-  const isElectronApp = typeof window !== 'undefined' && !!window.posLicense;
-  const [electronLicensePhase, setElectronLicensePhase] = useState(() =>
-    isElectronApp ? 'loading' : 'ready'
-  );
-  const [electronLicenseOk, setElectronLicenseOk] = useState(() => !isElectronApp);
-
-  useEffect(() => {
-    if (!isElectronApp) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const s = await window.posLicense.getLicenseStatus();
-        if (!cancelled) {
-          setElectronLicenseOk(!!s.valid);
-          setElectronLicensePhase('ready');
-        }
-      } catch {
-        if (!cancelled) {
-          setElectronLicenseOk(false);
-          setElectronLicensePhase('ready');
-        }
-      }
-    })();
-    const offInv = window.posLicense.onLicenseInvalidated?.(() => {
-      setElectronLicenseOk(false);
-    });
-    const offUp = window.posLicense.onLicenseUpdated?.(() => {
-      window.posLicense.getLicenseStatus().then((s) => {
-        setElectronLicenseOk(!!s.valid);
-      });
-    });
-    return () => {
-      cancelled = true;
-      offInv?.();
-      offUp?.();
-    };
-  }, [isElectronApp]);
 
   const fetchRoomCount = useCallback(async () => {
     try {
@@ -432,18 +393,6 @@ export default function App() {
     }
   }, [setViewAndPersist, fetchTables, fetchTableLayouts, fetchRoomCount]);
 
-  if (isElectronApp && electronLicensePhase === 'loading') {
-    return (
-      <div className="flex min-h-screen min-h-[100dvh] w-full items-center justify-center bg-pos-bg">
-        <LoadingSpinner label={t('license.checking')} />
-      </div>
-    );
-  }
-
-  if (isElectronApp && !electronLicenseOk) {
-    return <LicenseActivationPage onActivated={() => setElectronLicenseOk(true)} />;
-  }
-
   if (!user) {
     return (
       <LoginScreen
@@ -515,6 +464,7 @@ export default function App() {
         selectedCategoryId={selectedCategoryId}
         onSelectCategory={setSelectedCategoryId}
         currentUser={user}
+        onKdsClick={() => setViewAndPersist('kds')}
         onControlClick={() => setViewAndPersist('control')}
         onLogout={() => setShowLogoutConfirmModal(true)}
         time={time}

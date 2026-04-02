@@ -5,7 +5,7 @@ const base = String(import.meta.env.BASE_URL || '/');
 function fileLikeAppProtocol() {
   if (typeof window === 'undefined') return false;
   const p = window.location?.protocol;
-  return p === 'file:' || p === 'app:' || p === 'electron:';
+  return p === 'file:' || p === 'app:';
 }
 
 /**

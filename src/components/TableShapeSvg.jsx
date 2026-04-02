@@ -1,15 +1,17 @@
 import React from 'react';
 
-const ROSE_500 = '#f43f5e';
-const YELLOW_400 = '#facc15';
-const GREEN_500 = '#22c55e';
+/** POS table / board palette (same order as control color swatches). */
+const TABLE_GREEN = '#1F8E41';
+const TABLE_RED = '#B91C1C';
+const TABLE_GOLD = '#CA8A04';
 
 export function getTableFill(hasOpenOrders, wasPaidRecently) {
-  if (hasOpenOrders) return ROSE_500;
-  return GREEN_500;
+  if (hasOpenOrders) return TABLE_RED;
+  if (wasPaidRecently) return TABLE_GOLD;
+  return TABLE_GREEN;
 }
 
-export function Table4Svg({ tableFill = GREEN_500, className, idPrefix = 't4' }) {
+export function Table4Svg({ tableFill = TABLE_GREEN, className, idPrefix = 't4' }) {
   const filterId = `soft-4-${idPrefix}`;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 227" fill="none" className={className}>
@@ -29,7 +31,7 @@ export function Table4Svg({ tableFill = GREEN_500, className, idPrefix = 't4' })
   );
 }
 
-export function Table5Svg({ tableFill = GREEN_500, className, idPrefix = 't5' }) {
+export function Table5Svg({ tableFill = TABLE_GREEN, className, idPrefix = 't5' }) {
   const filterId = `soft-5-${idPrefix}`;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 227" fill="none" className={className}>
@@ -50,7 +52,7 @@ export function Table5Svg({ tableFill = GREEN_500, className, idPrefix = 't5' })
   );
 }
 
-export function Table6Svg({ tableFill = GREEN_500, className, idPrefix = 't6' }) {
+export function Table6Svg({ tableFill = TABLE_GREEN, className, idPrefix = 't6' }) {
   const filterId = `soft-6-${idPrefix}`;
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 227" fill="none" className={className}>

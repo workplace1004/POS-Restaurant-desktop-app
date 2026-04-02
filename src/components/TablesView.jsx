@@ -287,7 +287,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                       height: `${Math.max(10, Number(board.height) || 120)}px`,
                       transform: `rotate(${Number(board.rotation) || 0}deg)`,
                       zIndex: 10,
-                      backgroundColor: board.color || '#facc15'
+                      backgroundColor: board.color || '#CA8A04'
                     }}
                   />
                 ))}
@@ -319,7 +319,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
               const lastPaidAt = Number(lastPaidAtByTableId?.[id]) || 0;
               const wasPaidRecently = !hasOpenOrders && lastPaidAt > 0 && Date.now() - lastPaidAt <= TABLE_PAID_HIGHLIGHT_WINDOW_MS;
               const tableNumberColorClass = 'text-white';
-              const tableColorOverlay = hasOpenOrders ? 'bg-rose-500/50' : wasPaidRecently ? 'bg-green-500/50' : '';
+              const tableColorOverlay = hasOpenOrders ? 'bg-[#B91C1C]/50' : wasPaidRecently ? 'bg-[#CA8A04]/50' : '';
               return (
                 <button
                   key={id}

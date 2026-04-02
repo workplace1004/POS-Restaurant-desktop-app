@@ -202,11 +202,12 @@ export function buildSavedTableKitchenStartMap(value) {
  * Open draft orders on a table must not appear until then.
  */
 export function isKitchenOrder(order, savedKitchenStartMap) {
-  if (!order?.id) return false;
+  const oid = order?.id != null ? String(order.id) : '';
+  if (!oid) return false;
   if (order.status !== 'open') return false;
   if (!order.tableId) return false;
   const m = savedKitchenStartMap instanceof Map ? savedKitchenStartMap : new Map();
-  if (!m.has(order.id)) return false;
+  if (!m.has(oid)) return false;
   const items = order.items;
   return Array.isArray(items) && items.length > 0;
 }
@@ -214,7 +215,8 @@ export function isKitchenOrder(order, savedKitchenStartMap) {
 /** Elapsed timer on KDS should start at "Add to table", not order creation. */
 export function getKitchenTimerStartAt(order, savedKitchenStartMap) {
   const m = savedKitchenStartMap instanceof Map ? savedKitchenStartMap : new Map();
-  const savedAt = m.get(order?.id);
+  const oid = order?.id != null ? String(order.id) : '';
+  const savedAt = oid ? m.get(oid) : undefined;
   if (savedAt) return savedAt;
   return order?.updatedAt ?? order?.createdAt;
 }

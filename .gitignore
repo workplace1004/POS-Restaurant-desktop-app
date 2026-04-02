@@ -56,5 +56,5 @@ Desktop.ini
 .eslintcache
 .turbo
 
-# Electron / packaged app output
+# Packaged launchers (e.g. pkg output RESPOS.exe)
 release/

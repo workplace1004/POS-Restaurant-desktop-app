@@ -17,6 +17,11 @@ import {
 
 const SAVED_POLL_MS = 2000;
 
+/** Same-tab / same-browser fallback when Socket.IO misses (KDS + POS on one PC). */
+const TABLE_SAVED_BROADCAST = 'pos-kds-table-saved';
+
+const fetchNoStore = { cache: 'no-store' };
+
 const KDS_LINE_STATUS = new Set(['received', 'started', 'finished']);
 
 function normalizeKdsLineStatesClient(raw) {
@@ -181,7 +186,7 @@ export function KdsPage({
 
   const fetchTableSavedOrders = useCallback(async () => {
     try {
-      const res = await fetch(api.tableSavedOrders);
+      const res = await fetch(api.tableSavedOrders, fetchNoStore);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       setSavedKitchenStartByOrderId(buildSavedTableKitchenStartMap(data?.value));
@@ -192,7 +197,7 @@ export function KdsPage({
 
   const fetchKdsLineStates = useCallback(async () => {
     try {
-      const res = await fetch(api.kdsLineStates);
+      const res = await fetch(api.kdsLineStates, fetchNoStore);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       const v = data?.value && typeof data.value === 'object' ? data.value : {};
@@ -204,7 +209,7 @@ export function KdsPage({
 
   const fetchKdsDismissed = useCallback(async () => {
     try {
-      const res = await fetch(api.kdsDismissed);
+      const res = await fetch(api.kdsDismissed, fetchNoStore);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       const v = data?.value && typeof data.value === 'object' ? data.value : {};
@@ -256,7 +261,7 @@ export function KdsPage({
 
   const fetchKitchens = useCallback(async () => {
     try {
-      const res = await fetch(api.kitchens);
+      const res = await fetch(api.kitchens, fetchNoStore);
       const data = await res.json().catch(() => []);
       if (!res.ok) return;
       setKitchens(kitchensShownOnKds(data));
@@ -278,6 +283,16 @@ export function KdsPage({
   }, [fetchTableSavedOrders]);
 
   useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel(TABLE_SAVED_BROADCAST);
+    ch.onmessage = () => {
+      fetchOrders?.();
+      void fetchTableSavedOrders();
+    };
+    return () => ch.close();
+  }, [fetchOrders, fetchTableSavedOrders]);
+
+  useEffect(() => {
     fetchKdsLineStates();
   }, [fetchKdsLineStates]);
 
@@ -287,17 +302,20 @@ export function KdsPage({
 
   useEffect(() => {
     const id = setInterval(() => {
+      fetchOrders?.();
       fetchTableSavedOrders();
       fetchKdsDismissed();
     }, SAVED_POLL_MS);
     return () => clearInterval(id);
-  }, [fetchTableSavedOrders, fetchKdsDismissed]);
+  }, [fetchOrders, fetchTableSavedOrders, fetchKdsDismissed]);
 
   useEffect(() => {
     if (!socket?.on) return;
     const sync = () => {
       setOnline(!!socket.connected);
       if (socket.connected) {
+        fetchOrders?.();
+        fetchTableSavedOrders();
         fetchKdsLineStates();
         fetchKdsDismissed();
       }
@@ -309,7 +327,7 @@ export function KdsPage({
       socket.off('connect', sync);
       socket.off('disconnect', sync);
     };
-  }, [socket, fetchKdsLineStates, fetchKdsDismissed]);
+  }, [socket, fetchOrders, fetchTableSavedOrders, fetchKdsLineStates, fetchKdsDismissed]);
 
   useEffect(() => {
     if (!socket?.on) return;
@@ -333,13 +351,24 @@ export function KdsPage({
     const refreshSaved = () => {
       fetchTableSavedOrders();
     };
+    const onTableSavedUpdated = (payload) => {
+      fetchOrders?.();
+      const raw = payload?.value;
+      if (raw != null) {
+        setSavedKitchenStartByOrderId(buildSavedTableKitchenStartMap(raw));
+      } else {
+        fetchTableSavedOrders();
+      }
+    };
     socket.on('order:updated', refreshSaved);
     socket.on('orders:cleared', refreshSaved);
+    socket.on('table-saved-orders:updated', onTableSavedUpdated);
     return () => {
       socket.off('order:updated', refreshSaved);
       socket.off('orders:cleared', refreshSaved);
+      socket.off('table-saved-orders:updated', onTableSavedUpdated);
     };
-  }, [socket, fetchTableSavedOrders]);
+  }, [socket, fetchOrders, fetchTableSavedOrders]);
 
   useEffect(() => {
     if (!socket?.on) return;
