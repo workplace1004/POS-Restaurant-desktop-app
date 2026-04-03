@@ -17,12 +17,11 @@ import { ControlView } from './components/ControlView';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { usePos } from './hooks/usePos';
-import { KdsPage } from './kds/KdsPage';
 import { POS_API_PREFIX as API, POS_SOCKET_ORIGIN } from './lib/apiOrigin.js';
 
 const USER_STORAGE_KEY = 'pos-user';
 const VIEW_STORAGE_KEY = 'pos-view';
-const VALID_VIEWS = ['pos', 'control', 'tables', 'kds'];
+const VALID_VIEWS = ['pos', 'control', 'tables'];
 
 function loadInitialView() {
   try {
@@ -82,25 +81,6 @@ export default function App() {
     } catch { }
   }, []);
 
-  useEffect(() => {
-    const root = document.getElementById('root');
-    const kds = view === 'kds' && user;
-    if (kds) {
-      document.documentElement.classList.add('kds-mode');
-      document.body.classList.add('kds-mode');
-      root?.classList.add('kds-mode');
-    } else {
-      document.documentElement.classList.remove('kds-mode');
-      document.body.classList.remove('kds-mode');
-      root?.classList.remove('kds-mode');
-    }
-    return () => {
-      document.documentElement.classList.remove('kds-mode');
-      document.body.classList.remove('kds-mode');
-      root?.classList.remove('kds-mode');
-    };
-  }, [view, user]);
-
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [ordersModalTab, setOrdersModalTab] = useState('new');
   const [showInPlanningModal, setShowInPlanningModal] = useState(false);
@@ -158,7 +138,7 @@ export default function App() {
     fetchTableLayouts,
     appendSubproductNoteToItem,
     setOrderTable
-  } = usePos(API, socket, selectedTable?.id ?? null, focusedOrderId);
+  } = usePos(API, socket, selectedTable?.id ?? null, focusedOrderId, focusedOrderInitialItemCount);
 
   const inPlanningCountDisplay = (orders || []).filter((o) => o?.status === 'in_planning').length;
   const inWaitingCountDisplay = (orders || []).filter((o) => o?.status === 'in_waiting').length;
@@ -437,18 +417,6 @@ export default function App() {
     );
   }
 
-  if (view === 'kds') {
-    return (
-      <KdsPage
-        orders={orders}
-        fetchOrders={fetchOrders}
-        onBack={() => setViewAndPersist('pos')}
-        socket={socket}
-        currentUser={user}
-      />
-    );
-  }
-
   if (!isPosBootstrapReady) {
     return (
       <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-pos-bg">
@@ -464,7 +432,6 @@ export default function App() {
         selectedCategoryId={selectedCategoryId}
         onSelectCategory={setSelectedCategoryId}
         currentUser={user}
-        onKdsClick={() => setViewAndPersist('kds')}
         onControlClick={() => setViewAndPersist('control')}
         onLogout={() => setShowLogoutConfirmModal(true)}
         time={time}

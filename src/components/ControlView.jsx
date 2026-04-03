@@ -34,7 +34,7 @@ import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { LoadingSpinner } from './LoadingSpinner';
 import { publicAssetUrl, resolveMediaSrc } from '../lib/publicAssetUrl.js';
 
-/** Seeded KDS admin credential (same id as `seed.js`); hidden from Configuration → Kitchen list. */
+/** Seeded kitchen admin credential (same id as `seed.js`); hidden from Configuration → Kitchen list. */
 const KITCHEN_ADMIN_CREDENTIAL_ID = 'kitchen-kds-admin';
 
 const CONTROL_SIDEBAR_ITEMS = [

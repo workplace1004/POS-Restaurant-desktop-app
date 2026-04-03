@@ -163,14 +163,16 @@ model OrderPayment {
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  quantity  Int      @default(1)
-  price     Float
-  notes     String?
+  id                String   @id @default(cuid())
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id])
+  quantity          Int      @default(1)
+  price             Float
+  notes             String?
+  /// JSON: parent + noteIndexes — POS ticket delete marks, shown on KDS
+  ticketStrikeJson  String?
 }
 
 model SubproductGroup {

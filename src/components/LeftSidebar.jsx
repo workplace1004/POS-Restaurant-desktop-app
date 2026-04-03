@@ -7,7 +7,7 @@ const LANG_OPTIONS = [
   { value: 'tr', label: 'TR' },
 ];
 
-export function LeftSidebar({ categories, selectedCategoryId, onSelectCategory, currentUser, onControlClick, onKdsClick, onLogout, time }) {
+export function LeftSidebar({ categories, selectedCategoryId, onSelectCategory, currentUser, onControlClick, onLogout, time }) {
   const { t } = useLanguage();
   const categoriesListRef = useRef(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
@@ -109,15 +109,6 @@ export function LeftSidebar({ categories, selectedCategoryId, onSelectCategory, 
           )}
         </div>
         <div className="px-10 py-1 flex flex-col gap-2 items-center w-full">
-          {onKdsClick ? (
-            <button
-              type="button"
-              className="bg-transparent border-none text-emerald-500 text-xl font-semibold p-0 active:text-emerald-400"
-              onClick={() => onKdsClick()}
-            >
-              {t('kds.title')}
-            </button>
-          ) : null}
           <button
             type="button"
             className="bg-transparent border-none text-red-500 text-2xl font-semibold p-0 active:text-red-400"

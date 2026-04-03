@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
@@ -43,6 +43,94 @@ function ticketKeyOrderId(key) {
   const s = String(key);
   const c = s.indexOf(':');
   return c >= 0 ? s.slice(0, c) : '';
+}
+
+function ticketKeyItemId(key) {
+  const s = String(key);
+  const c = s.indexOf(':');
+  if (c < 0) return null;
+  const rest = s.slice(c + 1);
+  const h = rest.indexOf('#');
+  return (h >= 0 ? rest.slice(0, h) : rest) || null;
+}
+
+function parseItemNotesTokensForStrike(item) {
+  const parseNoteToken = (token) => {
+    const raw = String(token || '').trim();
+    if (!raw) return null;
+    const [labelPart, pricePart] = raw.split('::');
+    const label = String(labelPart || '').trim();
+    if (!label) return null;
+    if (pricePart == null) return { label, price: 0 };
+    const parsed = Number(pricePart);
+    if (!Number.isFinite(parsed)) return { label, price: 0 };
+    return { label, price: parsed };
+  };
+  return String(item?.notes || '')
+    .split(/[;,]/)
+    .map((n) => parseNoteToken(n))
+    .filter(Boolean);
+}
+
+function normalizeTicketStrikePayload(raw) {
+  try {
+    if (raw == null || raw === '') return { parent: false, noteIndexes: [] };
+    const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!o || typeof o !== 'object') return { parent: false, noteIndexes: [] };
+    const noteIndexes = Array.isArray(o.noteIndexes)
+      ? o.noteIndexes.map((x) => Math.floor(Number(x))).filter((n) => n >= 0 && n < 500)
+      : [];
+    return { parent: Boolean(o.parent), noteIndexes };
+  } catch {
+    return { parent: false, noteIndexes: [] };
+  }
+}
+
+function ticketStrikeStateToDeleteKeys(orderId, item) {
+  const notes = parseItemNotesTokensForStrike(item);
+  const { parent, noteIndexes } = normalizeTicketStrikePayload(item?.ticketStrikeJson);
+  const lineK = ticketLineKey(orderId, item.id);
+  const set = new Set();
+  if (notes.length === 0) {
+    if (parent) set.add(lineK);
+    return set;
+  }
+  if (parent) set.add(lineK);
+  const idxSet = new Set(noteIndexes);
+  for (let i = 0; i < notes.length; i++) {
+    if (idxSet.has(i)) set.add(ticketSubLineKey(orderId, item.id, i));
+  }
+  return set;
+}
+
+function deleteMarkSetToStrikeJson(orderId, item, markSet) {
+  const notes = parseItemNotesTokensForStrike(item);
+  const lineK = ticketLineKey(orderId, item.id);
+  if (notes.length === 0) {
+    return markSet.has(lineK) ? JSON.stringify({ parent: true, noteIndexes: [] }) : null;
+  }
+  const parent = markSet.has(lineK);
+  const idxs = [];
+  for (let i = 0; i < notes.length; i++) {
+    if (markSet.has(ticketSubLineKey(orderId, item.id, i))) idxs.push(i);
+  }
+  if (!parent && idxs.length === 0) return null;
+  return JSON.stringify({ parent, noteIndexes: idxs.sort((a, b) => a - b) });
+}
+
+function canonicalTicketStrikeJson(raw) {
+  if (raw == null || raw === '') return null;
+  try {
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== 'object') return null;
+    const parent = Boolean(o.parent);
+    const noteIndexes = Array.isArray(o.noteIndexes)
+      ? [...new Set(o.noteIndexes.map((x) => Math.floor(Number(x))).filter((n) => n >= 0 && n < 500))].sort((a, b) => a - b)
+      : [];
+    return JSON.stringify({ parent, noteIndexes });
+  } catch {
+    return String(raw);
+  }
 }
 
 /** Solid product-palette color for toolbar SVG icons (mask). */
@@ -305,6 +393,30 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const lastSavedBoundary = batchBoundaries.length > 0 ? batchBoundaries[batchBoundaries.length - 1] : 0;
   const inWaitingButtonDisabled = isViewedFromInWaiting && (order?.items?.length ?? 0) <= lastSavedBoundary;
 
+  const isOrderIdSavedToTable = (oid) => savedTableOrderIds.includes(String(oid));
+
+  /** Strikethrough / ticketStrikeJson only for “Add to table” batches or in-waiting locked batches — not draft lines. */
+  const itemRowOrderedForStrike = (lineOrderId, item) => {
+    if (isOrderIdSavedToTable(lineOrderId)) return true;
+    if (isViewedFromInWaiting && order?.id && String(order.id) === String(lineOrderId)) {
+      const idx = items.findIndex((it) => String(it.id) === String(item.id));
+      if (idx < 0) return false;
+      return idx < lastSavedBoundary;
+    }
+    return false;
+  };
+
+  const ticketLineKeyIsOrderedForStrike = (key) => {
+    const oid = ticketKeyOrderId(key);
+    if (!oid) return false;
+    if (isOrderIdSavedToTable(oid)) return true;
+    const iid = ticketKeyItemId(key);
+    if (!iid || !order?.id || String(order.id) !== String(oid)) return false;
+    const idx = items.findIndex((it) => String(it.id) === String(iid));
+    if (idx < 0) return false;
+    return isViewedFromInWaiting && idx < lastSavedBoundary;
+  };
+
   const normalizeSavedTableOrders = (list) => {
     if (!Array.isArray(list)) return [];
     const byOrderId = new Map();
@@ -343,13 +455,6 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     }
     const serverValue = normalizeSavedTableOrders(data?.value);
     setSavedTableOrders(serverValue);
-    try {
-      const bc = new BroadcastChannel('pos-kds-table-saved');
-      bc.postMessage({ type: 'table-saved' });
-      bc.close();
-    } catch {
-      /* ignore */
-    }
     return serverValue;
   };
 
@@ -386,6 +491,67 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         .map((o) => `${o?.id}:${(o.items || []).map((it) => `${it?.id}:${String(it?.notes ?? '')}`).join('|')}`)
         .join(';')}|${!isSavedTableOrder && order?.id ? items.map((it) => `${it?.id}:${String(it?.notes ?? '')}`).join(',') : ''}`,
     [savedOrdersForSelectedTable, isSavedTableOrder, order?.id, items]
+  );
+
+  const ticketStrikeHydrateKey = useMemo(() => {
+    const parts = [];
+    for (const so of savedOrdersForSelectedTable) {
+      for (const it of so.items || []) {
+        parts.push(`${so.id}:${it?.id}:${String(it?.ticketStrikeJson ?? '')}`);
+      }
+    }
+    if (order?.id) {
+      for (const it of items) {
+        parts.push(`${order.id}:${it?.id}:${String(it?.ticketStrikeJson ?? '')}`);
+      }
+    }
+    return parts.join(';');
+  }, [savedOrdersForSelectedTable, order?.id, items]);
+
+  const persistTicketStrikesForMarkSet = useCallback(
+    async (nextMarkSet) => {
+      const orderMap = new Map();
+      for (const so of savedOrdersForSelectedTable) {
+        if (so?.id) orderMap.set(so.id, so);
+      }
+      if (order?.id) {
+        orderMap.set(order.id, { ...order, items });
+      }
+      const tasks = [];
+      for (const [oid, o] of orderMap) {
+        const arr = o.items || [];
+        arr.forEach((it, itemIdx) => {
+          if (!it?.id) return;
+          const ordered =
+            savedTableOrderIds.includes(String(oid)) ||
+            (order?.id &&
+              String(order.id) === String(oid) &&
+              isViewedFromInWaiting &&
+              itemIdx < lastSavedBoundary);
+          const newJson = ordered ? deleteMarkSetToStrikeJson(oid, it, nextMarkSet) : null;
+          const oldCanon = canonicalTicketStrikeJson(it.ticketStrikeJson);
+          const newCanon = newJson == null ? null : canonicalTicketStrikeJson(newJson);
+          if (oldCanon !== newCanon) {
+            tasks.push(
+              fetch(`${API}/orders/${oid}/items/${it.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticketStrikeJson: newJson })
+              })
+            );
+          }
+        });
+      }
+      await Promise.all(tasks);
+    },
+    [
+      savedOrdersForSelectedTable,
+      savedTableOrderIds,
+      order,
+      items,
+      isViewedFromInWaiting,
+      lastSavedBoundary
+    ]
   );
 
   const wholeItemTicketSelected = (orderId, item) => {
@@ -458,12 +624,12 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const hasSelection = selectedLineKeys.length > 0;
   const canDecreaseAll = selectedItems.length > 0 && selectedItems.every((i) => (i.quantity ?? 0) > 1);
 
-  const renderTicketOrderLine = (orderId, item, keyPrefix) => {
+  const renderTicketOrderLine = (orderId, item, keyPrefix, orderedForStrike = true) => {
     if (item?.id == null) return null;
     const notes = getItemNotes(item);
     const lineKey = `${keyPrefix}-${item.id}`;
     const whole = wholeItemTicketSelected(orderId, item);
-    const parentMarked = ticketLineMarked(orderId, item);
+    const parentMarked = orderedForStrike && ticketLineMarked(orderId, item);
 
     if (notes.length === 0) {
       return (
@@ -500,7 +666,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         </div>
         {notes.map((note, noteIdx) => {
           const subSel = subLineTicketSelected(orderId, item.id, noteIdx);
-          const subMrk = ticketSubLineMarked(orderId, item.id, noteIdx);
+          const subMrk = orderedForStrike && ticketSubLineMarked(orderId, item.id, noteIdx);
           const rowGreen = subSel && !whole;
           return (
             <button
@@ -524,34 +690,47 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
   useEffect(() => {
     setSelectedLineKeys([]);
-    setTicketDeleteMarkIds(new Set());
   }, [order?.id]);
 
   useEffect(() => {
-    const keys = new Set();
+    const validKeys = new Set();
     const addTicketKeysForItem = (orderId, it) => {
       if (it?.id == null) return;
-      keys.add(ticketLineKey(orderId, it.id));
-      getItemNotes(it).forEach((_, idx) => keys.add(ticketSubLineKey(orderId, it.id, idx)));
+      validKeys.add(ticketLineKey(orderId, it.id));
+      getItemNotes(it).forEach((_, idx) => validKeys.add(ticketSubLineKey(orderId, it.id, idx)));
     };
     for (const so of savedOrdersForSelectedTable) {
       for (const it of so.items || []) addTicketKeysForItem(so.id, it);
     }
-    if (!isSavedTableOrder && order?.id) {
+    if (order?.id) {
       for (const it of items) addTicketKeysForItem(order.id, it);
     }
-    setTicketDeleteMarkIds((prev) => {
-      const next = new Set();
-      for (const k of prev) {
-        if (keys.has(k)) next.add(k);
+
+    const fromServer = new Set();
+    for (const so of savedOrdersForSelectedTable) {
+      for (const it of so.items || []) {
+        if (!it?.id) continue;
+        ticketStrikeStateToDeleteKeys(so.id, it).forEach((k) => {
+          if (validKeys.has(k)) fromServer.add(k);
+        });
       }
-      return next.size === prev.size && [...prev].every((k) => next.has(k)) ? prev : next;
-    });
+    }
+    if (order?.id) {
+      for (const it of items) {
+        if (!it?.id) continue;
+        if (!itemRowOrderedForStrike(order.id, it)) continue;
+        ticketStrikeStateToDeleteKeys(order.id, it).forEach((k) => {
+          if (validKeys.has(k)) fromServer.add(k);
+        });
+      }
+    }
+
+    setTicketDeleteMarkIds(fromServer);
     setSelectedLineKeys((prev) => {
-      const next = prev.filter((k) => keys.has(k));
+      const next = prev.filter((k) => validKeys.has(k));
       return next.length === prev.length && prev.every((k, idx) => k === next[idx]) ? prev : next;
     });
-  }, [ticketLinesValidityKey]);
+  }, [ticketLinesValidityKey, ticketStrikeHydrateKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1293,7 +1472,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
             {savedOrdersForSelectedTable.map((savedOrder) => (
               <div key={`saved-order-${savedOrder.id}`}>
                 {(savedOrder.items || []).map((item, itemIdx) =>
-                  renderTicketOrderLine(savedOrder.id, item, `saved-${savedOrder.id}-${itemIdx}`)
+                  renderTicketOrderLine(savedOrder.id, item, `saved-${savedOrder.id}-${itemIdx}`, true)
                 )}
                 <div className="pt-1 px-2 text-pos-bg/90">
                   {(() => {
@@ -1322,7 +1501,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                   return (
                     <React.Fragment key={`batch-${batchIdx}`}>
                       {batchItems.map((item, batchItemIdx) =>
-                        renderTicketOrderLine(order.id, item, `b-${batchIdx}-${batchItemIdx}`)
+                        renderTicketOrderLine(order.id, item, `b-${batchIdx}-${batchItemIdx}`, true)
                       )}
                       <div className="pt-1 px-2 text-pos-bg/90">
                         <div className="flex items-center justify-around text-md font-semibold py-1 pt-0">
@@ -1335,13 +1514,13 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                   );
                 })}
                 {items.slice(lastSavedBoundary).map((item, tailIdx) =>
-                  renderTicketOrderLine(order.id, item, `tail-${tailIdx}`)
+                  renderTicketOrderLine(order.id, item, `tail-${tailIdx}`, false)
                 )}
               </>
             ) : (
               <>
                 {items.map((item, itemIdx) =>
-                  renderTicketOrderLine(order.id, item, `main-${itemIdx}`)
+                  renderTicketOrderLine(order.id, item, `main-${itemIdx}`, false)
                 )}
               </>
             ))}
@@ -1400,19 +1579,49 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
             : 'active:bg-green-500'
             }`}
           onClick={() => {
-            if (selectedLineKeys.length > 0) {
-              const keys = [...selectedLineKeys];
-              setSelectedLineKeys([]);
+            if (selectedLineKeys.length === 0) return;
+            const keys = [...selectedLineKeys];
+            setSelectedLineKeys([]);
+
+            const unorderedKeys = keys.filter((k) => !ticketLineKeyIsOrderedForStrike(k));
+            const orderedKeys = keys.filter((k) => ticketLineKeyIsOrderedForStrike(k));
+
+            const toRemoveByOrder = new Map();
+            for (const k of unorderedKeys) {
+              const oid = ticketKeyOrderId(k);
+              const iid = ticketKeyItemId(k);
+              if (!oid || !iid) continue;
+              if (!toRemoveByOrder.has(oid)) toRemoveByOrder.set(oid, new Set());
+              toRemoveByOrder.get(oid).add(iid);
+            }
+            for (const [oid, idSet] of toRemoveByOrder) {
+              for (const iid of idSet) {
+                void onRemoveItem?.(oid, iid);
+              }
+            }
+
+            if (orderedKeys.length === 0) {
               setTicketDeleteMarkIds((prev) => {
                 const n = new Set(prev);
-                const allMarked = keys.length > 0 && keys.every((k) => n.has(k));
-                for (const k of keys) {
-                  if (allMarked) n.delete(k);
-                  else n.add(k);
-                }
+                for (const k of unorderedKeys) n.delete(k);
                 return n;
               });
+              return;
             }
+
+            setTicketDeleteMarkIds((prev) => {
+              const n = new Set(prev);
+              for (const k of unorderedKeys) n.delete(k);
+              const allMarked = orderedKeys.length > 0 && orderedKeys.every((k) => n.has(k));
+              for (const k of orderedKeys) {
+                if (allMarked) n.delete(k);
+                else n.add(k);
+              }
+              queueMicrotask(() => {
+                void persistTicketStrikesForMarkSet(n);
+              });
+              return n;
+            });
           }}
           disabled={!hasSelection}
           aria-label={t('remove')}

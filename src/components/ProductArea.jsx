@@ -142,6 +142,14 @@ export function ProductArea({
           runWithRetry(() => fetchSubproductsForProduct(product.id), 1)
         ]);
         if (requestId !== subproductsRequestIdRef.current) return;
+        if (createdItemId === false) {
+          setSelectedProduct(null);
+          setSelectedOrderItemId(null);
+          setSubproducts([]);
+          setShowSubproductModal(false);
+          setAddedSubproductIds(new Set());
+          return;
+        }
         setSelectedOrderItemId(createdItemId || null);
         const list = Array.isArray(data) ? data : [];
         subproductsCacheRef.current.set(product.id, { at: Date.now(), list });

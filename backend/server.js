@@ -1789,6 +1789,28 @@ app.patch('/api/orders/:id/items/:itemId', async (req, res) => {
       }
       patchData.price = Math.max(0, parsedPrice);
     }
+    if (req.body?.ticketStrikeJson !== undefined) {
+      const v = req.body.ticketStrikeJson;
+      if (v === null || v === '') {
+        patchData.ticketStrikeJson = null;
+      } else {
+        try {
+          const raw = typeof v === 'string' ? v : JSON.stringify(v);
+          const o = JSON.parse(raw);
+          if (!o || typeof o !== 'object') {
+            return res.status(400).json({ error: 'Invalid ticketStrikeJson' });
+          }
+          const parent = Boolean(o.parent);
+          const noteIndexes = Array.isArray(o.noteIndexes)
+            ? [...new Set(o.noteIndexes.map((x) => Math.floor(Number(x))).filter((n) => n >= 0 && n < 500))]
+                .sort((a, b) => a - b)
+            : [];
+          patchData.ticketStrikeJson = JSON.stringify({ parent, noteIndexes });
+        } catch {
+          return res.status(400).json({ error: 'Invalid ticketStrikeJson' });
+        }
+      }
+    }
     if (Object.keys(patchData).length === 0) {
       return res.status(400).json({ error: 'No item fields to update' });
     }
@@ -2447,6 +2469,170 @@ function formatEuroAmount(value) {
   return `€${(Math.round((Number(value) || 0) * 100) / 100).toFixed(2)}`;
 }
 
+/** Notes tokens on order items — same rules as POS OrderPanel. */
+function parseReceiptNoteToken(token) {
+  const raw = String(token || '').trim();
+  if (!raw) return null;
+  const [labelPart, pricePart] = raw.split('::');
+  const label = String(labelPart || '').trim();
+  if (!label) return null;
+  if (pricePart == null) return { label, price: 0 };
+  const parsed = Number(pricePart);
+  if (!Number.isFinite(parsed)) return { label, price: 0 };
+  return { label, price: parsed };
+}
+
+function parseReceiptItemNotes(item) {
+  return String(item?.notes || '')
+    .split(/[;,]/)
+    .map((n) => parseReceiptNoteToken(n))
+    .filter(Boolean);
+}
+
+function normalizeReceiptTicketStrike(raw) {
+  try {
+    if (raw == null || raw === '') return { parent: false, noteIndexes: [] };
+    const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!o || typeof o !== 'object') return { parent: false, noteIndexes: [] };
+    const noteIndexes = Array.isArray(o.noteIndexes)
+      ? o.noteIndexes.map((x) => Math.floor(Number(x))).filter((n) => n >= 0 && n < 500)
+      : [];
+    return { parent: Boolean(o.parent), noteIndexes };
+  } catch {
+    return { parent: false, noteIndexes: [] };
+  }
+}
+
+function receiptItemBaseUnitPrice(item) {
+  const productBase = Number(item?.product?.price);
+  if (Number.isFinite(productBase)) {
+    return Math.round(productBase * 100) / 100;
+  }
+  const orderUnit = Number(item.price) || 0;
+  const noteUnitTotal = parseReceiptItemNotes(item).reduce((s, n) => s + (Number(n.price) || 0), 0);
+  return Math.round(Math.max(0, orderUnit - noteUnitTotal) * 100) / 100;
+}
+
+function receiptPadLine(left, right, width = 40) {
+  const l = String(left || '');
+  const r = String(right || '');
+  const pad = Math.max(1, width - l.length - r.length);
+  return `${l}${' '.repeat(pad)}${r}`;
+}
+
+/**
+ * @returns {{ product: string, quantity: number, unitPrice: number, lineTotal: number, vatEatIn: any, vatTakeOut: any,
+ *   receiptPrintParts: { text: string, strike: boolean }[], slipPrintParts: { text: string, strike: boolean }[],
+ *   printer1Id?: string|null, printer2Id?: string|null, printer3Id?: string|null }}
+ */
+function buildReceiptItemStructured(item, printersById = null) {
+  const productName = item?.product?.name || 'Unknown item';
+  const qty = Math.max(1, Number(item.quantity) || 1);
+  const unitPrice = Math.round((Number(item.price) || 0) * 100) / 100;
+  const lineTotal = Math.round(unitPrice * qty * 100) / 100;
+  const notes = parseReceiptItemNotes(item);
+  const strike = normalizeReceiptTicketStrike(item?.ticketStrikeJson);
+  const idxSet = new Set(strike.noteIndexes);
+  const parentStruck =
+    strike.parent || (notes.length > 0 && notes.every((_, i) => idxSet.has(i)));
+  const noteStruck = (i) => strike.parent || idxSet.has(i);
+
+  const receiptPrintParts = [];
+  const slipPrintParts = [];
+
+  if (notes.length === 0) {
+    receiptPrintParts.push({
+      text: receiptPadLine(`${qty}x ${productName}`, formatEuroAmount(lineTotal)),
+      strike: parentStruck
+    });
+    slipPrintParts.push({ text: `${qty}x ${productName}`, strike: parentStruck });
+  } else {
+    const baseUnit = receiptItemBaseUnitPrice(item);
+    const baseLineTotal = Math.round(baseUnit * qty * 100) / 100;
+    receiptPrintParts.push({
+      text: receiptPadLine(`${qty}x ${productName}`, formatEuroAmount(baseLineTotal)),
+      strike: parentStruck
+    });
+    slipPrintParts.push({ text: `${qty}x ${productName}`, strike: parentStruck });
+    notes.forEach((note, i) => {
+      const nt = Math.round((Number(note.price) || 0) * qty * 100) / 100;
+      receiptPrintParts.push({
+        text: receiptPadLine(`   - ${note.label}`, formatEuroAmount(nt)),
+        strike: noteStruck(i)
+      });
+      slipPrintParts.push({
+        text: `   - ${note.label}`,
+        strike: noteStruck(i)
+      });
+    });
+  }
+
+  const noteSummary =
+    notes.length > 0
+      ? ` (${notes.map((n) => n.label).join(', ')})`
+      : item?.notes
+        ? ` (${String(item.notes).trim()})`
+        : '';
+
+  const out = {
+    product: `${productName}${noteSummary}`,
+    quantity: qty,
+    unitPrice,
+    lineTotal,
+    vatEatIn: item?.product?.vatEatIn || null,
+    vatTakeOut: item?.product?.vatTakeOut || null,
+    receiptPrintParts,
+    slipPrintParts
+  };
+
+  if (printersById) {
+    const p1 = String(item?.product?.printer1 || '').trim();
+    const p2 = String(item?.product?.printer2 || '').trim();
+    const p3 = String(item?.product?.printer3 || '').trim();
+    out.printer1Id = p1 && printersById.has(p1) ? p1 : null;
+    out.printer2Id = p2 && printersById.has(p2) ? p2 : null;
+    out.printer3Id = p3 && printersById.has(p3) ? p3 : null;
+  }
+
+  return out;
+}
+
+function normalizePrinterReceiptRows(receiptLines) {
+  if (!Array.isArray(receiptLines)) {
+    return [{ text: String(receiptLines ?? ''), strike: false }];
+  }
+  return receiptLines.map((row) => {
+    if (row == null) return { text: '', strike: false };
+    if (typeof row === 'string') return { text: row, strike: false };
+    return { text: String(row.text ?? ''), strike: !!row.strike };
+  });
+}
+
+function formatPrinterRowsPlainText(receiptLines) {
+  return normalizePrinterReceiptRows(receiptLines)
+    .map(({ text, strike }) => (strike ? `[VOID] ${text}` : text))
+    .join('\n');
+}
+
+function buildEscPosPayloadFromRows(rows) {
+  const init = Buffer.from([0x1b, 0x40]); // ESC @
+  const INV_ON = Buffer.from([0x1d, 0x42, 0x01]); // GS B 1 inverse
+  const INV_OFF = Buffer.from([0x1d, 0x42, 0x00]); // GS B 0 normal
+  const chunks = [init];
+  for (const { text, strike } of rows) {
+    const line = `${String(text)}\n`;
+    const lineBuf = Buffer.from(line, 'utf8');
+    if (strike) {
+      chunks.push(INV_ON, lineBuf, INV_OFF);
+    } else {
+      chunks.push(lineBuf);
+    }
+  }
+  const feed = Buffer.from([0x1b, 0x64, 0x04]);
+  const cut = Buffer.from([0x1d, 0x56, 0x00]);
+  return Buffer.concat([...chunks, feed, cut]);
+}
+
 function parseVatPercent(rawValue) {
   const cleaned = String(rawValue || '')
     .replace(',', '.')
@@ -2586,15 +2772,6 @@ function parseSerialPath(connectionString) {
   return s;
 }
 
-function buildEscPosPayload(receiptLines) {
-  const text = `${Array.isArray(receiptLines) ? receiptLines.join('\n') : String(receiptLines || '')}\n`;
-  const init = Buffer.from([0x1b, 0x40]); // ESC @ (initialize)
-  const body = Buffer.from(text, 'ascii'); // keep ASCII for broad ESC/POS compatibility
-  const feed = Buffer.from([0x1b, 0x64, 0x04]); // ESC d n (feed 4 lines)
-  const cut = Buffer.from([0x1d, 0x56, 0x00]); // GS V 0 (full cut)
-  return Buffer.concat([init, body, feed, cut]);
-}
-
 function sendTcpPrint(connectionString, payload) {
   const { host, port } = parseTcpTarget(connectionString);
   const payloadBuffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload || '');
@@ -2705,7 +2882,8 @@ async function sendSerialPrint(connectionString, baudRate, payload) {
 async function sendToPrinter(printer, receiptLines) {
   const safeType = String(printer?.type || '').trim().toLowerCase();
   const connectionString = String(printer?.connectionString || '').trim();
-  const payload = buildEscPosPayload(receiptLines);
+  const rows = normalizePrinterReceiptRows(receiptLines);
+  const payload = buildEscPosPayloadFromRows(rows);
   if (safeType === 'serial') {
     return await sendSerialPrint(connectionString, printer?.baudRate, payload);
   }
@@ -2718,7 +2896,7 @@ async function sendToPrinter(printer, receiptLines) {
     if (process.platform !== 'win32') {
       throw new Error(`Windows printer-name transport is only supported on Windows host. Current platform: ${process.platform}`);
     }
-    const text = `${Array.isArray(receiptLines) ? receiptLines.join('\n') : String(receiptLines || '')}\n\n\n`;
+    const text = `${formatPrinterRowsPlainText(receiptLines)}\n\n\n`;
     const escapedPrinterName = printerName.replace(/'/g, "''");
     const script =
       `$printerName = '${escapedPrinterName}';\n` +
@@ -2885,21 +3063,7 @@ app.post('/api/printers/production', async (req, res) => {
     });
     const printersById = new Map(enabledPrinters.map((p) => [p.id, p]));
 
-    const itemLines = order.items.map((item) => {
-      const productName = item?.product?.name || 'Unknown item';
-      const note = item?.notes ? ` (${String(item.notes).trim()})` : '';
-      const qty = Math.max(1, Number(item.quantity) || 1);
-      const printer1Id = String(item?.product?.printer1 || '').trim();
-      const printer2Id = String(item?.product?.printer2 || '').trim();
-      const printer3Id = String(item?.product?.printer3 || '').trim();
-      return {
-        product: `${productName}${note}`,
-        quantity: qty,
-        printer1Id: printer1Id && printersById.has(printer1Id) ? printer1Id : null,
-        printer2Id: printer2Id && printersById.has(printer2Id) ? printer2Id : null,
-        printer3Id: printer3Id && printersById.has(printer3Id) ? printer3Id : null
-      };
-    });
+    const itemLines = order.items.map((item) => buildReceiptItemStructured(item, printersById));
 
     const printedAt = new Date().toISOString();
     const productionByPrinterId = new Map();
@@ -2923,7 +3087,7 @@ app.post('/api/printers/production', async (req, res) => {
         `Table: ${order.table?.name || '-'}`,
         `Customer: ${order.customer?.name || '-'}`,
         '------------------------------',
-        ...lines.map((line) => `${line.quantity}x ${line.product}`),
+        ...lines.flatMap((line) => line.slipPrintParts),
         '------------------------------'
       ];
       try {
@@ -2974,21 +3138,7 @@ app.post('/api/printers/planning-totals', async (req, res) => {
     if (!validation.ok) return res.status(400).json({ error: validation.error });
 
     const dbTotal = Math.round(order.items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0) * 100) / 100;
-    const itemLines = order.items.map((item) => {
-      const productName = item?.product?.name || 'Unknown item';
-      const note = item?.notes ? ` (${String(item.notes).trim()})` : '';
-      const qty = Math.max(1, Number(item.quantity) || 1);
-      const unitPrice = Math.round((Number(item.price) || 0) * 100) / 100;
-      const lineTotal = Math.round(unitPrice * qty * 100) / 100;
-      return {
-        product: `${productName}${note}`,
-        quantity: qty,
-        unitPrice,
-        lineTotal,
-        vatEatIn: item?.product?.vatEatIn || null,
-        vatTakeOut: item?.product?.vatTakeOut || null
-      };
-    });
+    const itemLines = order.items.map((item) => buildReceiptItemStructured(item, null));
 
     const useEatInVat = !!(order.tableId && String(order.tableId).trim() !== '');
     const vatSummary = buildReceiptVatSummary(itemLines, useEatInVat);
@@ -3001,7 +3151,7 @@ app.post('/api/printers/planning-totals', async (req, res) => {
       `Table: ${order.table?.name || '-'}`,
       `Customer: ${custLabel}`,
       '------------------------------',
-      ...itemLines.map((line) => `${line.quantity}x ${line.product}  ${formatEuroAmount(line.lineTotal)}`),
+      ...itemLines.flatMap((line) => line.receiptPrintParts),
       '------------------------------',
       `SUBTOTAL: ${formatEuroAmount(dbTotal)}`,
       ...vatSummary.lines.map((entry) => entry.display),
@@ -3062,27 +3212,7 @@ app.post('/api/printers/receipt', async (req, res) => {
       isMain: mainPrinter.isMain === 1,
     });
 
-    const itemLines = order.items.map((item) => {
-      const productName = item?.product?.name || 'Unknown item';
-      const note = item?.notes ? ` (${String(item.notes).trim()})` : '';
-      const qty = Math.max(1, Number(item.quantity) || 1);
-      const unitPrice = Math.round((Number(item.price) || 0) * 100) / 100;
-      const lineTotal = Math.round(unitPrice * qty * 100) / 100;
-      const printer1Id = String(item?.product?.printer1 || '').trim();
-      const printer2Id = String(item?.product?.printer2 || '').trim();
-      const printer3Id = String(item?.product?.printer3 || '').trim();
-      return {
-        product: `${productName}${note}`,
-        quantity: qty,
-        unitPrice,
-        lineTotal,
-        vatEatIn: item?.product?.vatEatIn || null,
-        vatTakeOut: item?.product?.vatTakeOut || null,
-        printer1Id: printer1Id && printersById.has(printer1Id) ? printer1Id : null,
-        printer2Id: printer2Id && printersById.has(printer2Id) ? printer2Id : null,
-        printer3Id: printer3Id && printersById.has(printer3Id) ? printer3Id : null
-      };
-    });
+    const itemLines = order.items.map((item) => buildReceiptItemStructured(item, printersById));
 
     const printedAt = new Date().toISOString();
 
@@ -3098,7 +3228,7 @@ app.post('/api/printers/receipt', async (req, res) => {
       `Customer: ${order.customer?.name || '-'}`,
       `Printer: ${mainPrinter.name || mainPrinter.id}`,
       '------------------------------',
-      ...itemLines.map((line) => `${line.quantity}x ${line.product}  ${formatEuroAmount(line.lineTotal)}`),
+      ...itemLines.flatMap((line) => line.receiptPrintParts),
       '------------------------------',
       `SUBTOTAL: ${formatEuroAmount(dbTotal)}`,
       ...vatSummary.lines.map((entry) => entry.display),
@@ -3114,7 +3244,7 @@ app.post('/api/printers/receipt', async (req, res) => {
       printerName: mainPrinter.name,
       items: itemLines.length,
       subtotal: dbTotal,
-      receipt_text: receiptLines.join('\n'),
+      receipt_text: formatPrinterRowsPlainText(receiptLines),
       ...sendResult
     });
     serverLog('printer', 'Final ticket sent to main printer', {
@@ -3150,7 +3280,7 @@ app.post('/api/printers/receipt', async (req, res) => {
         `Table: ${order.table?.name || '-'}`,
         `Customer: ${order.customer?.name || '-'}`,
         '------------------------------',
-        ...lines.map((line) => `${line.quantity}x ${line.product}`),
+        ...lines.flatMap((line) => line.slipPrintParts),
         '------------------------------'
       ];
       try {
@@ -3160,7 +3290,7 @@ app.post('/api/printers/receipt', async (req, res) => {
           printerName: printer.name,
           items: lines.length,
           noPrices: true,
-          receipt_text: slipLines.join('\n'),
+          receipt_text: formatPrinterRowsPlainText(slipLines),
           ...sendResult
         });
         serverLog('printer', 'No-price slip sent to printer', {
@@ -3248,19 +3378,8 @@ app.post('/api/printers/receipt/table', async (req, res) => {
     const allItemLines = [];
     for (const order of orders) {
       for (const item of order.items) {
-        const productName = item?.product?.name || 'Unknown item';
-        const note = item?.notes ? ` (${String(item.notes).trim()})` : '';
-        const qty = Math.max(1, Number(item.quantity) || 1);
-        const unitPrice = Math.round((Number(item.price) || 0) * 100) / 100;
-        const lineTotal = Math.round(unitPrice * qty * 100) / 100;
-        allItemLines.push({
-          orderId: order.id,
-          product: `${productName}${note}`,
-          quantity: qty,
-          lineTotal,
-          vatEatIn: item?.product?.vatEatIn || null,
-          vatTakeOut: item?.product?.vatTakeOut || null
-        });
+        const structured = buildReceiptItemStructured(item, null);
+        allItemLines.push({ orderId: order.id, ...structured });
       }
     }
 
@@ -3281,7 +3400,7 @@ app.post('/api/printers/receipt/table', async (req, res) => {
       `Table: ${firstOrder?.table?.name || '-'}`,
       `Printer: ${mainPrinter.name || mainPrinter.id}`,
       '------------------------------',
-      ...allItemLines.map((line) => `${line.quantity}x ${line.product}  ${formatEuroAmount(line.lineTotal)}`),
+      ...allItemLines.flatMap((line) => line.receiptPrintParts),
       '------------------------------',
       `SUBTOTAL: ${formatEuroAmount(dbTotal)}`,
       ...vatSummary.lines.map((entry) => entry.display),
@@ -3319,7 +3438,7 @@ app.post('/api/printers/receipt/table', async (req, res) => {
           printerName: mainPrinter.name,
           items: allItemLines.length,
           subtotal: dbTotal,
-          receipt_text: receiptLines.join('\n'),
+          receipt_text: formatPrinterRowsPlainText(receiptLines),
           ...sendResult
         }],
         printed: true

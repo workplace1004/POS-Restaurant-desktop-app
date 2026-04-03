@@ -50,16 +50,3 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-
-/* Kitchen Display: use full viewport (POS body is normally capped at 1024px) */
-html.kds-mode,
-body.kds-mode {
-  max-width: none !important;
-  min-width: 100% !important;
-  width: 100vw !important;
-}
-#root.kds-mode {
-  max-width: none !important;
-  min-width: 100% !important;
-  width: 100vw !important;
-}

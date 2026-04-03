@@ -24,7 +24,7 @@ const normalizeFunctionButtonsLayout = (value) => {
   return next;
 };
 
-export function usePos(API, socket, selectedTableId = null, focusedOrderId = null) {
+export function usePos(API, socket, selectedTableId = null, focusedOrderId = null, focusedOrderInitialItemCount = 0) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -315,6 +315,23 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
     return candidateTime >= latestTime ? candidate : latest;
   }, null);
 
+  /** First index of “unordered” lines (product tap removes; no ticket strikethrough). In-waiting: earlier batches are ordered. */
+  const getOrderedLinePrefixCount = useCallback(() => {
+    const o = currentOrder;
+    if (!o) return 0;
+    if (o.status === 'in_waiting' && focusedOrderId && o.id === focusedOrderId) {
+      try {
+        const b = JSON.parse(o.itemBatchBoundariesJson || '[]');
+        if (Array.isArray(b) && b.length > 0) return b[b.length - 1];
+      } catch {
+        /* ignore */
+      }
+      const n = Number(focusedOrderInitialItemCount) || 0;
+      return n > 0 ? n : 0;
+    }
+    return 0;
+  }, [currentOrder, focusedOrderId, focusedOrderInitialItemCount]);
+
   const addItemToOrder = useCallback(
     async (product, quantity = 1, tableId = null) => {
       const notes = product?.subproductName || undefined;
@@ -358,6 +375,24 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
         }
         return null;
       }
+
+      const orderedPrefix = getOrderedLinePrefixCount();
+      const existingItems = currentOrder?.items || [];
+      const unorderedMatches = existingItems
+        .map((it, idx) => ({ it, idx }))
+        .filter(
+          ({ it, idx }) =>
+            idx >= orderedPrefix && String(it.productId || it.product?.id) === String(product.id)
+        );
+      const removeTarget = unorderedMatches[unorderedMatches.length - 1];
+      if (removeTarget) {
+        await fetch(`${API}/orders/${orderId}/items/${removeTarget.it.id}`, { method: 'DELETE' });
+        const resAfter = await fetch(`${API}/orders`);
+        const listAfter = await safeJson(resAfter);
+        if (Array.isArray(listAfter)) setOrders(listAfter);
+        return false;
+      }
+
       if (tableId && !currentOrder?.tableId) {
         await fetch(`${API}/orders/${orderId}`, {
           method: 'PATCH',
@@ -383,7 +418,7 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
       }
       return null;
     },
-    [API, currentOrder]
+    [API, currentOrder, getOrderedLinePrefixCount]
   );
 
   const appendSubproductNoteToItem = useCallback(
