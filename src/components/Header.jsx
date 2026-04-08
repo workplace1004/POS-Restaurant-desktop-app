@@ -118,8 +118,8 @@ export function Header({
   };
 
   return (
-    <header className="flex items-center w-full bg-pos-bg py-2 px-2 shrink-0">
-      <nav className={`flex-1 grid ${navGridClass} items-center gap-1 min-w-0`}>
+    <header className="flex items-stretch w-full bg-pos-bg py-2 px-2 shrink-0 gap-1">
+      <nav className={`flex-1 min-w-0 grid ${navGridClass} items-center gap-1`}>
         {slots.map((slotId, idx) => {
           const cfg = getButtonConfig(slotId);
           if (!cfg) return null;

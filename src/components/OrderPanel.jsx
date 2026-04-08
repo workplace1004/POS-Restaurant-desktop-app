@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { orderMatchesSelectedTable } from '../hooks/usePos';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
+import { buildPaymentBreakdown, formatPaymentAmount, roundCurrency, sumAmountsByIntegration } from '../lib/payDifferentlyUtils.js';
 import { InWaitingNameModal } from './InWaitingNameModal';
 import { InPlanningDateTimeModal } from './InPlanningDateTimeModal';
+import { PayDifferentlyModal } from './PayDifferentlyModal.jsx';
 
 const KEYPAD = [
   ['7', '8', '9'],
@@ -13,19 +16,6 @@ const KEYPAD = [
 ];
 
 const formatSubtotalPrice = (n) => `€ ${Number(n).toFixed(2).replace('.', ',')}`;
-const roundCurrency = (n) => Math.round((Number(n) || 0) * 100) / 100;
-const formatPaymentAmount = (n) => `€${roundCurrency(n).toFixed(2)}`;
-/** Payment tiles in “Pay differently” — files live in `public/` (copied to dist root). */
-const PAY_METHOD_ICON_PNG = {
-  manual_cash: '/cash.png',
-  cashmatic: '/cashmatic.png',
-  payworld: '/payworld.png',
-  generic: '/card.png'
-};
-function payMethodIconSrc(integ) {
-  const key = PAY_METHOD_ICON_PNG[integ] != null ? integ : 'generic';
-  return publicAssetUrl(PAY_METHOD_ICON_PNG[key] || PAY_METHOD_ICON_PNG.generic);
-}
 const TABLE_SAVED_ORDERS_API = `${API}/settings/table-saved-orders`;
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
 
@@ -133,6 +123,53 @@ function canonicalTicketStrikeJson(raw) {
   }
 }
 
+/** Same rules as ticket UI `ticketLineMarked` / `ticketSubLineMarked`, using a mark set (e.g. ticketDeleteMarkIds). */
+function ticketLineMarkedWithSet(orderId, item, markSet) {
+  if (item?.id == null || orderId == null) return false;
+  if (markSet.has(ticketLineKey(orderId, item.id))) return true;
+  const notes = parseItemNotesTokensForStrike(item);
+  if (notes.length === 0) return false;
+  return notes.every((_, idx) => markSet.has(ticketSubLineKey(orderId, item.id, idx)));
+}
+
+function ticketSubLineMarkedWithSet(orderId, itemId, noteIdx, markSet) {
+  return markSet.has(ticketSubLineKey(orderId, itemId, noteIdx));
+}
+
+/**
+ * Payable line total for an order item: excludes void/strike marks (matches ticket strikethrough).
+ */
+function computeItemPayableWithStrikeMarks(orderId, item, markSet) {
+  const qty = Math.max(1, Number(item?.quantity) || 1);
+  const full = roundCurrency((Number(item?.price) || 0) * qty);
+  if (orderId == null || item?.id == null) return full;
+
+  const notes = parseItemNotesTokensForStrike(item);
+
+  if (ticketLineMarkedWithSet(orderId, item, markSet)) return 0;
+
+  if (notes.length === 0) return full;
+
+  const productBase = Number(item?.product?.price);
+  const noteUnitTotal = notes.reduce((sum, note) => sum + (Number(note?.price) || 0), 0);
+  const baseUnit = Number.isFinite(productBase)
+    ? roundCurrency(productBase)
+    : roundCurrency(Math.max(0, (Number(item?.price) || 0) - noteUnitTotal));
+  const base = roundCurrency(baseUnit * qty);
+  let sub = 0;
+  for (let i = 0; i < notes.length; i++) {
+    if (!ticketSubLineMarkedWithSet(orderId, item.id, i, markSet)) {
+      sub += roundCurrency((Number(notes[i]?.price) || 0) * qty);
+    }
+  }
+  return roundCurrency(base + sub);
+}
+
+function computeOrderTotalWithStrikeMarks(sourceOrder, markSet) {
+  const oid = sourceOrder?.id;
+  return roundCurrency((sourceOrder?.items || []).reduce((sum, item) => sum + computeItemPayableWithStrikeMarks(oid, item, markSet), 0));
+}
+
 /** Solid product-palette color for toolbar SVG icons (mask). */
 function toolbarIconMaskStyle(assetPath, hex) {
   const u = publicAssetUrl(assetPath);
@@ -149,22 +186,6 @@ function toolbarIconMaskStyle(assetPath, hex) {
   };
 }
 
-function sumAmountsByIntegration(methods, amounts, integration) {
-  return methods
-    .filter((m) => m.integration === integration)
-    .reduce((sum, m) => sum + (Number(amounts[m.id]) || 0), 0);
-}
-
-/** Build payment breakdown { amounts: { methodId: amount } } from methods and amounts */
-function buildPaymentBreakdown(methods, amounts) {
-  const result = {};
-  for (const m of methods) {
-    const v = Number(amounts[m.id]) || 0;
-    if (v > 0.0001) result[m.id] = roundCurrency(v);
-  }
-  return Object.keys(result).length > 0 ? { amounts: result } : null;
-}
-
 /** Allocate payment breakdown proportionally across orders. totalOfAllOrders = sum of order totals. */
 function allocatePaymentBreakdown(paymentBreakdown, orderTotal, totalOfAllOrders) {
   if (!paymentBreakdown?.amounts || totalOfAllOrders <= 0) return paymentBreakdown;
@@ -177,7 +198,7 @@ function allocatePaymentBreakdown(paymentBreakdown, orderTotal, totalOfAllOrders
   return Object.keys(allocated).length > 0 ? { amounts: allocated } : null;
 }
 
-export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, onStatusChange, onCreateOrder, onRemoveAllOrders, tables, showSubtotalView = false, subtotalBreaks = [], onPaymentCompleted, selectedTable = null, currentUser = null, currentTime = '', onOpenTables, quantityInput = '', setQuantityInput, showInWaitingButton = false, showInPlanningButton = true, onOpenInPlanning, onOpenInWaiting, onSaveInWaitingAndReset, focusedOrderId = null, focusedOrderInitialItemCount = 0 }) {
+export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, onStatusChange, onCreateOrder, onRemoveAllOrders, tables, showSubtotalView = false, subtotalBreaks = [], onPaymentCompleted, selectedTable = null, currentUser = null, currentTime = '', onOpenTables, quantityInput = '', setQuantityInput, showInWaitingButton = false, showInPlanningButton = true, onOpenInPlanning, onOpenInWaiting, onSaveInWaitingAndReset, focusedOrderId = null, focusedOrderInitialItemCount = 0, onTableSavedOrdersPersisted, socket = null }) {
   const { t } = useLanguage();
   const tr = (key, fallback) => {
     const translated = t(key);
@@ -196,14 +217,9 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const [inPlanningCalendarAction, setInPlanningCalendarAction] = useState(null); // 'payNow' | 'inPlanning'
   const payNowFromInWaitingRef = useRef(false); // When Yes → calendar → Save → payment: after success, set status to in_planning
   const [showPayDifferentlyModal, setShowPayDifferentlyModal] = useState(false);
-  const [paymentAmounts, setPaymentAmounts] = useState({});
-  const [activePaymentMethods, setActivePaymentMethods] = useState([]);
-  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState(null);
   const [showPayworldStatusModal, setShowPayworldStatusModal] = useState(false);
   const [payworldStatus, setPayworldStatus] = useState({ state: 'IDLE', message: '', details: null });
   const [payModalTargetTotal, setPayModalTargetTotal] = useState(0);
-  const [payModalKeypadInput, setPayModalKeypadInput] = useState('');
   const [payConfirmLoading, setPayConfirmLoading] = useState(false);
   const [paymentErrorMessage, setPaymentErrorMessage] = useState('');
   const [paymentSuccessMessage, setPaymentSuccessMessage] = useState('');
@@ -215,6 +231,8 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const [subtotalSelectedLeftIds, setSubtotalSelectedLeftIds] = useState([]);
   const [subtotalSelectedRightIds, setSubtotalSelectedRightIds] = useState([]);
   const [savedTableOrders, setSavedTableOrders] = useState([]);
+  /** When > mount GET start time, ignore that GET so it cannot overwrite a newer persist. */
+  const savedTableOrdersPersistedAtRef = useRef(0);
   const splitRightPanelScrollRef = useRef(null);
   const orderListScrollRef = useRef(null);
   const activeCashmaticSessionIdRef = useRef(null);
@@ -234,9 +252,11 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const hasSelectedTable = selectedTable?.id != null;
   const hasOrderItems = items.length > 0;
   const cashierName = currentUser?.label || currentUser?.name || 'admin';
-  const savedTableOrderIds = savedTableOrders.map((entry) => entry.orderId).filter(Boolean);
-  const savedOrderMetaById = new Map(savedTableOrders.map((entry) => [entry.orderId, entry]));
-  const isSavedTableOrder = !!(hasSelectedTable && order?.id && savedTableOrderIds.includes(order.id));
+  const savedTableOrderIds = savedTableOrders.map((entry) => String(entry.orderId || '').trim()).filter(Boolean);
+  const savedOrderMetaById = new Map(
+    savedTableOrders.filter((e) => e?.orderId != null && String(e.orderId).trim() !== '').map((entry) => [String(entry.orderId), entry])
+  );
+  const isSavedTableOrder = !!(hasSelectedTable && order?.id && savedTableOrderIds.includes(String(order.id)));
   /** Saved batches: show oldest first (API `orders` list is usually newest-first). */
   const savedOrdersForSelectedTable = hasSelectedTable
     ? (() => {
@@ -247,18 +267,39 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                 (o) =>
                   o?.id &&
                   o?.status === 'open' &&
-                  String(o?.tableId ?? '') === String(selectedTable?.id ?? '') &&
-                  savedTableOrderIds.includes(o?.id)
+                  selectedTable &&
+                  orderMatchesSelectedTable(o, selectedTable) &&
+                  savedTableOrderIds.includes(String(o?.id))
               )
-              .map((o) => [o.id, o])
+              .map((o) => [String(o.id), o])
           ).values()
         );
         const batchTime = (o) => {
-          const meta = savedOrderMetaById.get(o.id);
+          const meta = savedOrderMetaById.get(String(o.id));
           const savedMs = meta?.savedAt ? new Date(meta.savedAt).getTime() : NaN;
           const createdMs = new Date(o?.createdAt || 0).getTime();
           return Number.isFinite(savedMs) && savedMs > 0 ? savedMs : createdMs;
         };
+        // After "Add to table", always fold the live ticket order in so lines + cashier/time show immediately
+        // (parent `orders` can lag or hold a stale copy while `order` already has the latest items).
+        if (
+          order?.id &&
+          order.status === 'open' &&
+          selectedTable &&
+          savedTableOrderIds.includes(String(order.id)) &&
+          orderMatchesSelectedTable(order, selectedTable)
+        ) {
+          const idStr = String(order.id);
+          const idx = list.findIndex((o) => String(o.id) === idStr);
+          const prev = idx >= 0 ? list[idx] : null;
+          const merged = {
+            ...(prev || {}),
+            ...order,
+            items: Array.isArray(order.items) ? order.items : prev?.items || []
+          };
+          if (idx >= 0) list[idx] = merged;
+          else list.push(merged);
+        }
         return list.sort((a, b) => batchTime(a) - batchTime(b));
       })()
     : [];
@@ -268,7 +309,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     (savedOrder?.items || []).map((item, itemIndex) => ({
       id: `${savedOrder.id}:${item?.id || itemIndex}`,
       label: `${Math.max(1, Number(item?.quantity) || 1)}x ${item?.product?.name ?? '—'}`,
-      amount: roundCurrency((Number(item?.price) || 0) * Math.max(1, Number(item?.quantity) || 1))
+      amount: computeItemPayableWithStrikeMarks(savedOrder.id, item, ticketDeleteMarkIds)
     }))
   );
   const settlementSubtotalLineById = new Map(settlementSubtotalLines.map((line) => [line.id, line]));
@@ -293,9 +334,8 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     if (!el) return;
     el.scrollTop += direction * 120;
   };
-  const computeOrderTotal = (sourceOrder) =>
-    roundCurrency((sourceOrder?.items || []).reduce((sum, item) => sum + (Number(item?.price) || 0) * (Number(item?.quantity) || 0), 0));
-  const currentOrderTotal = hasOrderItems ? computeOrderTotal({ items }) : roundCurrency(total);
+  const computeOrderTotal = (sourceOrder) => computeOrderTotalWithStrikeMarks(sourceOrder, ticketDeleteMarkIds);
+  const currentOrderTotal = hasOrderItems ? computeOrderTotal(order) : roundCurrency(total);
   const settlementOrdersTotal = roundCurrency(savedOrdersForSelectedTable.reduce((sum, sourceOrder) => sum + computeOrderTotal(sourceOrder), 0));
   const payableTotal = showSettlementActions ? settlementOrdersTotal : currentOrderTotal;
   const latestOpenNoTableOrder = !hasSelectedTable
@@ -443,6 +483,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
   const persistSavedTableOrders = async (entries) => {
     const normalized = normalizeSavedTableOrders(entries);
+    savedTableOrdersPersistedAtRef.current = Date.now();
     setSavedTableOrders(normalized);
     const res = await fetch(TABLE_SAVED_ORDERS_API, {
       method: 'PUT',
@@ -734,11 +775,13 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
   useEffect(() => {
     let cancelled = false;
+    const fetchStartedAt = Date.now();
     (async () => {
       try {
         const res = await fetch(TABLE_SAVED_ORDERS_API);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || cancelled) return;
+        if (savedTableOrdersPersistedAtRef.current > fetchStartedAt) return;
         setSavedTableOrders(normalizeSavedTableOrders(data?.value));
       } catch { }
     })();
@@ -748,29 +791,16 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   }, []);
 
   useEffect(() => {
-    if (!showPayDifferentlyModal) return;
-    let cancelled = false;
-    (async () => {
-      setPaymentMethodsLoading(true);
-      try {
-        const res = await fetch(`${API}/payment-methods?active=1`);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || cancelled) return;
-        const list = Array.isArray(data?.data) ? data.data : [];
-        const sorted = [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-        if (cancelled) return;
-        setActivePaymentMethods(sorted);
-        setPaymentAmounts(Object.fromEntries(sorted.map((m) => [m.id, 0])));
-      } catch {
-        if (!cancelled) setActivePaymentMethods([]);
-      } finally {
-        if (!cancelled) setPaymentMethodsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
+    if (!socket?.on) return;
+    const onTableSavedOrdersUpdated = (payload) => {
+      savedTableOrdersPersistedAtRef.current = Date.now();
+      setSavedTableOrders(normalizeSavedTableOrders(payload?.value));
     };
-  }, [showPayDifferentlyModal]);
+    socket.on('table-saved-orders:updated', onTableSavedOrdersUpdated);
+    return () => {
+      socket.off('table-saved-orders:updated', onTableSavedOrdersUpdated);
+    };
+  }, [socket]);
 
   const handleKeypad = (key) => {
     if (key === 'C') {
@@ -782,69 +812,14 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
 
   const openPayDifferentlyModal = (overrideTotal = null) => {
     const targetTotal = Math.max(0, roundCurrency(overrideTotal ?? payableTotalForPaymentModal));
-    setActivePaymentMethods([]);
-    setPaymentAmounts({});
-    setShowPayDifferentlyModal(true);
-    setSelectedPayment(null);
     setPayModalTargetTotal(targetTotal);
-    setPayModalKeypadInput(targetTotal.toFixed(2));
+    setShowPayDifferentlyModal(true);
   };
 
-  const payModalTotalAssigned = activePaymentMethods.reduce(
-    (sum, m) => sum + (Number(paymentAmounts[m.id]) || 0),
-    0,
-  );
-  const payModalRemaining = Math.max(0, payModalTargetTotal - payModalTotalAssigned);
-  const payModalKeypadValue = parseFloat(String(payModalKeypadInput || '').replace(',', '.')) || 0;
-  /** Block assigning if keypad value would push assigned total over order total. */
-  const payModalWouldExceedTotal =
-    payModalKeypadValue > 0 &&
-    roundCurrency(payModalTotalAssigned + payModalKeypadValue) - payModalTargetTotal > 0.009;
-  /** When assigned matches total, lock keypad/methods/half/remaining/cancel; only Reset + To confirm remain active (To confirm runs payment). */
-  const payModalSplitComplete =
-    (payModalTargetTotal <= 0.009 && payModalTotalAssigned <= 0.009) ||
-    (payModalTargetTotal > 0.009 && Math.abs(payModalTotalAssigned - payModalTargetTotal) <= 0.009);
-
-  const handlePayModalKeypad = (key) => {
-    if (payModalSplitComplete) return;
-    if (key === 'C') {
-      setPayModalKeypadInput('');
-      return;
-    }
-    setPayModalKeypadInput((prev) => {
-      if (prev === payModalTargetTotal.toFixed(2)) return key;
-      return prev + key;
-    });
-  };
-
-  const handlePaymentMethodClick = (method) => {
-    if (!method?.id || payModalSplitComplete || payModalWouldExceedTotal) return;
-    const value = parseFloat(String(payModalKeypadInput || '').replace(',', '.')) || 0;
-    if (value > 0) {
-      setPaymentAmounts((prev) => ({
-        ...prev,
-        [method.id]: (Number(prev[method.id]) || 0) + value,
-      }));
-      setPayModalKeypadInput('');
-    } else {
-      setSelectedPayment(method.id);
-    }
-  };
-
-  const handlePayHalfAmount = () => {
-    if (payModalSplitComplete) return;
-    const half = roundCurrency(payModalTargetTotal / 2);
-    setPayModalKeypadInput(half.toFixed(2));
-  };
-  const handlePayRemaining = () => {
-    if (payModalSplitComplete) return;
-    const remaining = roundCurrency(Math.max(0, payModalTargetTotal - payModalTotalAssigned));
-    setPayModalKeypadInput(remaining.toFixed(2));
-  };
-  const handlePayReset = () => {
-    setPaymentAmounts(Object.fromEntries(activePaymentMethods.map((m) => [m.id, 0])));
-    setPayModalKeypadInput(payModalTargetTotal.toFixed(2));
-    setSelectedPayment(null);
+  const handlePayDifferentlyClose = () => {
+    payNowFromInWaitingRef.current = false;
+    setPendingSplitCheckout(null);
+    setShowPayDifferentlyModal(false);
   };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1019,26 +994,6 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     }
   })();
 
-  const handleCancelPayDifferentlyModal = async () => {
-    if (payConfirmLoading) {
-      cancelCashmaticRequestedRef.current = true;
-      cancelPayworldRequestedRef.current = true;
-      const activeSessionId = activeCashmaticSessionIdRef.current;
-      if (activeSessionId) {
-        await fetch(`${API}/cashmatic/cancel/${encodeURIComponent(activeSessionId)}`, { method: 'POST' }).catch(() => { });
-      }
-      const activePayworldSessionId = activePayworldSessionIdRef.current;
-      if (activePayworldSessionId) {
-        await fetch(`${API}/payworld/cancel/${encodeURIComponent(activePayworldSessionId)}`, { method: 'POST' }).catch(() => { });
-      }
-      setShowPayworldStatusModal(false);
-      setPaymentErrorMessage(tr('orderPanel.paymentCancelled', 'Payment cancelled.'));
-    }
-    payNowFromInWaitingRef.current = false;
-    setShowPayDifferentlyModal(false);
-    setPendingSplitCheckout(null);
-  };
-
   const printTicketAutomatically = async (targetOrderId, paymentBreakdown = null) => {
     if (!targetOrderId) throw new Error('No order selected for printing.');
     const body = { orderId: targetOrderId };
@@ -1153,7 +1108,12 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       const remainingItems = sourceItems.filter((item) => !selectedItemIdsForOrder.has(item?.id));
       if (selectedItems.length === 0) continue;
 
-      const orderTotal = roundCurrency(selectedItems.reduce((sum, item) => sum + (Number(item?.price) || 0) * Math.max(1, Number(item?.quantity) || 1), 0));
+      const orderTotal = roundCurrency(
+        selectedItems.reduce(
+          (sum, item) => sum + computeItemPayableWithStrikeMarks(sourceOrder.id, item, ticketDeleteMarkIds),
+          0
+        )
+      );
       ordersToPay.push({ sourceOrder, selectedItems, remainingItems, orderTotal });
     }
 
@@ -1186,11 +1146,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
   const resetAfterSuccessfulPayment = () => {
     payNowFromInWaitingRef.current = false;
     setShowPayDifferentlyModal(false);
-    setPaymentAmounts({});
-    setActivePaymentMethods([]);
-    setSelectedPayment(null);
     setPayModalTargetTotal(0);
-    setPayModalKeypadInput('');
     setSelectedLineKeys([]);
     setDisplayQuantity('');
     setShowDeleteAllModal(false);
@@ -1204,41 +1160,10 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
     setPayworldStatus({ state: 'IDLE', message: '', details: null });
   };
 
-  /** Shared by Pay modal “To confirm” and footer € (full Cash + confirm, no modal). */
-  const executePayModalConfirmation = async (methods, amounts, modalTargetTotal) => {
-    if (payConfirmLoading) return;
-
-    const assignedTotal = roundCurrency(
-      methods.reduce((sum, m) => sum + (Number(amounts[m.id]) || 0), 0),
-    );
+  /** After Cashmatic/Payworld (or when skipped): settle orders, print, reset. Used by PayDifferentlyModal and executePayModalConfirmation. */
+  const settleOrdersAfterTerminalPayment = async (methods, amounts, modalTargetTotal) => {
     const modalTotal = roundCurrency(modalTargetTotal);
-
-    if (modalTotal > 0.009 && assignedTotal <= 0) {
-      setPaymentErrorMessage(tr('orderPanel.assignedAmountGreaterThanZero', 'Assigned amount must be greater than 0.'));
-      return;
-    }
-    if (Math.abs(assignedTotal - modalTotal) > 0.009) {
-      setPaymentErrorMessage(`Assigned amount (€${assignedTotal.toFixed(2)}) must match total (€${modalTotal.toFixed(2)}).`);
-      return;
-    }
-    if (!methods.length) {
-      setPaymentErrorMessage(
-        tr('orderPanel.noPaymentMethods', 'No active payment methods. Add them under Control → Payment types.'),
-      );
-      return;
-    }
-
-    try {
-      setPayConfirmLoading(true);
-      const cashmaticTotal = sumAmountsByIntegration(methods, amounts, 'cashmatic');
-      if (cashmaticTotal > 0) {
-        await runCashmaticPayment(cashmaticTotal);
-      }
-      const payworldTotal = sumAmountsByIntegration(methods, amounts, 'payworld');
-      if (payworldTotal > 0) {
-        await runPayworldPayment(payworldTotal);
-      }
-      if (pendingSplitCheckout?.type === 'splitBill') {
+    if (pendingSplitCheckout?.type === 'splitBill') {
         const paymentBreakdown = buildPaymentBreakdown(methods, amounts);
         const paidOrderIds = await settleSplitBillSelection(pendingSplitCheckout.lineIds || [], paymentBreakdown);
         if (paidOrderIds.length === 0) {
@@ -1349,6 +1274,43 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         await onCreateOrder?.();
       }
       resetAfterSuccessfulPayment();
+  };
+
+  /** Shared by PayDifferentlyModal confirm and footer € (full Cash + confirm, no modal). */
+  const executePayModalConfirmation = async (methods, amounts, modalTargetTotal) => {
+    if (payConfirmLoading) return;
+
+    const assignedTotal = roundCurrency(
+      methods.reduce((sum, m) => sum + (Number(amounts[m.id]) || 0), 0),
+    );
+    const modalTotal = roundCurrency(modalTargetTotal);
+
+    if (modalTotal > 0.009 && assignedTotal <= 0) {
+      setPaymentErrorMessage(tr('orderPanel.assignedAmountGreaterThanZero', 'Assigned amount must be greater than 0.'));
+      return;
+    }
+    if (Math.abs(assignedTotal - modalTotal) > 0.009) {
+      setPaymentErrorMessage(`Assigned amount (€${assignedTotal.toFixed(2)}) must match total (€${modalTotal.toFixed(2)}).`);
+      return;
+    }
+    if (!methods.length) {
+      setPaymentErrorMessage(
+        tr('orderPanel.noPaymentMethods', 'No active payment methods. Add them under Control → Payment types.'),
+      );
+      return;
+    }
+
+    try {
+      setPayConfirmLoading(true);
+      const cashmaticTotal = sumAmountsByIntegration(methods, amounts, 'cashmatic');
+      if (cashmaticTotal > 0) {
+        await runCashmaticPayment(cashmaticTotal);
+      }
+      const payworldTotal = sumAmountsByIntegration(methods, amounts, 'payworld');
+      if (payworldTotal > 0) {
+        await runPayworldPayment(payworldTotal);
+      }
+      await settleOrdersAfterTerminalPayment(methods, amounts, modalTargetTotal);
     } catch (err) {
       setPaymentErrorMessage(err?.message || tr('orderPanel.paymentFailed', 'Payment failed.'));
     } finally {
@@ -1358,17 +1320,6 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
       cancelCashmaticRequestedRef.current = false;
       cancelPayworldRequestedRef.current = false;
     }
-  };
-
-  const handleConfirmPayment = async () => {
-    if (payConfirmLoading) return;
-    if (paymentMethodsLoading || activePaymentMethods.length === 0) {
-      setPaymentErrorMessage(
-        tr('orderPanel.noPaymentMethods', 'No active payment methods. Add them under Control → Payment types.'),
-      );
-      return;
-    }
-    await executePayModalConfirmation(activePaymentMethods, paymentAmounts, payModalTargetTotal);
   };
 
   /** Footer €: same as Pay modal — assign full total to Cash (manual_cash) then run confirm (no modal). */
@@ -1476,7 +1427,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                 )}
                 <div className="pt-1 px-2 text-pos-bg/90">
                   {(() => {
-                    const savedMeta = savedOrderMetaById.get(savedOrder.id);
+                    const savedMeta = savedOrderMetaById.get(String(savedOrder.id));
                     const savedCashierName = savedMeta?.cashierName || cashierName;
                     const savedTime = formatSavedOrderTime(savedMeta?.savedAt, savedOrder?.createdAt);
                     return (
@@ -1659,14 +1610,7 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
           <div className="flex gap-2 text-sm py-1 min-h-[59px]">
             <button
               type="button"
-              className="flex-1 py-3 px-2 bg-pos-surface border-none rounded-md text-pos-text active:bg-green-500"
-              onClick={() => settlementOrder && onStatusChange?.(settlementOrder.id, 'in_planning')}
-            >
-              {t('interimAccount')}
-            </button>
-            <button
-              type="button"
-              className="flex-1 py-3 px-2 bg-pos-surface border-none rounded-md text-pos-text active:bg-green-500"
+              className="w-full py-3 px-2 bg-pos-surface border-none rounded-md text-pos-text active:bg-green-500"
               onClick={() => setShowFinalSettlementModal(true)}
             >
               {t('finalSettlement')}
@@ -1687,12 +1631,13 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
                 try {
                   await persistSavedTableOrders([
                     ...savedTableOrders,
-                    { orderId: currentOrderId, cashierName, savedAt: new Date().toISOString() }
+                    { orderId: String(currentOrderId), cashierName, savedAt: new Date().toISOString() }
                   ]);
                 } catch (err) {
                   setPaymentErrorMessage(err?.message || tr('orderPanel.failedSaveTableOrder', 'Failed to save table order.'));
                   return;
                 }
+                onTableSavedOrdersPersisted?.();
                 try {
                   const prodRes = await fetch(`${API}/printers/production`, {
                     method: 'POST',
@@ -1799,165 +1744,13 @@ export function OrderPanel({ order, orders, onRemoveItem, onUpdateItemQuantity, 
         </div>
       )}
 
-      {showPayDifferentlyModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="pay-differently-title"
-        >
-          <div
-            className="flex flex-col bg-gray-100 rounded-xl shadow-2xl max-w-[1800px] w-full overflow-auto text-gray-800"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Left: Total + payment methods */}
-            <div className="flex items-center justify-center">
-              <div className="p-6 min-w-[56%] w-full h-full flex flex-col">
-                <div className="text-lg font-semibold mb-3 flex w-full justify-center items-center">{t('total')}: €{payModalTargetTotal.toFixed(2)}</div>
-                <div className="grid grid-cols-4 gap-4 w-full mb-4 h-full items-start justify-center">
-                  {paymentMethodsLoading ? (
-                    <div className="col-span-full text-sm text-gray-600 py-6 text-center">
-                      {tr('orderPanel.loadingPaymentMethods', 'Loading payment methods...')}
-                    </div>
-                  ) : activePaymentMethods.length === 0 ? (
-                    <div className="col-span-full text-sm text-amber-900 py-6 text-center max-w-lg px-4">
-                      {tr(
-                        'orderPanel.noPaymentMethods',
-                        'No active payment methods. Configure them under Control → Payment types.',
-                      )}
-                    </div>
-                  ) : (
-                    activePaymentMethods.map((m) => {
-                      const amt = Number(paymentAmounts[m.id]) || 0;
-                      const isHighlighted = selectedPayment === m.id || amt > 0;
-                      const integ = m.integration || 'generic';
-                      return (
-                        <div key={m.id} className="flex flex-col items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={payModalSplitComplete || payModalWouldExceedTotal}
-                            onClick={() => handlePaymentMethodClick(m)}
-                            className={`rounded-lg border-2 p-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHighlighted ? 'bg-green-500 border-green-700' : 'bg-white border-gray-300'
-                              }`}
-                            aria-label={m.name}
-                          >
-                            {integ === 'manual_cash' ||
-                            integ === 'cashmatic' ||
-                            integ === 'payworld' ||
-                            integ === 'generic' ? (
-                              <img
-                                src={payMethodIconSrc(integ)}
-                                alt=""
-                                className="max-h-[70px] min-w-[105px] w-[105px] h-[70px] object-contain"
-                                onError={(e) => {
-                                  const el = e.currentTarget;
-                                  if (integ === 'payworld' && el.dataset.svgFallback !== '1') {
-                                    el.dataset.svgFallback = '1';
-                                    el.src = publicAssetUrl('/payworld.svg');
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <span className="flex items-center justify-center w-[105px] min-h-[70px] px-2 py-3 text-base font-semibold text-center text-blue-900 bg-blue-50/80 rounded leading-tight">
-                                {m.name}
-                              </span>
-                            )}
-                          </button>
-                          <div className="text-sm font-semibold tabular-nums text-center max-w-[140px]" aria-live="polite">
-                            <span className="block text-xs font-normal text-gray-600 mb-0.5 truncate">{m.name}</span>
-                            {formatPaymentAmount(amt)}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-              {/* Right: Assigned + input + keypad */}
-              <div className="min-w-[26%] p-6">
-                <div className="text-lg font-semibold mb-2 flex justify-center">{t('assigned')}: €{payModalTotalAssigned.toFixed(2)}</div>
-                <div className="flex justify-center mt-2">
-                  <input
-                    readOnly
-                    className="w-[160px] py-2 px-3 bg-gray-200 rounded-lg text-base mb-3 outline-none cursor-default focus:border-green-500 focus:outline-none"
-                    value={payModalKeypadInput}
-                    aria-label={t('amountKeypad')}
-                  />
-                </div>
-                <div className="flex gap-2 flex-1 min-h-0 mt-3">
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    {KEYPAD.map((row, ri) => (
-                      <div key={ri} className="grid grid-cols-3 gap-1.5">
-                        {row.map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            disabled={payModalSplitComplete}
-                            className={`py-4 rounded-lg text-lg font-medium ${payModalSplitComplete ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-300 text-gray-800 active:bg-green-500'}`}
-                            onClick={() => handlePayModalKeypad(key)}
-                          >
-                            {key}
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="min-w-[18%] flex flex-col items-center justify-center gap-4 p-6">
-                <button
-                  type="button"
-                  disabled={payModalSplitComplete}
-                  className={`py-2 px-4 w-full max-w-[200px] rounded-lg text-sm font-medium ${payModalSplitComplete ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-300 text-gray-800 active:bg-green-500'}`}
-                  onClick={handlePayHalfAmount}
-                >
-                  {t('halfAmount')}
-                </button>
-                <button
-                  type="button"
-                  disabled={payModalSplitComplete}
-                  className={`py-2 px-4 w-full max-w-[200px] rounded-lg text-sm font-medium ${payModalSplitComplete ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-300 text-gray-800 active:bg-green-500'}`}
-                  onClick={handlePayRemaining}
-                >
-                  {t('remainingAmount')}
-                </button>
-                <button
-                  type="button"
-                  className="py-2 px-4 bg-gray-300 w-full max-w-[200px] rounded-lg text-gray-800 text-sm font-medium active:bg-green-500"
-                  onClick={handlePayReset}
-                >
-                  {t('reset')}
-                </button>
-              </div>
-            </div>
-            <div className="flex justify-around px-6 gap-4 w-full pt-6 pb-6">
-              <button
-                type="button"
-                className="w-[140px] py-2 px-4 rounded-lg text-sm font-medium bg-gray-300 text-gray-800 active:bg-green-500"
-                onClick={handleCancelPayDifferentlyModal}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={
-                  Math.abs(payModalTotalAssigned - payModalTargetTotal) > 0.009 ||
-                  payConfirmLoading ||
-                  paymentMethodsLoading ||
-                  activePaymentMethods.length === 0
-                }
-                className={`w-[140px] py-2 px-4 rounded-lg text-sm font-medium ${Math.abs(payModalTotalAssigned - payModalTargetTotal) > 0.009 || payConfirmLoading || paymentMethodsLoading || activePaymentMethods.length === 0
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-300 text-gray-800 active:bg-green-500'
-                  }`}
-                onClick={handleConfirmPayment}
-              >
-                {payConfirmLoading ? t('processing') : t('toConfirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PayDifferentlyModal
+        open={showPayDifferentlyModal}
+        targetTotal={payModalTargetTotal}
+        onClose={handlePayDifferentlyClose}
+        onProceedAfterTerminals={settleOrdersAfterTerminalPayment}
+        onPaymentError={setPaymentErrorMessage}
+      />
 
       {showPayworldStatusModal && (
         <div

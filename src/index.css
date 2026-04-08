@@ -50,3 +50,168 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Kiosk: light scrollbars (matches white sidebar + rose selection accent) */
+.kiosk-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #f43f5e #f3f4f6;
+}
+.kiosk-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.kiosk-scrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 9999px;
+}
+.kiosk-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #fb7185 0%, #f43f5e 100%);
+  border-radius: 9999px;
+  border: 2px solid #f3f4f6;
+}
+.kiosk-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #e11d48;
+}
+.kiosk-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.kiosk-scrollbar::-webkit-scrollbar-corner {
+  background: #f3f4f6;
+}
+
+/* Kiosk basket: bottom sheet slides up */
+@keyframes kiosk-basket-sheet-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0.92;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.kiosk-basket-sheet {
+  animation: kiosk-basket-sheet-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Kiosk subproduct picker: tiny center → full size */
+@keyframes kiosk-subproduct-modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes kiosk-subproduct-modal-panel-in {
+  from {
+    transform: scale(0.06);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes kiosk-subproduct-modal-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes kiosk-subproduct-modal-panel-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.06);
+    opacity: 0;
+  }
+}
+.kiosk-subproduct-modal-backdrop {
+  animation: kiosk-subproduct-modal-backdrop-in 0.35s ease-out forwards;
+}
+.kiosk-subproduct-modal-backdrop.kiosk-subproduct-modal-backdrop--exiting {
+  animation: kiosk-subproduct-modal-backdrop-out 0.34s ease-in forwards;
+}
+.kiosk-subproduct-modal-panel {
+  transform-origin: center center;
+  will-change: transform, opacity;
+  animation: kiosk-subproduct-modal-panel-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.kiosk-subproduct-modal-panel.kiosk-subproduct-modal-panel--exiting {
+  animation: kiosk-subproduct-modal-panel-out 0.34s cubic-bezier(0.55, 0.06, 0.74, 0.19) forwards;
+}
+
+/* Kiosk Control: light shell like language picker (children still use pos-* utilities). */
+.kiosk-control-root {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+.kiosk-control-root .bg-pos-bg {
+  background-color: #ffffff !important;
+}
+.kiosk-control-root .bg-pos-panel {
+  background-color: #f3f4f6 !important;
+}
+.kiosk-control-root .text-pos-text {
+  color: #111827 !important;
+}
+.kiosk-control-root .text-pos-muted {
+  color: #6b7280 !important;
+}
+.kiosk-control-root .border-pos-border {
+  border-color: #e5e7eb !important;
+}
+
+.kiosk-control-root .bg-pos-bg\/50 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+.kiosk-control-root .bg-pos-panel\/30 {
+  background-color: rgba(243, 244, 246, 0.55) !important;
+}
+.kiosk-control-root .bg-pos-panel\/50 {
+  background-color: rgba(243, 244, 246, 0.8) !important;
+}
+.kiosk-control-root .bg-pos-panel\/70 {
+  background-color: rgba(229, 231, 235, 0.95) !important;
+}
+.kiosk-control-root .text-pos-text\/80 {
+  color: rgba(17, 24, 39, 0.82) !important;
+}
+.kiosk-control-root .active\:bg-green-500\/25:active {
+  background-color: rgba(34, 197, 94, 0.18) !important;
+}
+.kiosk-control-root .ring-offset-pos-bg {
+  --tw-ring-offset-color: #ffffff !important;
+}
+
+.kiosk-control-root .placeholder-pos-muted::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Modal copy still uses gray-200 for “light on dark”; remap for white backgrounds. */
+.kiosk-control-root .text-gray-200 {
+  color: #1f2937 !important;
+}
+.kiosk-control-root .text-gray-300 {
+  color: #374151 !important;
+}
+.kiosk-control-root .text-gray-400 {
+  color: #4b5563 !important;
+}
+.kiosk-control-root .text-gray-500 {
+  color: #6b7280 !important;
+}
+
+/* LoadingSpinner: visible ring on white */
+.kiosk-control-root .inline-block.animate-spin.border-pos-border.border-t-white {
+  border-color: #d1d5db !important;
+  border-top-color: #111827 !important;
+}

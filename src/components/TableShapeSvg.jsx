@@ -3,11 +3,10 @@ import React from 'react';
 /** POS table / board palette (same order as control color swatches). */
 const TABLE_GREEN = '#1F8E41';
 const TABLE_RED = '#B91C1C';
-const TABLE_GOLD = '#CA8A04';
 
-export function getTableFill(hasOpenOrders, wasPaidRecently) {
+/** Red while the table has an open order; green when free (including right after successful payment). */
+export function getTableFill(hasOpenOrders, _wasPaidRecently) {
   if (hasOpenOrders) return TABLE_RED;
-  if (wasPaidRecently) return TABLE_GOLD;
   return TABLE_GREEN;
 }
 

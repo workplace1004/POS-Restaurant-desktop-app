@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { KeyboardWithNumpad } from './KeyboardWithNumpad';
 import { SmallKeyboardWithNumpad } from './SmallKeyboardWithNumpad';
@@ -33,9 +33,14 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { LoadingSpinner } from './LoadingSpinner';
 import { publicAssetUrl, resolveMediaSrc } from '../lib/publicAssetUrl.js';
+import { parseLayoutTableColor } from '../lib/tablePlanDisplay.jsx';
 
 /** Seeded kitchen admin credential (same id as `seed.js`); hidden from Configuration → Kitchen list. */
 const KITCHEN_ADMIN_CREDENTIAL_ID = 'kitchen-kds-admin';
+
+/** Logical frame for kiosk Control (matches `KioskLanguagePicker`). */
+const KIOSK_CONTROL_FRAME_W = 1080;
+const KIOSK_CONTROL_FRAME_H = 1920;
 
 const CONTROL_SIDEBAR_ITEMS = [
   { id: 'personalize', label: 'Personalize Cash Register', icon: 'monitor' },
@@ -474,20 +479,25 @@ const normalizeLayoutEditorDraft = (raw, locationName = 'Restaurant') => {
   const hasTopLevelBoards = Array.isArray(raw?.boards);
   const hasTopLevelFlowerPots = Array.isArray(raw?.flowerPots);
   const tables = Array.isArray(raw?.tables)
-    ? raw.tables.map((table, index) => ({
-      id: String(table?.id || `tbl-${index + 1}`),
-      name: String(table?.name || `T-${String(index + 1).padStart(2, '0')}`),
-      x: Number(table?.x) || 0,
-      y: Number(table?.y) || 0,
-      width: Math.max(60, Number(table?.width) || 120),
-      height: Math.max(40, Number(table?.height) || 80),
-      chairs: Math.max(0, Number(table?.chairs) || 4),
-      rotation: Number(table?.rotation) || 0,
-      round: !!table?.round,
-      templateType: TABLE_TEMPLATE_OPTIONS.some((tpl) => tpl.id === table?.templateType)
-        ? table.templateType
-        : ((Number(table?.chairs) || 4) >= 6 ? '6table' : (Number(table?.chairs) || 4) >= 5 ? '5table' : '4table')
-    }))
+    ? raw.tables.map((table, index) => {
+        const tc = parseLayoutTableColor(table?.tableColor);
+        return {
+          id: String(table?.id || `tbl-${index + 1}`),
+          name: String(table?.name || `T-${String(index + 1).padStart(2, '0')}`),
+          x: Number(table?.x) || 0,
+          y: Number(table?.y) || 0,
+          width: Math.max(60, Number(table?.width) || 120),
+          height: Math.max(40, Number(table?.height) || 80),
+          chairs: Math.max(0, Number(table?.chairs) || 4),
+          rotation: Number(table?.rotation) || 0,
+          round: !!table?.round,
+          templateType: TABLE_TEMPLATE_OPTIONS.some((tpl) => tpl.id === table?.templateType)
+            ? table.templateType
+            : ((Number(table?.chairs) || 4) >= 6 ? '6table' : (Number(table?.chairs) || 4) >= 5 ? '5table' : '4table'),
+          ...(tc ? { tableColor: tc } : {}),
+          ...(Boolean(table?.centerDecoration) ? { centerDecoration: true } : {})
+        };
+      })
     : [];
   const legacyBoards = Array.isArray(raw?.tables)
     ? raw.tables.flatMap((table) => {
@@ -593,8 +603,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [controlSidebarId, setControlSidebarId] = useState('personalize');
-  /** Waiters may only use Language in Control; users without role (legacy session) are restricted. */
-  const isWaiterControlUser = currentUser?.role !== 'admin';
+  /** Waiters may only use Language in Control. Kiosk guest (`kiosk`) and admin see full configuration. */
+  const isWaiterControlUser = currentUser?.role === 'waiter';
   const effectiveControlSidebarId = isWaiterControlUser ? 'language' : controlSidebarId;
   const [appLanguage, setAppLanguage] = useState(() => (LANGUAGE_OPTIONS.some((o) => o.value === lang) ? lang : 'en'));
   const [savingAppLanguage, setSavingAppLanguage] = useState(false);
@@ -2631,7 +2641,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       const e = extra[sp.id] || {};
       setSubproductKeyName(e.keyName || '');
       setSubproductProductionName(e.productionName || '');
-      setSubproductPrice(e.price != null ? String(e.price) : '');
+      const dbPrice = sp.price;
+      if (dbPrice != null && dbPrice !== '' && Number.isFinite(Number(dbPrice))) {
+        setSubproductPrice(String(dbPrice));
+      } else if (e.price != null && e.price !== '') {
+        setSubproductPrice(String(e.price));
+      } else {
+        setSubproductPrice('');
+      }
       setSubproductVatTakeOut(e.vatTakeOut ?? '');
       setSubproductVatEatIn(e.vatEatIn ?? '');
       setSubproductKioskPicture(e.kioskPicture || '');
@@ -2674,10 +2691,13 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     if (!groupId && !editingSubproductId) return;
     setSavingSubproduct(true);
     const name = subproductName.trim() || 'New subproduct';
+    const priceTrim = subproductPrice.trim().replace(/,/g, '.');
+    const priceParsed = priceTrim === '' ? null : parseFloat(priceTrim);
+    const priceForApi = priceTrim !== '' && Number.isFinite(priceParsed) ? Math.round(priceParsed * 100) / 100 : null;
     const extraData = {
       keyName: subproductKeyName.trim(),
       productionName: subproductProductionName.trim(),
-      price: subproductPrice.trim(),
+      price: priceTrim === '' ? '' : String(priceForApi ?? ''),
       vatTakeOut: subproductVatTakeOut,
       vatEatIn: subproductVatEatIn,
       kioskPicture: subproductKioskPicture.trim(),
@@ -2688,7 +2708,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         const res = await fetch(`${API}/subproducts/${editingSubproductId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
+          body: JSON.stringify({ name, price: priceForApi })
         });
         const updated = await res.json();
         if (res.ok && updated) {
@@ -2700,7 +2720,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         const res = await fetch(`${API}/subproducts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, groupId })
+          body: JSON.stringify({ name, groupId, price: priceForApi })
         });
         const created = await res.json();
         if (res.ok && created) {
@@ -5407,9 +5427,33 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   }, [kitchenProductsKitchen, kitchenProductsLinked, closeKitchenProductsModal, fetchKitchens]);
 
+  const [controlFrameScale, setControlFrameScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const update = () => {
+      const sw = window.innerWidth;
+      const sh = window.innerHeight;
+      const s = Math.min(sw / KIOSK_CONTROL_FRAME_W, sh / KIOSK_CONTROL_FRAME_H);
+      setControlFrameScale(Number.isFinite(s) && s > 0 ? s : 1);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
   return (
-    <div className="relative h-full w-full min-h-0">
-      <div className="flex h-full bg-pos-bg text-pos-text">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black">
+      <div
+        className="kiosk-control-root relative flex h-full w-full flex-col overflow-hidden bg-white text-black shadow-2xl"
+        style={{
+          width: KIOSK_CONTROL_FRAME_W,
+          height: KIOSK_CONTROL_FRAME_H,
+          transform: `scale(${controlFrameScale})`,
+          transformOrigin: 'center center',
+        }}
+      >
+    <div className="relative flex h-full w-full min-h-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 w-full flex-1 bg-white text-black">
       {/* Control left sidebar */}
       <aside className="w-1/5 shrink-0 flex flex-col bg-pos-panel border-r border-pos-border">
         <nav className="flex flex-col gap-0.5 flex-1 p-3">
@@ -6051,6 +6095,18 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                       >
                         {template ? (
                           <img src={publicAssetUrl(template.src)} alt={table.name} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+                        ) : null}
+                        {table.centerDecoration ? (
+                          <span
+                            className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center pt-[6%]"
+                            aria-hidden
+                          >
+                            <img
+                              src={publicAssetUrl('/flowerpot.svg')}
+                              alt=""
+                              className="w-[28%] max-w-[40px] h-auto object-contain opacity-95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]"
+                            />
+                          </span>
                         ) : null}
                         <span className="relative z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)]">{table.name}</span>
                       </button>
@@ -7371,10 +7427,12 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       />
       </div>
       {!controlBootstrapReady && (
-        <div className="absolute inset-0 z-[200] flex items-center justify-center bg-pos-bg">
+        <div className="absolute inset-0 z-[200] flex items-center justify-center bg-white">
           <LoadingSpinner label={tr('control.loadingConfiguration', 'Loading configuration...')} />
         </div>
       )}
+    </div>
+    </div>
     </div>
   );
 }

@@ -58,6 +58,8 @@ export function ControlViewManageGroupsModal({
                 onScroll={updateManageGroupsPaginationState}
                 onPointerDown={(e) => {
                   if (e.pointerType === 'mouse' && e.button !== 0) return;
+                  // Do not capture the pointer for drag when clicking edit/delete (capture would steal clicks).
+                  if (e.target.closest?.('button, input, textarea, a, [role="button"]')) return;
                   const el = manageGroupsListRef.current;
                   if (!el) return;
                   manageGroupsDragRef.current = {
@@ -96,7 +98,7 @@ export function ControlViewManageGroupsModal({
                     {sortedGroups.map((grp) => (
                       <tr
                         key={grp.id}
-                        className={`border-b border-gray-300 w-full items-center min-h-[40px] flex justify-between ${selectedManageGroupId === grp.id ? 'bg-pos-panel/70' : ''} active:bg-green-500`}
+                        className={`border-b border-gray-300 w-full items-center min-h-[40px] flex justify-between ${selectedManageGroupId === grp.id ? 'bg-pos-panel/70' : ''}`}
                         onClick={(e) => { if (!e.target.closest('button')) setSelectedManageGroupId(grp.id); }}
                       >
                         <td className="w-full py-2 px-3">

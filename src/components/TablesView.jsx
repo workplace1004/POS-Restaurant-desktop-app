@@ -4,6 +4,12 @@ import { POS_API_PREFIX } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
 import { TableShapeSvg, getTableFill } from './TableShapeSvg';
 import { LoadingSpinner } from './LoadingSpinner';
+import {
+  mergeLayoutFlowerPots,
+  getLayoutTableSurfaceFill,
+  TableCenterDecoration,
+  tableHasOpenOrderOnFloor
+} from '../lib/tablePlanDisplay.jsx';
 
 const TABLE_SIZE = 200;
 const TABLE_GAP = 24;
@@ -11,7 +17,17 @@ const TABLE_POSITIONS_STORAGE_KEY = 'pos.tables.positions';
 const TABLE_LAST_PAID_AT_STORAGE_KEY = 'pos.tables.lastPaidAtById';
 const TABLE_PAID_HIGHLIGHT_WINDOW_MS = 15 * 60 * 1000;
 
-export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, selectedTableId = null, onSelectTable, onBack, time, api = POS_API_PREFIX }) {
+export function TablesView({
+  tables = [],
+  orders = [],
+  tableLayouts = {},
+  fetchTableLayouts,
+  selectedTableId = null,
+  onSelectTable,
+  onBack,
+  time,
+  api = POS_API_PREFIX
+}) {
   const { t } = useLanguage();
   const canvasRef = useRef(null);
   const [rooms, setRooms] = useState([]);
@@ -71,7 +87,13 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
     const roomHasOpenOrders = (room) => {
       const roomId = room?.id != null ? String(room.id) : null;
       if (!roomId) return false;
-      return tables.some((t) => t && String(t?.roomId || '') === roomId && Array.isArray(t?.orders) && t.orders.length > 0);
+      return tables.some(
+        (t) =>
+          t &&
+          String(t?.roomId || '') === roomId &&
+          (tableHasOpenOrderOnFloor(t.id, t?.name, orders) ||
+            (Array.isArray(t?.orders) && t.orders.length > 0))
+      );
     };
     return [...rooms].sort((a, b) => {
       const aHasTables = roomHasTables(a);
@@ -84,7 +106,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
       if (!aHasOpen && bHasOpen) return 1;
       return 0;
     });
-  }, [rooms, tables]);
+  }, [rooms, tables, orders]);
 
   useEffect(() => {
     if (sortedRooms.length === 0) {
@@ -106,10 +128,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
     if (layout?.boards && Array.isArray(layout.boards)) return layout.boards;
     return layoutTables.flatMap((layoutTable) => (Array.isArray(layoutTable?.boards) ? layoutTable.boards : []));
   }, [layout, layoutTables]);
-  const layoutFlowerPots = useMemo(() => {
-    if (layout?.flowerPots && Array.isArray(layout.flowerPots)) return layout.flowerPots;
-    return layoutTables.flatMap((layoutTable) => (Array.isArray(layoutTable?.flowerPots) ? layoutTable.flowerPots : []));
-  }, [layout, layoutTables]);
+  const layoutFlowerPots = useMemo(() => mergeLayoutFlowerPots(layout, layoutTables), [layout, layoutTables]);
   const useLayoutMode = layoutTables.length > 0;
 
   const tablesForCurrentRoom = useMemo(() => {
@@ -238,11 +257,13 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                 const id = matchedTable?.id != null ? String(matchedTable.id) : layoutTable.id;
                 const isSelected = selectedTableId != null && String(selectedTableId) === id;
                 const tableNumber = String(layoutTable?.name ?? currentRoom?.name ?? id).replace(/^Table\s*/i, '') || String(idx + 1);
-                const hasOpenOrders = matchedTable && Array.isArray(matchedTable?.orders) && matchedTable.orders.length > 0;
+                const hasOpenOrders =
+                  tableHasOpenOrderOnFloor(matchedTable?.id ?? null, layoutTable?.name ?? tableNumber, orders) ||
+                  (matchedTable && Array.isArray(matchedTable?.orders) && matchedTable.orders.length > 0);
                 const lastPaidAt = Number(lastPaidAtByTableId?.[id]) || 0;
                 const wasPaidRecently = !hasOpenOrders && lastPaidAt > 0 && Date.now() - lastPaidAt <= TABLE_PAID_HIGHLIGHT_WINDOW_MS;
                 const tableNumberColorClass = 'text-white';
-                const tableFill = getTableFill(hasOpenOrders, wasPaidRecently);
+                const tableFill = getLayoutTableSurfaceFill(layoutTable, hasOpenOrders, wasPaidRecently);
                 return (
                   <button
                     key={layoutTable.id || id}
@@ -253,7 +274,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                         roomName: currentRoom?.name ?? null
                       })
                     }
-                    className={`absolute flex items-center justify-center font-semibold border-2 text-white overflow-hidden ${
+                    className={`absolute flex items-center justify-center font-semibold border-2 text-white overflow-hidden bg-transparent ${
                       layoutTable.round ? 'rounded-full' : 'rounded-md'
                     } border-transparent cursor-pointer`}
                     style={{
@@ -272,6 +293,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                         idPrefix={layoutTable.id || id || `idx-${idx}`}
                       />
                     </span>
+                    <TableCenterDecoration layoutTable={layoutTable} />
                     <span className={`relative z-10 text-2xl font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.7)] ${tableNumberColorClass}`}>{tableNumber}</span>
                   </button>
                 );
@@ -315,11 +337,12 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
               const isSelected = selectedTableId != null && String(selectedTableId) === id;
               const tableNumber = String(table?.name ?? id).replace(/^Table\s*/i, '') || id;
               const pos = positions[id] || { x: 0, y: 0 };
-              const hasOpenOrders = Array.isArray(table?.orders) && table.orders.length > 0;
+              const hasOpenOrders =
+                tableHasOpenOrderOnFloor(table.id, table?.name ?? tableNumber, orders) ||
+                (Array.isArray(table?.orders) && table.orders.length > 0);
               const lastPaidAt = Number(lastPaidAtByTableId?.[id]) || 0;
               const wasPaidRecently = !hasOpenOrders && lastPaidAt > 0 && Date.now() - lastPaidAt <= TABLE_PAID_HIGHLIGHT_WINDOW_MS;
               const tableNumberColorClass = 'text-white';
-              const tableColorOverlay = hasOpenOrders ? 'bg-[#B91C1C]/50' : wasPaidRecently ? 'bg-[#CA8A04]/50' : '';
               return (
                 <button
                   key={id}
@@ -330,7 +353,7 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                   })}
                   className={`w-[200px] h-[200px] absolute overflow-hidden rounded-[4px] border-2 transition-colors ${
                     'border-transparent'
-                  } cursor-pointer`}
+                  } cursor-pointer bg-transparent`}
                   style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
                 >
                   <TableShapeSvg
@@ -347,7 +370,6 @@ export function TablesView({ tables = [], tableLayouts = {}, fetchTableLayouts, 
                     className="w-full h-full object-contain pointer-events-none"
                     idPrefix={`room-${id}`}
                   />
-                  {tableColorOverlay ? <span className={`absolute inset-0 pointer-events-none ${tableColorOverlay}`} aria-hidden /> : null}
                   <span
                     className={`absolute inset-0 flex items-center justify-center text-[40px] font-bold -mt-10 pointer-events-none ${tableNumberColorClass}`}
                   >

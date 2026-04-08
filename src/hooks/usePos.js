@@ -1,5 +1,36 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
+export function orderMatchesSelectedTable(o, selectedTable) {
+  if (!o || o.status !== 'open' || !selectedTable || selectedTable.id == null) return false;
+  const selId = String(selectedTable.id ?? '').trim();
+  const selName = String(selectedTable.name ?? '').trim().toLowerCase();
+  const selRoom = selectedTable.roomId != null ? String(selectedTable.roomId).trim() : '';
+  const oid = String(o.tableId ?? '').trim();
+  const nestId = String(o.table?.id ?? '').trim();
+  if (selId && (oid === selId || nestId === selId)) return true;
+  if (selName) {
+    const on = String(o.table?.name ?? '').trim().toLowerCase();
+    if (on === selName) {
+      const or = o.table?.roomId != null ? String(o.table.roomId).trim() : '';
+      if (!selRoom || !or || or === selRoom) return true;
+    }
+  }
+  return false;
+}
+
+function savedTableOrdersValueToIdSet(value) {
+  const rawList = Array.isArray(value) ? value : [];
+  return new Set(
+    rawList
+      .map((entry) => {
+        if (typeof entry === 'string') return String(entry || '').trim();
+        if (entry && typeof entry === 'object') return String(entry.orderId ?? entry.id ?? '').trim();
+        return '';
+      })
+      .filter(Boolean)
+  );
+}
+
 const FUNCTION_BUTTON_SLOT_COUNT = 4;
 const FUNCTION_BUTTON_ALLOWED_IDS = [
   'tables',
@@ -24,7 +55,7 @@ const normalizeFunctionButtonsLayout = (value) => {
   return next;
 };
 
-export function usePos(API, socket, selectedTableId = null, focusedOrderId = null, focusedOrderInitialItemCount = 0) {
+export function usePos(API, socket, selectedTableRef = null, focusedOrderId = null) {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -42,6 +73,8 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   const [tableLayouts, setTableLayouts] = useState({});
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [loading, setLoading] = useState(false);
+  /** Order ids registered as saved table batches (settings). `null` until first fetch (do not treat as empty set). */
+  const [savedTableOrderIds, setSavedTableOrderIds] = useState(null);
 
   const productsByCategoryIdRef = useRef({});
   const subproductsByProductIdRef = useRef(new Map());
@@ -162,6 +195,16 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
     if (Array.isArray(data)) setOrders(data);
   }, [API]);
 
+  const fetchSavedTableOrderIds = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/settings/table-saved-orders`);
+      const data = await safeJson(res);
+      setSavedTableOrderIds(savedTableOrdersValueToIdSet(data?.value));
+    } catch {
+      setSavedTableOrderIds((prev) => (prev == null ? new Set() : prev));
+    }
+  }, [API]);
+
   const fetchWebordersCount = useCallback(async () => {
     const res = await fetch(`${API}/weborders/count`);
     const data = await safeJson(res);
@@ -201,10 +244,8 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   const fetchSubproductsForProduct = useCallback(
     async (productId) => {
       if (!productId) return [];
-      if (subproductsByProductIdRef.current.has(productId)) {
-        return subproductsByProductIdRef.current.get(productId);
-      }
-      const res = await fetch(`${API}/products/${productId}/subproducts`);
+      // Always hit the API — permanent in-memory cache caused stale subproduct prices after Control edits.
+      const res = await fetch(`${API}/products/${productId}/subproducts`, { cache: 'no-store' });
       const data = await safeJson(res);
       const list = Array.isArray(data) ? data : [];
       subproductsByProductIdRef.current.set(productId, list);
@@ -272,65 +313,102 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   useEffect(() => {
     if (!socket?.on) return;
     const handler = (order) => {
-      if (!order || order.id == null || String(order.id).trim() === '') {
-        fetchOrders();
-        return;
+      if (order && order.id != null && String(order.id).trim() !== '') {
+        setOrders((prev) => {
+          const id = String(order.id);
+          const without = prev.filter((o) => String(o?.id) !== id);
+          return [order, ...without];
+        });
       }
-      setOrders((prev) => {
-        const idx = prev.findIndex((o) => o.id === order.id);
-        const next = idx >= 0 ? [...prev.slice(0, idx), order, ...prev.slice(idx + 1)] : [order, ...prev];
-        return next;
-      });
-      if (order?.status === 'paid' || order?.status === 'in_planning') {
-        fetchTables();
-      }
-    };
-    const clearHandler = () => {
+      void fetchSavedTableOrderIds();
+      // Tables embed open orders only; refetch on every change so POS / tablet / handheld floor state matches DB.
       fetchOrders();
       fetchTables();
     };
+    const clearHandler = () => {
+      void fetchSavedTableOrderIds();
+      fetchOrders();
+      fetchTables();
+    };
+    const deletedHandler = () => {
+      void fetchSavedTableOrderIds();
+      fetchOrders();
+      fetchTables();
+    };
+    const onTableSavedOrdersUpdated = (payload) => {
+      setSavedTableOrderIds(savedTableOrdersValueToIdSet(payload?.value));
+    };
     socket.on('order:updated', handler);
     socket.on('orders:cleared', clearHandler);
+    socket.on('order:deleted', deletedHandler);
+    socket.on('table-saved-orders:updated', onTableSavedOrdersUpdated);
     return () => {
       socket.off('order:updated', handler);
       socket.off('orders:cleared', clearHandler);
+      socket.off('order:deleted', deletedHandler);
+      socket.off('table-saved-orders:updated', onTableSavedOrdersUpdated);
     };
-  }, [socket, fetchOrders, fetchTables]);
+  }, [socket, fetchOrders, fetchTables, fetchSavedTableOrderIds]);
+
+  useEffect(() => {
+    fetchSavedTableOrderIds();
+  }, [fetchSavedTableOrderIds]);
+
+  const tableIdNorm = (id) => String(id ?? '').trim();
+  const selectedTableObj =
+    selectedTableRef != null && typeof selectedTableRef === 'object'
+      ? selectedTableRef
+      : selectedTableRef != null
+        ? { id: selectedTableRef }
+        : null;
 
   const currentOrderCandidates = orders.filter((o) => {
     if (o?.status !== 'open') return false;
-    if (selectedTableId) return o?.tableId === selectedTableId;
-    return !o?.tableId;
+    if (!selectedTableObj || selectedTableObj.id == null || tableIdNorm(selectedTableObj.id) === '') {
+      const oid = tableIdNorm(o?.tableId);
+      const nestId = tableIdNorm(o?.table?.id);
+      return oid === '' && nestId === '';
+    }
+    return orderMatchesSelectedTable(o, selectedTableObj);
   });
   // When viewing an in_waiting or in_planning order, show it without changing status
-  const focusedOrderFromWaiting = focusedOrderId ? orders.find((o) => o?.id === focusedOrderId && o?.status === 'in_waiting') : null;
-  const focusedOrderFromPlanning = focusedOrderId ? orders.find((o) => o?.id === focusedOrderId && o?.status === 'in_planning') : null;
-  const focusedOrder = focusedOrderId
-    ? (focusedOrderFromWaiting || focusedOrderFromPlanning || currentOrderCandidates.find((o) => o?.id === focusedOrderId))
+  const fid = focusedOrderId != null ? String(focusedOrderId) : '';
+  const focusedOrderFromWaiting = fid
+    ? orders.find((o) => String(o?.id) === fid && o?.status === 'in_waiting')
     : null;
-  const currentOrder = focusedOrder || currentOrderCandidates.reduce((latest, candidate) => {
-    if (!latest) return candidate;
-    const latestTime = new Date(latest?.createdAt || 0).getTime();
-    const candidateTime = new Date(candidate?.createdAt || 0).getTime();
-    return candidateTime >= latestTime ? candidate : latest;
-  }, null);
+  const focusedOrderFromPlanning = fid
+    ? orders.find((o) => String(o?.id) === fid && o?.status === 'in_planning')
+    : null;
+  const focusedOrder = fid
+    ? focusedOrderFromWaiting || focusedOrderFromPlanning || currentOrderCandidates.find((o) => String(o?.id) === fid)
+    : null;
 
-  /** First index of “unordered” lines (product tap removes; no ticket strikethrough). In-waiting: earlier batches are ordered. */
-  const getOrderedLinePrefixCount = useCallback(() => {
-    const o = currentOrder;
-    if (!o) return 0;
-    if (o.status === 'in_waiting' && focusedOrderId && o.id === focusedOrderId) {
-      try {
-        const b = JSON.parse(o.itemBatchBoundariesJson || '[]');
-        if (Array.isArray(b) && b.length > 0) return b[b.length - 1];
-      } catch {
-        /* ignore */
-      }
-      const n = Number(focusedOrderInitialItemCount) || 0;
-      return n > 0 ? n : 0;
-    }
-    return 0;
-  }, [currentOrder, focusedOrderId, focusedOrderInitialItemCount]);
+  /** Saved batches stay in ticket history but must not steal "current" from the live draft order new lines attach to. */
+  const tableSelectionActive =
+    selectedTableObj != null && selectedTableObj.id != null && tableIdNorm(selectedTableObj.id) !== '';
+  const draftOrderCandidates =
+    tableSelectionActive && savedTableOrderIds != null
+      ? currentOrderCandidates.filter((o) => !savedTableOrderIds.has(String(o?.id ?? '')))
+      : currentOrderCandidates;
+  const currentOrderPickPool =
+    tableSelectionActive && savedTableOrderIds != null && draftOrderCandidates.length > 0
+      ? draftOrderCandidates
+      : currentOrderCandidates;
+
+  const currentOrder =
+    focusedOrder ||
+    currentOrderPickPool.reduce((latest, candidate) => {
+      if (!latest) return candidate;
+      const li = Array.isArray(latest?.items) ? latest.items.length : 0;
+      const ci = Array.isArray(candidate?.items) ? candidate.items.length : 0;
+      if (ci !== li) return ci > li ? candidate : latest;
+      const lt = Math.round((Number(latest?.total) || 0) * 100) / 100;
+      const ct = Math.round((Number(candidate?.total) || 0) * 100) / 100;
+      if (ct !== lt) return ct > lt ? candidate : latest;
+      const latestTime = new Date(latest?.createdAt || 0).getTime();
+      const candidateTime = new Date(candidate?.createdAt || 0).getTime();
+      return candidateTime >= latestTime ? candidate : latest;
+    }, null);
 
   const addItemToOrder = useCallback(
     async (product, quantity = 1, tableId = null) => {
@@ -376,23 +454,6 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
         return null;
       }
 
-      const orderedPrefix = getOrderedLinePrefixCount();
-      const existingItems = currentOrder?.items || [];
-      const unorderedMatches = existingItems
-        .map((it, idx) => ({ it, idx }))
-        .filter(
-          ({ it, idx }) =>
-            idx >= orderedPrefix && String(it.productId || it.product?.id) === String(product.id)
-        );
-      const removeTarget = unorderedMatches[unorderedMatches.length - 1];
-      if (removeTarget) {
-        await fetch(`${API}/orders/${orderId}/items/${removeTarget.it.id}`, { method: 'DELETE' });
-        const resAfter = await fetch(`${API}/orders`);
-        const listAfter = await safeJson(resAfter);
-        if (Array.isArray(listAfter)) setOrders(listAfter);
-        return false;
-      }
-
       if (tableId && !currentOrder?.tableId) {
         await fetch(`${API}/orders/${orderId}`, {
           method: 'PATCH',
@@ -418,7 +479,7 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
       }
       return null;
     },
-    [API, currentOrder, getOrderedLinePrefixCount]
+    [API, currentOrder]
   );
 
   const appendSubproductNoteToItem = useCallback(
@@ -473,14 +534,25 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
   const setOrderTable = useCallback(
     async (orderId, tableId) => {
       if (!orderId) return;
-      await fetch(`${API}/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tableId: tableId || null })
-      });
-      const res = await fetch(`${API}/orders`);
-      const list = await safeJson(res);
-      if (Array.isArray(list)) setOrders(list);
+      const idStr = String(orderId);
+      const nextTableId = tableId != null && tableId !== '' ? tableId : null;
+      setOrders((prev) =>
+        prev.map((o) => (String(o?.id) === idStr ? { ...o, tableId: nextTableId } : o))
+      );
+      try {
+        await fetch(`${API}/orders/${encodeURIComponent(orderId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tableId: nextTableId })
+        });
+        const res = await fetch(`${API}/orders`);
+        const list = await safeJson(res);
+        if (Array.isArray(list)) setOrders(list);
+      } catch {
+        const res = await fetch(`${API}/orders`);
+        const list = await safeJson(res);
+        if (Array.isArray(list)) setOrders(list);
+      }
     },
     [API]
   );
@@ -648,6 +720,7 @@ export function usePos(API, socket, selectedTableId = null, focusedOrderId = nul
     fetchProducts,
     loadPosFullCatalog,
     fetchOrders,
+    fetchSavedTableOrderIds,
     fetchWebordersCount,
     fetchInPlanningCount,
     fetchTables,

@@ -29,7 +29,8 @@ export function ProductArea({
   const productPressLockRef = useRef(false);
   const subproductPressLockRef = useRef(false);
   const subproductsCacheRef = useRef(new Map());
-  const SUBPRODUCTS_CACHE_TTL_MS = 60 * 1000;
+  /** No TTL — avoid showing old prices after Control edits; list is refetched on each product tap. */
+  const SUBPRODUCTS_CACHE_TTL_MS = 0;
   const getSubproductExtra = useCallback(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_subproduct_extra') : null;
@@ -257,6 +258,8 @@ export function ProductArea({
     yellow: { backgroundColor: '#CA8A04', color: '#ffffff' },
   };
 
+  const productGridLocked = productPressLocked || loadingSubproducts || subproductPressLocked;
+
   return (
     <>
       <main className="flex-1 flex flex-col min-w-0 p-4 bg-pos-bg py-2">
@@ -286,9 +289,10 @@ export function ProductArea({
                   <button
                     type="button"
                     key={`${product.id}-${idx}`}
-                    disabled={productPressLocked || loadingSubproducts || subproductPressLocked}
+                    aria-disabled={productGridLocked}
+                    tabIndex={productGridLocked ? -1 : undefined}
                     style={tileStyle}
-                    className={`flex relative flex-row items-center gap-1 justify-center px-1 border-none rounded-lg text-sm min-h-[70px] max-h-[70px] ${tileStyle ? '' : 'bg-pos-panel'} ${(productPressLocked || loadingSubproducts || subproductPressLocked) ? 'opacity-70 cursor-not-allowed' : ''} ${selectedProduct?.id === product.id ? 'ring-2 ring-pos-text' : ''
+                    className={`flex relative flex-row items-center gap-1 justify-center px-1 border-none rounded-lg text-sm min-h-[70px] max-h-[70px] ${tileStyle ? '' : 'bg-pos-panel'} ${productGridLocked ? 'pointer-events-none cursor-wait' : ''} ${selectedProduct?.id === product.id ? 'ring-2 ring-pos-text' : ''
                       }`}
                     onClick={() => handleProductPress(product)}
                   >
@@ -326,8 +330,9 @@ export function ProductArea({
               </h3>
               <button
                 type="button"
-                disabled={subproductPressLocked}
-                className="p-2 rounded text-pos-muted enabled:active:text-pos-text enabled:active:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-disabled={subproductPressLocked}
+                tabIndex={subproductPressLocked ? -1 : undefined}
+                className={`p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500 ${subproductPressLocked ? 'pointer-events-none cursor-wait' : ''}`}
                 onClick={closeSubproductModal}
                 aria-label={t('close', 'Close')}
               >
@@ -346,11 +351,14 @@ export function ProductArea({
                       <button
                         type="button"
                         key={sp.id}
-                        disabled={subproductPressLocked}
-                        className={`flex items-center justify-center p-1 min-h-[50px] max-h-[50px] rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        aria-disabled={subproductPressLocked}
+                        tabIndex={subproductPressLocked ? -1 : undefined}
+                        className={`flex items-center justify-center p-1 min-h-[50px] max-h-[50px] rounded-lg transition-colors active:bg-green-500 ${
+                          subproductPressLocked ? 'pointer-events-none cursor-wait' : ''
+                        } ${
                           addedSubproductIds.has(sp.id)
-                            ? 'bg-green-600 text-white enabled:active:bg-green-500'
-                            : 'bg-pos-panel text-pos-text enabled:active:bg-green-500'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-pos-panel text-pos-text'
                         }`}
                         onClick={() => handleSubproductPress(sp)}
                       >
@@ -370,16 +378,18 @@ export function ProductArea({
             <div className="w-full px-5 pb-2 flex justify-end gap-2 absolute bottom-0 right-0">
               <button
                 type="button"
-                disabled={subproductPressLocked}
-                className="px-4 py-2 w-full rounded-lg border border-pos-border bg-pos-panel text-pos-text enabled:active:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-disabled={subproductPressLocked}
+                tabIndex={subproductPressLocked ? -1 : undefined}
+                className={`px-4 py-2 w-full rounded-lg border border-pos-border bg-pos-panel text-pos-text active:bg-green-500 ${subproductPressLocked ? 'pointer-events-none cursor-wait' : ''}`}
                 onClick={closeSubproductModal}
               >
                 {t('cancel', 'Cancel')}
               </button>
               <button
                 type="button"
-                disabled={subproductPressLocked}
-                className="px-4 py-2 w-full rounded-lg bg-green-600 text-white enabled:active:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-disabled={subproductPressLocked}
+                tabIndex={subproductPressLocked ? -1 : undefined}
+                className={`px-4 py-2 w-full rounded-lg bg-green-600 text-white active:bg-green-500 ${subproductPressLocked ? 'pointer-events-none cursor-wait' : ''}`}
                 onClick={closeSubproductModal}
               >
                 {t('ok', 'OK')}
