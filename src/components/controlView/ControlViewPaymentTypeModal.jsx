@@ -28,24 +28,24 @@ export function ControlViewPaymentTypeModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="relative flex flex-col bg-pos-bg justify-between items-center rounded-xl border border-pos-border shadow-2xl max-w-[90%] w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closePaymentTypeModal} aria-label="Close">
+        <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-black active:text-white active:bg-rose-500" onClick={closePaymentTypeModal} aria-label="Close">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
-        <div className="p-6 flex flex-col gap-4 pt-14 text-sm">
+        <div className="p-6 flex flex-col gap-4 pt-20 text-lg">
           <div className="flex items-center gap-2">
-            <label className="text-pos-text font-medium shrink-0 min-w-[130px]">{tr('control.paymentTypes.name', 'Name :')}</label>
+            <label className="text-black font-medium shrink-0 min-w-[130px]">{tr('control.paymentTypes.name', 'Name :')}</label>
             <input
               type="text"
               value={paymentTypeName}
               onChange={(e) => setPaymentTypeName(e.target.value)}
               placeholder={tr('control.paymentTypes.namePlaceholder', 'e.g. Cash, Bancontact')}
-              className="flex-1 max-w-[200px] px-4 py-3 h-[40px] rounded-lg bg-pos-panel border border-gray-300 text-gray-200 placeholder-pos-muted focus:outline-none focus:border-green-500"
+              className="flex-1 max-w-[200px] px-4 py-3 h-[40px] rounded-lg border border-gray-300 text-black placeholder-pos-muted focus:outline-none focus:border-rose-500"
             />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-pos-text font-medium shrink-0 min-w-[130px]">{tr('control.paymentTypes.active', 'Active :')}</span>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={paymentTypeActive} onChange={(e) => setPaymentTypeActive(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+              <input type="checkbox" checked={paymentTypeActive} onChange={(e) => setPaymentTypeActive(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
             </label>
           </div>
           <div className="flex items-center gap-2">
@@ -61,7 +61,7 @@ export function ControlViewPaymentTypeModal({
           <div className="flex justify-center pt-5 pb-5">
             <button
               type="button"
-              className="flex items-center text-lg gap-4 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50"
+              className="flex items-center text-lg gap-4 px-[70px] py-3 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50"
               disabled={savingPaymentType || !(paymentTypeName || '').trim()}
               onClick={handleSavePaymentType}
             >

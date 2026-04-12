@@ -30,12 +30,12 @@ export function ControlViewKitchenAssignProductsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
-        className="relative bg-pos-bg rounded-xl min-w-[600px] border border-pos-border shadow-2xl p-6 text-sm max-h-[90vh] overflow-auto [scrollbar-width:none]"
+        className="relative bg-white rounded-xl min-w-[800px] border border-pos-border shadow-2xl p-6 text-lg max-h-[90vh] overflow-auto [scrollbar-width:none]"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
-          className="absolute top-2 right-4 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500"
+          className="absolute top-2 right-4 p-2 rounded text-black active:text-pos-text active:bg-rose-500"
           onClick={closeKitchenProductsModal}
           aria-label="Close"
         >
@@ -52,7 +52,7 @@ export function ControlViewKitchenAssignProductsModal({
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
                   <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                 </svg>
-                <span className="text-sm">{tr('control.productSubproducts.loading', 'Loading...')}</span>
+                <span className="text-lg">{tr('control.productSubproducts.loading', 'Loading...')}</span>
               </div>
             </div>
           )}
@@ -63,7 +63,7 @@ export function ControlViewKitchenAssignProductsModal({
             ]}
             value={kitchenProductsCategoryFilter}
             onChange={setKitchenProductsCategoryFilter}
-            className="w-full max-w-[200px]"
+            className="w-full max-w-[250px]"
           />
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-stretch min-h-[280px]">
             <div className="flex flex-col rounded-lg border border-pos-border bg-pos-panel/30 overflow-hidden min-w-0">
@@ -71,7 +71,7 @@ export function ControlViewKitchenAssignProductsModal({
                 {tr('control.kitchen.availableProducts', 'Available products')}
               </div>
               <label
-                className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500 ${!kitchenProductsAvailable.length ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`flex items-center gap-2 px-3 py-2 border-b active:text-white border-pos-border text-black shrink-0 cursor-pointer active:bg-rose-500 ${!kitchenProductsAvailable.length ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <input
                   type="checkbox"
@@ -92,7 +92,7 @@ export function ControlViewKitchenAssignProductsModal({
               </label>
               <div
                 ref={kitchenProductsLeftListRef}
-                className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                className="flex-1 overflow-y-auto p-2 min-h-[650px] max-h-[650px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 {loadingKitchenProductsCatalog ? (
                   <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
@@ -108,7 +108,7 @@ export function ControlViewKitchenAssignProductsModal({
                   <ul className="space-y-1">
                     {kitchenProductsAvailable.map((p) => (
                       <li key={p.id}>
-                        <label className="flex items-center gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text">
+                        <label className="flex items-center gap-2 px-3 py-2 rounded cursor-pointer active:bg-rose-500 text-black active:text-white">
                           <input
                             type="checkbox"
                             checked={kitchenProductsLeftSelectedIds.has(p.id)}
@@ -120,7 +120,7 @@ export function ControlViewKitchenAssignProductsModal({
                                 return next;
                               });
                             }}
-                            className="rounded"
+                            className="rounded items-center"
                           />
                           <span className="truncate">{p.name || p.id}</span>
                         </label>
@@ -132,7 +132,7 @@ export function ControlViewKitchenAssignProductsModal({
               <div className="px-3 py-2 border-t border-pos-border shrink-0">
                 <button
                   type="button"
-                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-green-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-green-600/80 active:bg-rose-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleAddKitchenProductLinks}
                   disabled={!kitchenProductsLeftSelectedIds.size || loadingKitchenProductsCatalog}
                 >
@@ -144,7 +144,7 @@ export function ControlViewKitchenAssignProductsModal({
               </div>
             </div>
 
-            <div className="hidden md:flex items-center justify-center text-pos-muted shrink-0">
+            <div className="hidden md:flex items-center justify-center text-black shrink-0">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
@@ -155,7 +155,7 @@ export function ControlViewKitchenAssignProductsModal({
                 {tr('control.kitchen.linkedProducts', 'Linked to kitchen')}
               </div>
               <label
-                className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500 ${!kitchenProductsLinked.length ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-black active:text-white shrink-0 cursor-pointer active:bg-rose-500 ${!kitchenProductsLinked.length ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <input
                   type="checkbox"
@@ -176,7 +176,7 @@ export function ControlViewKitchenAssignProductsModal({
               </label>
               <div
                 ref={kitchenProductsRightListRef}
-                className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                className="flex-1 overflow-y-auto p-2 min-h-[650px] max-h-[650px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 {loadingKitchenProductsCatalog ? (
                   <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
@@ -188,7 +188,7 @@ export function ControlViewKitchenAssignProductsModal({
                   <ul className="space-y-1">
                     {kitchenProductsLinked.map((link) => (
                       <li key={link.productId}>
-                        <label className="flex items-center justify-between gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text group">
+                        <label className="flex items-center justify-between gap-2 px-3 py-2 rounded cursor-pointer active:bg-rose-500 text-black active:text-white group">
                           <div className="flex items-center gap-2 min-w-0">
                             <input
                               type="checkbox"
@@ -208,7 +208,7 @@ export function ControlViewKitchenAssignProductsModal({
                           </div>
                           <button
                             type="button"
-                            className="p-1 rounded active:bg-green-500 text-pos-muted active:text-red-400 shrink-0 opacity-0 group-active:opacity-100 transition-opacity"
+                            className="p-1 rounded active:bg-rose-500 text-pos-muted active:text-red-400 shrink-0 opacity-0 group-active:opacity-100 transition-opacity"
                             onClick={(e) => {
                               e.preventDefault();
                               removeKitchenProductLink(link.productId);
@@ -228,7 +228,7 @@ export function ControlViewKitchenAssignProductsModal({
               <div className="px-3 py-2 border-t border-pos-border shrink-0">
                 <button
                   type="button"
-                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-red-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-red-600/80 active:bg-rose-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleRemoveKitchenProductLinks}
                   disabled={!kitchenProductsRightSelectedIds.size || loadingKitchenProductsCatalog}
                 >
@@ -245,7 +245,7 @@ export function ControlViewKitchenAssignProductsModal({
         <div className="mt-6 flex justify-center shrink-0">
           <button
             type="button"
-            className="px-6 py-3 rounded-lg bg-green-600 text-white text-sm font-medium active:bg-green-500 disabled:opacity-50"
+            className="px-[70px] py-3 rounded-lg bg-rose-600 text-white text-xl font-medium active:bg-rose-500 disabled:opacity-50"
             onClick={handleSaveKitchenProducts}
             disabled={savingKitchenProducts || loadingKitchenProductsCatalog || !kitchenProductsKitchen}
           >

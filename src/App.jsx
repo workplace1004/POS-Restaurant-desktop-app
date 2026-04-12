@@ -4,11 +4,13 @@ import { useLanguage } from './contexts/LanguageContext';
 import { TablesView } from './components/TablesView';
 import { ControlView } from './components/ControlView';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { LicenseActivationScreen } from './components/LicenseActivationScreen';
 import { KioskView } from './components/KioskView';
 import { KioskLanguagePicker } from './components/KioskLanguagePicker';
 import { KioskStaffPinModal } from './components/KioskStaffPinModal';
 import { usePos } from './hooks/usePos';
 import { POS_API_PREFIX as API, POS_SOCKET_ORIGIN } from './lib/apiOrigin.js';
+import { isLicenseEnforcementEnabled, runStartupLicenseCheck } from './lib/posWebLicense.js';
 
 const USER_STORAGE_KEY = 'pos-user';
 const VIEW_STORAGE_KEY = 'pos-view';
@@ -88,6 +90,8 @@ const socket = io(POS_SOCKET_ORIGIN, { path: '/socket.io' });
 
 export default function App() {
   const { t } = useLanguage();
+  const [licenseUi, setLicenseUi] = useState(() => (isLicenseEnforcementEnabled() ? 'checking' : 'ready'));
+  const [licenseBlockReason, setLicenseBlockReason] = useState(null);
   const [user, setUser] = useState(() => KIOSK_GUEST_USER);
   const [view, setView] = useState(loadInitialView);
   const [selectedTable, setSelectedTable] = useState(null);
@@ -117,6 +121,15 @@ export default function App() {
     } catch {
       /* ignore */
     }
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.get('view') !== v) {
+        u.searchParams.set('view', v);
+        window.history.replaceState({}, '', u.toString());
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const {
@@ -132,8 +145,6 @@ export default function App() {
     fetchOrders,
     fetchTables,
     fetchSubproductsForProduct,
-    fetchSavedPositioningLayout,
-    fetchSavedPositioningColors,
     fetchSavedFunctionButtonsLayout,
     tableLayouts,
     fetchTableLayouts,
@@ -153,6 +164,23 @@ export default function App() {
       1000,
     );
     return () => clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    if (!isLicenseEnforcementEnabled()) return;
+    let cancelled = false;
+    (async () => {
+      const r = await runStartupLicenseCheck();
+      if (cancelled) return;
+      if (r.ok || r.skipped) setLicenseUi('ready');
+      else {
+        setLicenseBlockReason(r.errorKey || 'license.err.generic');
+        setLicenseUi('blocked');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -193,7 +221,7 @@ export default function App() {
       (async () => {
         setIsPosBootstrapReady(false);
         try {
-          await Promise.all([loadPosFullCatalog(), fetchSavedPositioningLayout(), fetchSavedPositioningColors()]);
+          await loadPosFullCatalog();
         } finally {
           if (!cancelled) setIsPosBootstrapReady(true);
         }
@@ -204,7 +232,7 @@ export default function App() {
     }
     setIsPosBootstrapReady(true);
     return undefined;
-  }, [user, view, loadPosFullCatalog, fetchSavedPositioningLayout, fetchSavedPositioningColors]);
+  }, [user, view, loadPosFullCatalog]);
 
   useEffect(() => {
     if (selectedCategoryId) fetchProducts(selectedCategoryId);
@@ -263,6 +291,25 @@ export default function App() {
     setViewAndPersist('control');
   }, [setViewAndPersist]);
 
+  if (licenseUi === 'checking') {
+    return (
+      <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-white">
+        <LoadingSpinner label={t('license.checking')} />
+      </div>
+    );
+  }
+
+  if (licenseUi === 'blocked') {
+    return (
+      <LicenseActivationScreen
+        time={time}
+        variant="kiosk"
+        initialErrorKey={licenseBlockReason}
+        onLicensed={() => setLicenseUi('ready')}
+      />
+    );
+  }
+
   if (view === 'tables') {
     return (
       <TablesView
@@ -295,7 +342,7 @@ export default function App() {
   if (view === 'kiosk') {
     if (!isPosBootstrapReady) {
       return (
-        <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-pos-bg">
+        <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-white">
           <LoadingSpinner label={t('loadingPos')} />
         </div>
       );
@@ -326,6 +373,35 @@ export default function App() {
         /* ignore */
       }
     };
+
+    /** PIN exit from language screen: user is already on picker — `kioskOnClose` would be a no-op; actually leave the window/tab. */
+    const kioskExitFromLanguagePicker = () => {
+      try {
+        window.sessionStorage.removeItem(KIOSK_LANG_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
+      setKioskMenuEntered(false);
+      exitDocumentFullscreen();
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.close();
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+      try {
+        window.close();
+      } catch {
+        /* ignore */
+      }
+      try {
+        window.location.replace('about:blank');
+      } catch {
+        /* ignore */
+      }
+    };
     const staffPinModal = (
       <KioskStaffPinModal
         open={showStaffPinModal}
@@ -347,6 +423,7 @@ export default function App() {
               }
             }}
             onOpenConfiguration={() => setShowStaffPinModal(true)}
+            onExitKiosk={kioskExitFromLanguagePicker}
           />
           {staffPinModal}
         </>
@@ -377,7 +454,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-pos-bg text-pos-text">
+    <div className="flex h-full min-h-[100dvh] w-full items-center justify-center bg-white text-black">
       <LoadingSpinner label={t('loadingPos')} />
     </div>
   );

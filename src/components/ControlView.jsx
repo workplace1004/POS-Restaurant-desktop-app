@@ -6,13 +6,14 @@ import { PrinterModal } from './PrinterModal';
 import { ControlViewDiscountModal } from './controlView/ControlViewDiscountModal';
 import { ControlViewCategoryModal } from './controlView/ControlViewCategoryModal';
 import { ControlViewProductModal } from './controlView/ControlViewProductModal';
-import { ControlViewProductPositioningModal } from './controlView/ControlViewProductPositioningModal';
 import { ControlViewProductSubproductsModal } from './controlView/ControlViewProductSubproductsModal';
+import { ControlViewProductKioskConfigurationModal } from './controlView/ControlViewProductKioskConfigurationModal';
 import { ControlViewSubproductModal } from './controlView/ControlViewSubproductModal';
 import { ControlViewManageGroupsModal } from './controlView/ControlViewManageGroupsModal';
 import { ControlViewKitchenAssignProductsModal } from './controlView/ControlViewKitchenAssignProductsModal';
 import { ControlViewProductionMessagesModal } from './controlView/ControlViewProductionMessagesModal';
 import { ControlViewSystemSettingsModal } from './controlView/ControlViewSystemSettingsModal';
+import { PosBackendSettingsModal } from './PosBackendSettingsModal.jsx';
 import { ControlViewDeviceSettingsModal } from './controlView/ControlViewDeviceSettingsModal';
 import { ControlViewTableLocationModal } from './controlView/ControlViewTableLocationModal';
 import { ControlViewLabelModal } from './controlView/ControlViewLabelModal';
@@ -27,10 +28,12 @@ import {
   layoutEditorReadTableX,
   layoutEditorReadTableY,
   SET_TABLES_LAYOUT_CANVAS_WIDTH,
-  SET_TABLES_LAYOUT_CANVAS_HEIGHT
+  SET_TABLES_LAYOUT_CANVAS_HEIGHT,
+  DISABLE_CONTROL_TABLES_TOP_NAV
 } from './controlView/controlViewUtils.js';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
+import { parseIsoDateOnlyLocal, localTodayIsoDate } from '../lib/isoDateLocal.js';
 import { LoadingSpinner } from './LoadingSpinner';
 import { publicAssetUrl, resolveMediaSrc } from '../lib/publicAssetUrl.js';
 import { parseLayoutTableColor } from '../lib/tablePlanDisplay.jsx';
@@ -44,7 +47,7 @@ const KIOSK_CONTROL_FRAME_H = 1920;
 
 const CONTROL_SIDEBAR_ITEMS = [
   { id: 'personalize', label: 'Personalize Cash Register', icon: 'monitor' },
-  // { id: 'reports', label: 'Reports', icon: 'chart' },
+  { id: 'reports', label: 'Report', icon: 'chart' },
   { id: 'users', label: 'Users', icon: 'users' },
   { id: 'language', label: 'Language', icon: 'language' }
 ];
@@ -73,7 +76,6 @@ const SUB_NAV_ITEMS = [
 ];
 
 const CASH_REGISTER_SUB_NAV_ITEMS = [
-  'Template Settings',
   'Device Settings',
   'System Settings',
   'Payment types',
@@ -152,7 +154,6 @@ const SCALE_TYPE_OPTIONS = [
 ];
 
 const SCALE_PORT_OPTIONS = [
-  { value: '', label: '' },
   { value: 'COM 1', label: 'COM 1' },
   { value: 'COM 2', label: 'COM 2' },
   { value: 'COM 3', label: 'COM 3' },
@@ -610,8 +611,19 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [savingAppLanguage, setSavingAppLanguage] = useState(false);
   const [topNavId, setTopNavId] = useState('categories-products');
   const [subNavId, setSubNavId] = useState('Price Groups');
+
+  useEffect(() => {
+    if (!DISABLE_CONTROL_TABLES_TOP_NAV || topNavId !== 'tables') return;
+    setTopNavId('categories-products');
+    setSubNavId('Price Groups');
+  }, [topNavId]);
+
   const [controlBootstrapReady, setControlBootstrapReady] = useState(false);
   const [reportTabId, setReportTabId] = useState('financial');
+  /** Financial reports sub-view: Z (period close), X (interim), or history list. */
+  const [financialReportKind, setFinancialReportKind] = useState('z');
+  /** User reports sub-view: Z (close) or X (interim). */
+  const [userReportKind, setUserReportKind] = useState('z');
   const [reportGenerateUntil, setReportGenerateUntil] = useState('current-time');
   const [periodicReportStartTime, setPeriodicReportStartTime] = useState('00:00');
   const [periodicReportStartDate, setPeriodicReportStartDate] = useState(() => {
@@ -625,9 +637,10 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   });
   const [reportSettings, setReportSettings] = useState(() => ({ ...DEFAULT_REPORT_SETTINGS }));
   const [savingReportSettings, setSavingReportSettings] = useState(false);
+  const [periodicReportLines, setPeriodicReportLines] = useState(null);
+  const [periodicReportLoading, setPeriodicReportLoading] = useState(false);
 
   const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
   const usersListRef = useRef(null);
   const [canUsersScrollUp, setCanUsersScrollUp] = useState(false);
   const [canUsersScrollDown, setCanUsersScrollDown] = useState(false);
@@ -692,7 +705,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const kitchenProductsRightListRef = useRef(null);
 
   const [priceGroups, setPriceGroups] = useState([]);
-  const [priceGroupsLoading, setPriceGroupsLoading] = useState(false);
   const priceGroupsListRef = useRef(null);
   const [canPriceGroupsScrollUp, setCanPriceGroupsScrollUp] = useState(false);
   const [canPriceGroupsScrollDown, setCanPriceGroupsScrollDown] = useState(false);
@@ -704,7 +716,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
   const [categories, setCategories] = useState([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [categoryName, setCategoryName] = useState('');
@@ -727,7 +738,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [canSubproductsScrollDown, setCanSubproductsScrollDown] = useState(false);
 
   const [products, setProducts] = useState([]);
-  const [productsLoading, setProductsLoading] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [productHasSubproductsById, setProductHasSubproductsById] = useState({});
@@ -743,17 +753,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const productSubproductsListRef = useRef(null);
   const [loadingProductSubproductsLinked, setLoadingProductSubproductsLinked] = useState(false);
   const [savingProductSubproducts, setSavingProductSubproducts] = useState(false);
+  const [showProductKioskConfigurationModal, setShowProductKioskConfigurationModal] = useState(false);
+  const [productKioskConfigurationProduct, setProductKioskConfigurationProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
-  const [showProductPositioningModal, setShowProductPositioningModal] = useState(false);
-  const [positioningCategoryId, setPositioningCategoryId] = useState(null);
-  const [positioningSelectedProductId, setPositioningSelectedProductId] = useState(null);
-  const [positioningSelectedCellIndex, setPositioningSelectedCellIndex] = useState(null);
-  const [positioningSelectedPoolItemId, setPositioningSelectedPoolItemId] = useState(null);
-  const [positioningSubproducts, setPositioningSubproducts] = useState([]);
-  const [positioningLayoutByCategory, setPositioningLayoutByCategory] = useState({});
-  const [positioningColorByCategory, setPositioningColorByCategory] = useState({});
-  const [savingPositioningLayout, setSavingPositioningLayout] = useState(false);
-  const [positioningLayoutSaveMessage, setPositioningLayoutSaveMessage] = useState('');
   const [editingProductId, setEditingProductId] = useState(null);
   const [productTab, setProductTab] = useState('general');
   const [productTabsUnlocked, setProductTabsUnlocked] = useState(false);
@@ -880,15 +882,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     offsetY: 0
   });
 
-  const [templateTheme, setTemplateTheme] = useState(() => {
-    try {
-      return (typeof localStorage !== 'undefined' && localStorage.getItem('pos-template-theme')) || 'light';
-    } catch {
-      return 'light';
-    }
-  });
-  const [savingTemplateSettings, setSavingTemplateSettings] = useState(false);
-
   const [showDeviceSettingsModal, setShowDeviceSettingsModal] = useState(false);
   const [deviceSettingsTab, setDeviceSettingsTab] = useState('General');
   const [deviceUseSubproducts, setDeviceUseSubproducts] = useState(true);
@@ -944,6 +937,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [selectedOptionButtonPoolItemId, setSelectedOptionButtonPoolItemId] = useState(null);
 
   const [showSystemSettingsModal, setShowSystemSettingsModal] = useState(false);
+  const [showPosBackendSettingsModal, setShowPosBackendSettingsModal] = useState(false);
   const [systemSettingsTab, setSystemSettingsTab] = useState('General');
   const [sysUseStockManagement, setSysUseStockManagement] = useState(true);
   const [sysUsePriceGroups, setSysUsePriceGroups] = useState(true);
@@ -1115,11 +1109,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [payworldTerminalId, setPayworldTerminalId] = useState(null);
 
   const [subproductGroups, setSubproductGroups] = useState([]);
-  const [subproductGroupsLoading, setSubproductGroupsLoading] = useState(false);
   const [selectedSubproductGroupId, setSelectedSubproductGroupId] = useState(null);
   const [selectedSubproductId, setSelectedSubproductId] = useState(null);
   const [subproducts, setSubproducts] = useState([]);
-  const [subproductsLoading, setSubproductsLoading] = useState(false);
   const [subproductSearch, setSubproductSearch] = useState('');
   const [showSubproductModal, setShowSubproductModal] = useState(false);
   const [showManageGroupsModal, setShowManageGroupsModal] = useState(false);
@@ -1135,6 +1127,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [subproductKioskPicture, setSubproductKioskPicture] = useState('');
   const [subproductAttachToCategoryIds, setSubproductAttachToCategoryIds] = useState([]);
   const subproductAttachToListRef = useRef(null);
+  const [canSubproductAttachToScrollUp, setCanSubproductAttachToScrollUp] = useState(false);
+  const [canSubproductAttachToScrollDown, setCanSubproductAttachToScrollDown] = useState(false);
   const [subproductAddCategoryId, setSubproductAddCategoryId] = useState('');
   const [savingSubproduct, setSavingSubproduct] = useState(false);
   const [deleteConfirmSubproductId, setDeleteConfirmSubproductId] = useState(null);
@@ -1147,7 +1141,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   const [selectedManageGroupId, setSelectedManageGroupId] = useState(null);
   const manageGroupsListRef = useRef(null);
   const manageGroupsDragRef = useRef({ active: false, startY: 0, startScrollTop: 0, pointerId: null });
-  const positioningCategoryTabsRef = useRef(null);
   const [canManageGroupsPageUp, setCanManageGroupsPageUp] = useState(false);
   const [canManageGroupsPageDown, setCanManageGroupsPageDown] = useState(false);
   const LOCALE_BY_LANG = { en: 'en-US', nl: 'nl-NL', fr: 'fr-FR', tr: 'tr-TR' };
@@ -1318,6 +1311,24 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     el.scrollBy({ top: delta, behavior: 'smooth' });
   }, []);
 
+  const updateSubproductAttachToScrollState = useCallback(() => {
+    const el = subproductAttachToListRef.current;
+    if (!el) {
+      setCanSubproductAttachToScrollUp(false);
+      setCanSubproductAttachToScrollDown(false);
+      return;
+    }
+    const { scrollTop, clientHeight, scrollHeight } = el;
+    if (scrollHeight <= clientHeight + 1) {
+      setCanSubproductAttachToScrollUp(false);
+      setCanSubproductAttachToScrollDown(false);
+      return;
+    }
+    const gapBelow = scrollHeight - scrollTop - clientHeight;
+    setCanSubproductAttachToScrollUp(scrollTop > 1);
+    setCanSubproductAttachToScrollDown(gapBelow > 4);
+  }, []);
+
   const updateProductionMessagesScrollState = useCallback(() => {
     const el = productionMessagesListRef.current;
     if (!el) {
@@ -1397,9 +1408,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       setCanUsersScrollDown(false);
       return;
     }
-    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-    setCanUsersScrollUp(el.scrollTop > 0);
-    setCanUsersScrollDown(el.scrollTop < maxScrollTop - 1);
+    const { scrollTop, clientHeight, scrollHeight } = el;
+    if (scrollHeight <= clientHeight + 1) {
+      setCanUsersScrollUp(false);
+      setCanUsersScrollDown(false);
+      return;
+    }
+    const gapBelow = scrollHeight - scrollTop - clientHeight;
+    setCanUsersScrollUp(scrollTop > 1);
+    setCanUsersScrollDown(gapBelow > 4);
   }, []);
 
   const scrollUsersByPage = useCallback((direction) => {
@@ -1432,8 +1449,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
   const formatDateForCurrentLanguage = useCallback((isoDate) => {
     if (!isoDate) return '';
-    const d = new Date(isoDate);
-    if (Number.isNaN(d.getTime())) return isoDate;
+    const d = parseIsoDateOnlyLocal(isoDate);
+    if (!d || Number.isNaN(d.getTime())) return String(isoDate);
     return d.toLocaleDateString(LOCALE_BY_LANG[lang] || 'en-US', {
       month: '2-digit',
       day: '2-digit',
@@ -1461,6 +1478,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     updateDiscountTargetScrollState();
   }, [showDiscountModal, discountTargetIds, updateDiscountTargetScrollState]);
 
+  useLayoutEffect(() => {
+    if (!showSubproductModal) return;
+    updateSubproductAttachToScrollState();
+  }, [showSubproductModal, categories, updateSubproductAttachToScrollState]);
+
   useEffect(() => {
     if (topNavId !== 'categories-products' || subNavId !== 'Categories') return;
     updateCategoriesScrollState();
@@ -1486,7 +1508,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     updatePaymentTypesScrollState();
   }, [topNavId, subNavId, paymentTypes, updatePaymentTypesScrollState]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (effectiveControlSidebarId !== 'users') return;
     updateUsersScrollState();
   }, [effectiveControlSidebarId, users, updateUsersScrollState]);
@@ -1513,28 +1535,22 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, [toast]);
 
   const fetchPriceGroups = useCallback(async () => {
-    setPriceGroupsLoading(true);
     try {
       const res = await fetch(`${API}/price-groups`);
       const data = await res.json();
       setPriceGroups(Array.isArray(data) ? data : []);
     } catch {
       setPriceGroups([]);
-    } finally {
-      setPriceGroupsLoading(false);
     }
   }, []);
 
   const fetchCategories = useCallback(async () => {
-    setCategoriesLoading(true);
     try {
       const res = await fetch(`${API}/categories`);
       const data = await res.json();
       setCategories(Array.isArray(data) ? data : []);
     } catch {
       setCategories([]);
-    } finally {
-      setCategoriesLoading(false);
     }
   }, []);
 
@@ -1581,15 +1597,12 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       setProducts([]);
       return;
     }
-    setProductsLoading(true);
     try {
       const res = await fetch(`${API}/categories/${categoryId}/products`);
       const data = await res.json();
       setProducts(Array.isArray(data) ? data : []);
     } catch {
       setProducts([]);
-    } finally {
-      setProductsLoading(false);
     }
   }, []);
 
@@ -1645,13 +1658,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, [topNavId, subNavId, selectedCategoryId, categories]);
 
   useEffect(() => {
-    if (!showProductPositioningModal) return;
-    if (!positioningCategoryId && categories.length > 0) {
-      setPositioningCategoryId(selectedCategoryId || categories[0].id);
-    }
-  }, [showProductPositioningModal, positioningCategoryId, categories, selectedCategoryId]);
-
-  useEffect(() => {
     if (!showProductModal || productTab !== 'extra_prices') return;
     const id = requestAnimationFrame(() => {
       syncExtraPricesScrollEdges();
@@ -1659,155 +1665,13 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     return () => cancelAnimationFrame(id);
   }, [showProductModal, productTab, extraPricesRows.length, syncExtraPricesScrollEdges]);
 
-  useEffect(() => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('pos_product_positioning_layout', JSON.stringify(positioningLayoutByCategory));
-      }
-    } catch {
-      // ignore localStorage write failures
-    }
-  }, [positioningLayoutByCategory]);
-
-  useEffect(() => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('pos_product_positioning_colors', JSON.stringify(positioningColorByCategory));
-      }
-    } catch {
-      // ignore localStorage write failures
-    }
-  }, [positioningColorByCategory]);
-
-  const fetchPositioningSubproducts = useCallback(async (categoryId) => {
-    if (!categoryId) {
-      setPositioningSubproducts([]);
-      return;
-    }
-    try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_subproduct_extra') : null;
-      const extraMap = raw ? JSON.parse(raw) : {};
-      const attachedIds = Object.entries(extraMap || {})
-        .filter(([, value]) => Array.isArray(value?.attachToCategoryIds) && value.attachToCategoryIds.includes(categoryId))
-        .map(([id]) => id);
-      if (attachedIds.length === 0) {
-        setPositioningSubproducts([]);
-        return;
-      }
-      const groupsRes = await fetch(`${API}/subproduct-groups`);
-      const groups = await groupsRes.json().catch(() => []);
-      const safeGroups = Array.isArray(groups) ? groups : [];
-      const listNested = await Promise.all(
-        safeGroups.map(async (g) => {
-          const res = await fetch(`${API}/subproduct-groups/${g.id}/subproducts`);
-          const data = await res.json().catch(() => []);
-          return Array.isArray(data) ? data : [];
-        })
-      );
-      const allSubproducts = listNested.flat();
-      const filtered = allSubproducts
-        .filter((sp) => attachedIds.includes(sp.id))
-        .map((sp) => {
-          const ex = extraMap?.[sp.id] || {};
-          const parsedPrice = parseFloat(ex?.price);
-          return {
-            ...sp,
-            type: 'subproduct',
-            _positioningId: `s:${sp.id}`,
-            _positioningPrice: Number.isFinite(parsedPrice) ? parsedPrice : Number(sp.price ?? 0),
-          };
-        });
-      setPositioningSubproducts(filtered);
-    } catch {
-      setPositioningSubproducts([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!showProductPositioningModal) return;
-    const categoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
-    if (!categoryId) return;
-    fetchProducts(categoryId);
-    fetchPositioningSubproducts(categoryId);
-  }, [showProductPositioningModal, positioningCategoryId, selectedCategoryId, categories, fetchProducts, fetchPositioningSubproducts]);
-
-  useEffect(() => {
-    if (!showProductPositioningModal) return;
-    const categoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
-    if (!categoryId) return;
-    setPositioningLayoutByCategory((prev) => {
-      if (Array.isArray(prev?.[categoryId])) return prev;
-      // Persist explicit empty layout so POS does not auto-fallback to full product list.
-      return { ...prev, [categoryId]: Array.from({ length: 25 }, () => null) };
-    });
-  }, [showProductPositioningModal, positioningCategoryId, selectedCategoryId, categories]);
-
-  useEffect(() => {
-    if (!showProductPositioningModal) return;
-    const categoryId = positioningCategoryId || selectedCategoryId || categories[0]?.id || null;
-    if (!categoryId || !positioningCategoryTabsRef.current) return;
-    const selectedTab = positioningCategoryTabsRef.current.querySelector(`[data-category-id="${String(categoryId)}"]`);
-    if (selectedTab && typeof selectedTab.scrollIntoView === 'function') {
-      selectedTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
-  }, [showProductPositioningModal, positioningCategoryId, selectedCategoryId, categories]);
-
-  const openProductPositioningModal = () => {
-    setPositioningCategoryId(selectedCategoryId || categories[0]?.id || null);
-    setPositioningSelectedProductId(null);
-    setPositioningSelectedCellIndex(null);
-    setPositioningSelectedPoolItemId(null);
-    setShowProductPositioningModal(true);
-  };
-
-  const closeProductPositioningModal = () => {
-    setShowProductPositioningModal(false);
-    setPositioningSelectedProductId(null);
-    setPositioningSelectedCellIndex(null);
-    setPositioningSelectedPoolItemId(null);
-    setPositioningLayoutSaveMessage('');
-  };
-
-  const saveProductPositioningLayout = useCallback(async () => {
-    setSavingPositioningLayout(true);
-    setPositioningLayoutSaveMessage('');
-    try {
-      const [layoutRes, colorRes] = await Promise.all([
-        fetch(`${API}/settings/product-positioning-layout`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: positioningLayoutByCategory || {} })
-        }),
-        fetch(`${API}/settings/product-positioning-colors`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: positioningColorByCategory || {} })
-        })
-      ]);
-      if (!layoutRes.ok || !colorRes.ok) {
-        const layoutErr = layoutRes.ok ? null : await layoutRes.json().catch(() => null);
-        const colorErr = colorRes.ok ? null : await colorRes.json().catch(() => null);
-        throw new Error(layoutErr?.error || colorErr?.error || 'Failed to save positioning layout');
-      }
-      showToast('success', 'Layout and colors saved.');
-      closeProductPositioningModal();
-    } catch (err) {
-      showToast('error', err?.message || 'Failed to save layout');
-    } finally {
-      setSavingPositioningLayout(false);
-    }
-  }, [positioningLayoutByCategory, positioningColorByCategory, showToast, closeProductPositioningModal]);
-
   const fetchSubproductGroups = useCallback(async () => {
-    setSubproductGroupsLoading(true);
     try {
       const res = await fetch(`${API}/subproduct-groups`);
       const data = await res.json();
       setSubproductGroups(Array.isArray(data) ? data : []);
     } catch {
       setSubproductGroups([]);
-    } finally {
-      setSubproductGroupsLoading(false);
     }
   }, []);
 
@@ -1836,15 +1700,12 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
   }, [topNavId, fetchTableLocations]);
 
   const fetchUsers = useCallback(async () => {
-    setUsersLoading(true);
     try {
       const res = await fetch(`${API}/users`);
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch {
       setUsers([]);
-    } finally {
-      setUsersLoading(false);
     }
   }, []);
 
@@ -1857,15 +1718,12 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       setSubproducts([]);
       return;
     }
-    setSubproductsLoading(true);
     try {
       const res = await fetch(`${API}/subproduct-groups/${groupId}/subproducts`);
       const data = await res.json();
       setSubproducts(Array.isArray(data) ? data : []);
     } catch {
       setSubproducts([]);
-    } finally {
-      setSubproductsLoading(false);
     }
   }, []);
 
@@ -2267,6 +2125,45 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setProductTabsUnlocked(true);
     setProductDisplayNumber(null);
     setAdvancedKassaPhotoPreview(null);
+    setAdvancedOpenPrice(false);
+    setAdvancedWeegschaal(false);
+    setAdvancedSubproductRequires(false);
+    setAdvancedLeeggoedPrijs('0.00');
+    setAdvancedPagerVerplicht(false);
+    setAdvancedBoldPrint(false);
+    setAdvancedGroupingReceipt(true);
+    setAdvancedLabelExtraInfo('');
+    setAdvancedVoorverpakVervaltype('Shelf life');
+    setAdvancedHoudbareDagen('0');
+    setAdvancedBewarenGebruik('');
+    setExtraPricesRows([]);
+    setExtraPricesSelectedIndex(0);
+    setPurchaseVat('');
+    setPurchasePriceExcl('0.00');
+    setPurchasePriceIncl('0.00');
+    setProfitPct('0.00');
+    setPurchaseUnit('Piece');
+    setUnitContent('0');
+    setStock('0');
+    setPurchaseSupplier('');
+    setSupplierCode('');
+    setStockNotification(true);
+    setExpirationDate('');
+    setDeclarationExpiryDays('0');
+    setNotificationSoldOutPieces('');
+    setProductInWebshop(false);
+    setWebshopOnlineOrderable(true);
+    setWebsiteRemark('');
+    setWebsiteOrder('0');
+    setShortWebText('');
+    setWebsitePhotoFileName('');
+    setKioskInfo('');
+    setKioskTakeAway(true);
+    setKioskEatIn('');
+    setKioskSubtitle('');
+    setKioskPictureFileName('');
+    setKioskMinSubs('unlimited');
+    setKioskMaxSubs('unlimited');
     setShowProductModal(true);
   };
 
@@ -2351,6 +2248,16 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
     setShowProductModal(true);
   };
+
+  const openProductKioskConfiguration = (product) => {
+    setProductKioskConfigurationProduct(product);
+    setShowProductKioskConfigurationModal(true);
+  };
+
+  const closeProductKioskConfigurationModal = useCallback(() => {
+    setShowProductKioskConfigurationModal(false);
+    setProductKioskConfigurationProduct(null);
+  }, []);
 
   const closeProductModal = () => {
     setAdvancedKassaPhotoPreview(null);
@@ -4894,6 +4801,46 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     }
   };
 
+  const handleMakePeriodicReport = useCallback(async () => {
+    setPeriodicReportLoading(true);
+    try {
+      const qs = new URLSearchParams({
+        startDate: periodicReportStartDate,
+        startTime: periodicReportStartTime,
+        endDate: periodicReportEndDate,
+        endTime: periodicReportEndTime,
+        lang: lang || 'en',
+        userName: String(currentUser?.label ?? currentUser?.name ?? '').trim(),
+        storeName: String(finalTicketsCompanyData1 ?? '')
+          .trim()
+          .slice(0, 120),
+      });
+      const res = await fetch(`${API}/reports/periodic?${qs}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || tr('control.reports.generateFailed', 'Could not generate report.'));
+      }
+      setPeriodicReportLines(Array.isArray(data.lines) ? data.lines : []);
+    } catch (e) {
+      setPeriodicReportLines(null);
+      showToast('error', e?.message || tr('control.reports.generateFailed', 'Could not generate report.'));
+    } finally {
+      setPeriodicReportLoading(false);
+    }
+  }, [
+    API,
+    currentUser?.label,
+    currentUser?.name,
+    finalTicketsCompanyData1,
+    lang,
+    periodicReportEndDate,
+    periodicReportEndTime,
+    periodicReportStartDate,
+    periodicReportStartTime,
+    showToast,
+    tr,
+  ]);
+
   const openNewUserModal = () => {
     setEditingUserId(null);
     setUserName('');
@@ -5054,7 +5001,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
     setDiscountTrigger('number');
     setDiscountType('amount');
     setDiscountValue('');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localTodayIsoDate();
     setDiscountStartDate(today);
     setDiscountEndDate(today);
     setDiscountOn('products');
@@ -5147,50 +5094,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
 
   useEffect(() => {
     let cancelled = false;
-    const loadSavedPositioningLayout = async () => {
-      try {
-        const res = await fetch(`${API}/settings/product-positioning-layout`);
-        const data = await res.json().catch(() => null);
-        const value = data?.value;
-        if (!cancelled && value && typeof value === 'object') {
-          setPositioningLayoutByCategory(value);
-          return;
-        }
-      } catch {
-        // fallback to local draft when api is unavailable
-      }
-      try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_layout') : null;
-        if (!cancelled && raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') setPositioningLayoutByCategory(parsed);
-        }
-      } catch {
-        // ignore broken local positioning data
-      }
-    };
-    const loadSavedPositioningColors = async () => {
-      try {
-        const res = await fetch(`${API}/settings/product-positioning-colors`);
-        const data = await res.json().catch(() => null);
-        const value = data?.value;
-        if (!cancelled && value && typeof value === 'object') {
-          setPositioningColorByCategory(value);
-          return;
-        }
-      } catch {
-        // fallback to local draft when api is unavailable
-      }
-      try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('pos_product_positioning_colors') : null;
-        if (!cancelled && raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') setPositioningColorByCategory(parsed);
-        }
-      } catch {
-        // ignore broken local color data
-      }
-    };
     (async () => {
       try {
         await Promise.all([
@@ -5201,9 +5104,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           fetchUsers(),
           fetchSubproductGroups(),
           fetchKitchens(),
-          fetchPrintersFromDb(),
-          loadSavedPositioningLayout(),
-          loadSavedPositioningColors()
+          fetchPrintersFromDb()
         ]);
       } finally {
         if (!cancelled) setControlBootstrapReady(true);
@@ -5464,9 +5365,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
                 key={item.id}
                 type="button"
                 disabled={sidebarDisabled}
-                className={`flex items-center gap-3 px-2 py-3 rounded-lg text-left text-md transition-colors ${effectiveControlSidebarId === item.id
-                  ? 'bg-pos-bg text-pos-text font-medium'
-                  : 'text-pos-muted active:bg-green-500 active:text-pos-text'
+                className={`flex items-center gap-3 px-2 py-3 rounded-lg text-left text-lg transition-colors ${effectiveControlSidebarId === item.id
+                  ? 'bg-rose-600 text-white font-medium'
+                  : 'text-black active:text-white active:bg-rose-500'
                   } ${sidebarDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                 onClick={() => {
                   if (sidebarDisabled) return;
@@ -5479,21 +5380,21 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
             );
           })}
         </nav>
-        <div className="p-4 w-full flex flex-col items-center gap-2">
+        <div className="p-4 w-full flex flex-col items-center gap-10">
           {currentUser && (
-            <p className="text-pos-text text-xl font-medium truncate px-1">{currentUser.label}</p>
+            <p className="text-black text-4xl font-medium truncate px-1">{currentUser.label}</p>
           )}
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-10">
             <button
               type="button"
-              className="px-3 py-1 rounded-lg text-pos-muted active:text-pos-text active:bg-green-500 text-2xl"
+              className="px-3 py-1 rounded-lg text-black active:text-white border-2 border-black active:border-white active:bg-rose-500 text-4xl"
               onClick={() => onBack?.()}
             >
               {tr('backName', 'Back')}
             </button>
             <button
               type="button"
-              className="px-3 py-2 rounded-lg text-rose-500 active:text-pos-text active:bg-green-500 text-2xl font-medium"
+              className="px-3 py-2 rounded-lg text-rose-500 active:text-white border-2 border-rose-500 active:bg-rose-500 text-4xl font-medium"
               onClick={() => setShowLogoutModal(true)}
             >
               {tr('logOut', 'Log out')}
@@ -5557,7 +5458,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           cashmaticKeyboardValue,
           categories,
           categoriesListRef,
-          categoriesLoading,
           controlSidebarId: effectiveControlSidebarId,
           creditCardType,
           discounts,
@@ -5585,6 +5485,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           handleSavePayworld,
           handleSavePriceDisplay,
           handleSaveProductionTickets,
+          handleMakePeriodicReport,
           handleSaveReportSettings,
           handleSaveRfidReader,
           handleSaveScale,
@@ -5607,6 +5508,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           openEditPriceGroupModal,
           openEditPrinterModal,
           openEditProductModal,
+          openProductKioskConfiguration,
           openEditSubproductModal,
           openEditTableLocationModal,
           openEditUserModal,
@@ -5619,7 +5521,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           openNewUserModal,
           openPriceGroupModal,
           openProductModal,
-          openProductPositioningModal,
           openProductSubproductsModal,
           openSetTablesModal,
           openSubproductModal,
@@ -5634,12 +5535,13 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           payworldKeyboardValue,
           periodicReportEndDate,
           periodicReportEndTime,
+          periodicReportLines,
+          periodicReportLoading,
           periodicReportStartDate,
           periodicReportStartTime,
           priceDisplayType,
           priceGroups,
           priceGroupsListRef,
-          priceGroupsLoading,
           printerTab,
           printers,
           printersPage,
@@ -5662,7 +5564,8 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           products,
           productsCategoryTabsRef,
           productsListRef,
-          productsLoading,
+          financialReportKind,
+          userReportKind,
           reportGenerateUntil,
           reportSettings,
           reportTabId,
@@ -5679,7 +5582,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           savingReportSettings,
           savingRfidReader,
           savingScale,
-          savingTemplateSettings,
           scalePort,
           scaleType,
           scrollCategoriesByPage,
@@ -5756,10 +5658,11 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           setProdTicketsSpaceAbove,
           setProdTicketsTicketTearable,
           setProductSearch,
+          setFinancialReportKind,
+          setUserReportKind,
           setReportGenerateUntil,
           setReportTabId,
           setRfidReaderType,
-          setSavingTemplateSettings,
           setScalePort,
           setScaleType,
           setSelectedCategoryId,
@@ -5772,19 +5675,15 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           setShowProductionMessagesModal,
           setShowSystemSettingsModal,
           setSubNavId,
-          setTemplateTheme,
           setTopNavId,
           subNavId,
           subproductGroups,
-          subproductGroupsLoading,
           subproducts,
           subproductsGroupTabsRef,
           subproductsListRef,
-          subproductsLoading,
           tableLocations,
           tableLocationsListRef,
           tableLocationsLoading,
-          templateTheme,
           togglePaymentTypeActive,
           topNavId,
           tr,
@@ -5800,7 +5699,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
           updateUsersScrollState,
           users,
           usersListRef,
-          usersLoading,
         }}
       />
       <DeleteConfirmModal
@@ -6810,7 +6708,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
             <div className="flex justify-center mt-6 gap-3">
               <button
                 type="button"
-                className="px-6 py-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-sm"
+                className="px-6 py-3 rounded-lg bg-rose-600 border border-pos-border text-pos-text active:bg-rose-500 text-xl"
                 onClick={() => setShowSetBoardColorModal(false)}
               >
                 {tr('cancel', 'Cancel')}
@@ -6837,7 +6735,6 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         }}
         printers={printers}
         categories={categories}
-        categoriesLoading={categoriesLoading}
         savingDeviceSettings={savingDeviceSettings}
         handleSaveDeviceSettings={handleSaveDeviceSettings}
         optionButtonItems={OPTION_BUTTON_ITEMS}
@@ -6951,6 +6848,7 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         mapTranslatedOptions={mapTranslatedOptions}
         showSystemSettingsModal={showSystemSettingsModal}
         closeSystemSettingsModal={() => setShowSystemSettingsModal(false)}
+        onOpenBackendSettings={() => setShowPosBackendSettingsModal(true)}
         systemSettingsTab={systemSettingsTab}
         setSystemSettingsTab={setSystemSettingsTab}
         priceGroups={priceGroups}
@@ -7014,6 +6912,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         setSysTicketScheduledPrintMode={setSysTicketScheduledPrintMode}
         sysTicketScheduledCustomerSort={sysTicketScheduledCustomerSort}
         setSysTicketScheduledCustomerSort={setSysTicketScheduledCustomerSort}
+      />
+
+      <PosBackendSettingsModal
+        open={showPosBackendSettingsModal}
+        onClose={() => setShowPosBackendSettingsModal(false)}
+        tr={tr}
+        cancelLabel={t('cancel')}
+        overlayClassName="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
       />
 
       {/* New / Edit payment type modal */}
@@ -7293,40 +7199,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         productKeyboardOnChange={productKeyboardOnChange}
       />
 
-      {/* Product positioning modal */}
-      <ControlViewProductPositioningModal
-        tr={tr}
-        showProductPositioningModal={showProductPositioningModal}
-        closeProductPositioningModal={closeProductPositioningModal}
-        positioningCategoryId={positioningCategoryId}
-        setPositioningCategoryId={setPositioningCategoryId}
-        selectedCategoryId={selectedCategoryId}
-        categories={categories}
-        products={products}
-        positioningSubproducts={positioningSubproducts}
-        positioningLayoutByCategory={positioningLayoutByCategory}
-        setPositioningLayoutByCategory={setPositioningLayoutByCategory}
-        positioningColorByCategory={positioningColorByCategory}
-        setPositioningColorByCategory={setPositioningColorByCategory}
-        positioningSelectedProductId={positioningSelectedProductId}
-        setPositioningSelectedProductId={setPositioningSelectedProductId}
-        positioningSelectedCellIndex={positioningSelectedCellIndex}
-        setPositioningSelectedCellIndex={setPositioningSelectedCellIndex}
-        positioningSelectedPoolItemId={positioningSelectedPoolItemId}
-        setPositioningSelectedPoolItemId={setPositioningSelectedPoolItemId}
-        positioningCategoryTabsRef={positioningCategoryTabsRef}
-        saveProductPositioningLayout={saveProductPositioningLayout}
-        savingPositioningLayout={savingPositioningLayout}
-      />
-
       {/* Product search keyboard modal */}
       {showProductSearchKeyboard && subNavId === 'Products' && (
         <div className="fixed inset-0 z-10 flex items-end justify-center">
           <div className="relative bg-pos-bg rounded-t-xl shadow-2xl w-[90%] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="absolute top-1 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={() => setShowProductSearchKeyboard(false)} aria-label="Close">
+            <button type="button" className="absolute top-1 right-4 z-10 p-2 rounded text-black active:text-white active:bg-rose-500" onClick={() => setShowProductSearchKeyboard(false)} aria-label="Close">
               <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-            <div className="p-2 shrink-0 pt-10 flex w-full justify-center">
+            <div className="p-2 shrink-0 pt-16 flex w-full justify-center">
               <KeyboardWithNumpad value={productSearch} onChange={setProductSearch} />
             </div>
           </div>
@@ -7334,6 +7214,14 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
       )}
 
       {/* Product row -> Subproducts modal */}
+      <ControlViewProductKioskConfigurationModal
+        tr={tr}
+        open={showProductKioskConfigurationModal}
+        product={productKioskConfigurationProduct}
+        onClose={closeProductKioskConfigurationModal}
+        showToast={showToast}
+      />
+
       <ControlViewProductSubproductsModal
         tr={tr}
         showProductSubproductsModal={showProductSubproductsModal}
@@ -7385,6 +7273,9 @@ export function ControlView({ currentUser, onLogout, onBack, fetchTableLayouts, 
         subproductAttachToCategoryIds={subproductAttachToCategoryIds}
         setSubproductAttachToCategoryIds={setSubproductAttachToCategoryIds}
         subproductAttachToListRef={subproductAttachToListRef}
+        updateSubproductAttachToScrollState={updateSubproductAttachToScrollState}
+        canSubproductAttachToScrollUp={canSubproductAttachToScrollUp}
+        canSubproductAttachToScrollDown={canSubproductAttachToScrollDown}
         scrollSubproductAttachToByPage={scrollSubproductAttachToByPage}
         savingSubproduct={savingSubproduct}
         handleSaveSubproduct={handleSaveSubproduct}

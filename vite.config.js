@@ -4,8 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   const isPwaMode = mode === 'pwa';
+  /** Relative asset URLs for Electron `loadFile` (file://). */
+  const isElectronBuild = mode === 'electron';
   return {
-    base: '/',
+    base: isElectronBuild ? './' : '/',
     plugins: [
       react(),
       VitePWA({

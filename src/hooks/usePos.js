@@ -65,8 +65,6 @@ export function usePos(API, socket, selectedTableRef = null, focusedOrderId = nu
   const [inPlanningCount, setInPlanningCount] = useState(0);
   const [inWaitingCount, setInWaitingCount] = useState(0);
   const [historyOrders, setHistoryOrders] = useState([]);
-  const [savedPositioningLayoutByCategory, setSavedPositioningLayoutByCategory] = useState({});
-  const [savedPositioningColorByCategory, setSavedPositioningColorByCategory] = useState({});
   const [savedFunctionButtonsLayout, setSavedFunctionButtonsLayout] = useState(() =>
     Array(FUNCTION_BUTTON_SLOT_COUNT).fill('')
   );
@@ -253,28 +251,6 @@ export function usePos(API, socket, selectedTableRef = null, focusedOrderId = nu
     },
     [API]
   );
-
-  const fetchSavedPositioningLayout = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/settings/product-positioning-layout`);
-      const data = await safeJson(res);
-      const value = data?.value;
-      setSavedPositioningLayoutByCategory(value && typeof value === 'object' ? value : {});
-    } catch {
-      setSavedPositioningLayoutByCategory({});
-    }
-  }, [API]);
-
-  const fetchSavedPositioningColors = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/settings/product-positioning-colors`);
-      const data = await safeJson(res);
-      const value = data?.value;
-      setSavedPositioningColorByCategory(value && typeof value === 'object' ? value : {});
-    } catch {
-      setSavedPositioningColorByCategory({});
-    }
-  }, [API]);
 
   const fetchSavedFunctionButtonsLayout = useCallback(async () => {
     try {
@@ -727,10 +703,6 @@ export function usePos(API, socket, selectedTableRef = null, focusedOrderId = nu
     historyOrders,
     fetchOrderHistory,
     fetchSubproductsForProduct,
-    savedPositioningLayoutByCategory,
-    fetchSavedPositioningLayout,
-    savedPositioningColorByCategory,
-    fetchSavedPositioningColors,
     savedFunctionButtonsLayout,
     fetchSavedFunctionButtonsLayout,
     tableLayouts,

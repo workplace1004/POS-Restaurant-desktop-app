@@ -166,11 +166,11 @@ export function ControlViewProductModal({
   if (!showProductModal) return null;
   return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col min-h-[705px] max-h-[705px]" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeProductModal} aria-label="Close">
+          <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-[90%] w-full justify-center items-center mx-4 overflow-hidden flex flex-col min-h-[770px] max-h-[770px]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-black active:text-white active:bg-rose-500" onClick={closeProductModal} aria-label="Close">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
-            <div className="flex gap-1 w-full justify-around px-10 pt-5 shrink-0 pr-14">
+            <div className="flex gap-1 w-full justify-around px-10 pt-14 shrink-0 pr-14">
               {[
                 { id: 'general', label: tr('control.productModal.tab.general', 'General') },
                 { id: 'advanced', label: tr('control.productModal.tab.advanced', 'Advanced') },
@@ -185,7 +185,7 @@ export function ControlViewProductModal({
                     key={tab.id}
                     type="button"
                     disabled={isLocked}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${productTab === tab.id ? 'bg-green-600 text-white border border-b-0 border-pos-border' : isLocked ? 'text-pos-muted opacity-50 cursor-not-allowed' : 'text-white active:text-pos-text'} active:bg-green-500`}
+                    className={`px-4 py-2 rounded-lg text-lg font-medium transition-colors ${productTab === tab.id ? 'bg-rose-600 text-white' : isLocked ? 'text-pos-muted opacity-50 cursor-not-allowed' : 'text-black bg-white active:text-pos-text'} active:bg-rose-500`}
                     onClick={() => !isLocked && setProductTab(tab.id)}
                   >
                     {tab.label}
@@ -197,36 +197,36 @@ export function ControlViewProductModal({
             <div className="flex-1 min-h-0 w-full overflow-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {productTab === 'general' && (
                 <div className="p-6 pb-0">
-                  <div className="grid grid-cols-3 gap-3 text-sm">
-                    <div className="flex text-md flex-col gap-3">
+                  <div className="grid grid-cols-3 gap-3 text-lg">
+                    <div className="flex flex-col gap-3">
                       <div className="flex w-full items-center gap-1">
-                        <label className="text-md min-w-[125px] font-medium text-gray-200">{tr('name', 'Name')}:</label>
-                        <input type="text" value={productName} onChange={(e) => setProductName(e.target.value)} className={`h-[40px] min-w-[150px] max-w-[150px] px-4 py-3 border rounded-lg text-pos-text text-md caret-white ${productFieldErrors.name ? 'bg-rose-500/40 border-rose-400' : 'bg-pos-panel border-pos-border'}`} onFocus={() => setProductActiveField('name')} onClick={() => setProductActiveField('name')} />
+                        <label className="min-w-[140px] max-w-[140px] text-black">{tr('name', 'Name')}:</label>
+                        <input type="text" value={productName} onChange={(e) => setProductName(e.target.value)} className={`h-[40px] min-w-[150px] max-w-[150px] px-4 py-3 border rounded-lg text-black text-md caret-black ${productFieldErrors.name ? 'bg-rose-500/40 border-rose-400' : 'border-pos-border'}`} onFocus={() => setProductActiveField('name')} onClick={() => setProductActiveField('name')} />
                       </div>
                       <div className="flex items-center gap-1">
-                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.testName', 'Test name')}:</label>
-                        <input type="text" value={productKeyName} onChange={(e) => setProductKeyName(e.target.value)} className={`min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border rounded-lg text-pos-text text-md ${productFieldErrors.keyName ? 'bg-rose-500/40 border-rose-400' : 'bg-pos-panel border-pos-border'}`} onFocus={() => setProductActiveField('keyName')} onClick={() => setProductActiveField('keyName')} />
+                        <label className="min-w-[140px] max-w-[140px] text-black">{tr('control.productModal.testName', 'Test name')}:</label>
+                        <input type="text" value={productKeyName} onChange={(e) => setProductKeyName(e.target.value)} className={`min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border rounded-lg text-black caret-black ${productFieldErrors.keyName ? 'bg-rose-500/40 border-rose-400' : 'border-pos-border'}`} onFocus={() => setProductActiveField('keyName')} onClick={() => setProductActiveField('keyName')} />
                       </div>
                       <div className="flex items-center gap-1">
-                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.productionName', 'Production name')}:</label>
-                        <input type="text" value={productProductionName} onChange={(e) => setProductProductionName(e.target.value)} className={`min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border rounded-lg text-pos-text text-md ${productFieldErrors.productionName ? 'bg-rose-500/40 border-rose-400' : 'bg-pos-panel border-pos-border'}`} onFocus={() => setProductActiveField('productionName')} onClick={() => setProductActiveField('productionName')} />
+                        <label className="min-w-[140px] max-w-[140px] text-black">{tr('control.productModal.productionName', 'Production name')}:</label>
+                        <input type="text" value={productProductionName} onChange={(e) => setProductProductionName(e.target.value)} className={`min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border rounded-lg text-black caret-black ${productFieldErrors.productionName ? 'bg-rose-500/40 border-rose-400' : 'border-pos-border'}`} onFocus={() => setProductActiveField('productionName')} onClick={() => setProductActiveField('productionName')} />
                       </div>
                       <div className="flex items-center gap-1">
-                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.price', 'Price')}:</label>
-                        <input type="text" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} className="min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 bg-pos-panel border border-pos-border rounded-lg text-pos-text text-md max-w-[150px]" onFocus={() => setProductActiveField('price')} onClick={() => setProductActiveField('price')} />
+                        <label className="min-w-[140px] max-w-[140px] text-black">{tr('control.productModal.price', 'Price')}:</label>
+                        <input type="text" value={productPrice} onChange={(e) => setProductPrice(e.target.value)} className="min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border border-pos-border rounded-lg text-black caret-black max-w-[150px]" onFocus={() => setProductActiveField('price')} onClick={() => setProductActiveField('price')} />
                       </div>
                       <div className="flex items-center gap-1">
-                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.vatTakeOut', 'VAT Take out')}:</label>
+                        <label className="min-w-[140px] max-w-[140px] text-black">{tr('control.productModal.vatTakeOut', 'VAT Take out')}:</label>
                         <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatTakeOut} onChange={(v) => { setProductVatTakeOut(v); setProductFieldErrors((e) => ({ ...e, vatTakeOut: false })); }} placeholder="--" className={`text-md min-w-[150px] ${productFieldErrors.vatTakeOut ? '!bg-rose-500/40 !border-rose-400' : ''}`} />
                       </div>
                       <div className="flex items-center gap-1">
-                        <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.vatEatIn', 'VAT Eat in')}:</label>
+                        <label className="min-w-[140px] max-w-[140px] text-black">{tr('control.productModal.vatEatIn', 'VAT Eat in')}:</label>
                         <Dropdown options={VAT_PERCENT_OPTIONS} value={productVatEatIn} onChange={(v) => { setProductVatEatIn(v); setProductFieldErrors((e) => ({ ...e, vatEatIn: false })); }} placeholder="--" className={`text-md min-w-[150px] ${productFieldErrors.vatEatIn ? '!bg-rose-500/40 !border-rose-400' : ''}`} />
                       </div>
                       {productTabsUnlocked ? (
                         <div className="flex items-center gap-1 h-[40px]">
-                          <label className="min-w-[125px] font-medium text-gray-200 text-md">{tr('control.productModal.id', 'Id')}:</label>
-                          <span className="text-pos-text text-md">{productDisplayNumber != null ? productDisplayNumber : '—'}</span>
+                          <label className="min-w-[140px] text-black">{tr('control.productModal.id', 'Id')}:</label>
+                          <span className="text-black">{productDisplayNumber != null ? productDisplayNumber : '—'}</span>
                         </div>
                       )
                         : (
@@ -261,8 +261,8 @@ export function ControlViewProductModal({
                           const prevIds = ids.slice(0, i);
                           const optionsForI = i === 0 ? categories : categories.filter((c) => !prevIds.includes(c.id));
                           return (
-                            <div key={i} className="flex gap-1 w-full h-[40px]">
-                              <label className="pr-5 font-medium text-md items-center justify-center flex h-[40px] text-gray-200">{tr('control.productModal.category', 'Category')}:</label>
+                            <div key={i} className="flex gap-1 w-full h-[45px] items-center">
+                              <label className="pr-5 items-center justify-center flex h-[40px] text-black">{tr('control.productModal.category', 'Category')}:</label>
                               <Dropdown
                                 options={optionsForI.map((c) => ({ value: c.id, label: c.name }))}
                                 value={ids[i] || ''}
@@ -276,7 +276,7 @@ export function ControlViewProductModal({
                                   });
                                 }}
                                 placeholder="--"
-                                className="text-md w-full min-w-[150px]"
+                                className="text-md w-full min-w-[180px] max-w-[180px]"
                               />
                             </div>
                           );
@@ -285,20 +285,20 @@ export function ControlViewProductModal({
                     </div>
                     <div className="flex flex-col gap-4">
                       <div className="flex gap-1 items-center w-full">
-                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.addition', 'Addition')}:</label>
+                        <label className="min-w-[80px] text-black">{tr('control.productModal.addition', 'Addition')}:</label>
                         <Dropdown options={[{ value: 'Subproducts', label: tr('control.productModal.subproducts', 'Subproducts') }]} value={productAddition} onChange={setProductAddition} placeholder="--" className="text-md w-full min-w-[150px]" />
                       </div>
                       <div className="flex gap-1 items-center">
-                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.barcode', 'Barcode')}:</label>
+                        <label className="min-w-[80px] text-black">{tr('control.productModal.barcode', 'Barcode')}:</label>
                         <div className="flex gap-2 items-center w-full">
-                          <input type="text" value={productBarcode} onChange={(e) => setProductBarcode(e.target.value)} className="min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 bg-pos-panel border border-pos-border rounded-lg text-pos-text text-md" onFocus={() => setProductActiveField('barcode')} onClick={() => setProductActiveField('barcode')} />
-                          <button type="button" className="p-2 rounded-full bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 disabled:opacity-70" aria-label="Generate barcode" onClick={handleGenerateBarcode}>
-                            <svg className={`w-5 h-5 ${barcodeButtonSpinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          <input type="text" value={productBarcode} onChange={(e) => setProductBarcode(e.target.value)} className="min-w-[150px] max-w-[150px] px-4 h-[40px] py-3 border border-pos-border rounded-lg text-black text-md caret-black" onFocus={() => setProductActiveField('barcode')} onClick={() => setProductActiveField('barcode')} />
+                          <button type="button" className="p-2 rounded-full border border-pos-border text-black active:text-white active:bg-rose-500 disabled:opacity-70" aria-label="Generate barcode" onClick={handleGenerateBarcode}>
+                            <svg className={`w-9 h-9 ${barcodeButtonSpinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                           </button>
                         </div>
                       </div>
                       <div className="flex gap-1 items-center">
-                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.printer1', 'Printer 1')}:</label>
+                        <label className="min-w-[80px] text-black">{tr('control.productModal.printer1', 'Printer 1')}:</label>
                         <Dropdown
                           options={getUniqueProductPrinterOptions(productPrinter1, [productPrinter2, productPrinter3])}
                           value={productPrinter1}
@@ -307,7 +307,7 @@ export function ControlViewProductModal({
                         />
                       </div>
                       <div className="flex gap-1 items-center">
-                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.printer2', 'Printer 2')}:</label>
+                        <label className="min-w-[80px] text-black">{tr('control.productModal.printer2', 'Printer 2')}:</label>
                         <Dropdown
                           options={getUniqueProductPrinterOptions(productPrinter2, [productPrinter1, productPrinter3])}
                           value={productPrinter2}
@@ -316,7 +316,7 @@ export function ControlViewProductModal({
                         />
                       </div>
                       <div className="flex gap-1 items-center">
-                        <label className="min-w-[80px] font-medium text-md text-gray-200">{tr('control.productModal.printer3', 'Printer 3')}:</label>
+                        <label className="min-w-[80px] text-black">{tr('control.productModal.printer3', 'Printer 3')}:</label>
                         <Dropdown
                           options={getUniqueProductPrinterOptions(productPrinter3, [productPrinter1, productPrinter2])}
                           value={productPrinter3}
@@ -327,7 +327,7 @@ export function ControlViewProductModal({
                     </div>
                   </div>
                   <div className="flex w-full justify-center gap-4">
-                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" disabled={savingProduct} onClick={handleSaveProduct}>
+                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50" disabled={savingProduct} onClick={handleSaveProduct}>
                       <svg fill="#ffffff" width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                       {tr('control.productModal.addAndClose', 'Add and close')}
                     </button>
@@ -335,54 +335,54 @@ export function ControlViewProductModal({
                 </div>
               )}
               {productTab === 'advanced' && (
-                <div className="p-6 pb-0 flex w-full flex-col px-10 text-sm">
-                  <div className="flex w-full gap-10">
+                <div className="p-6 pb-0 flex w-full flex-col px-10 text-lg">
+                  <div className="flex w-full gap-5">
                     <div className="flex flex-col gap-3">
                       <div className='flex items-center'>
-                        <label className="flex items-center gap-2 min-w-[170px] text-pos-text">{tr('control.productModal.advanced.openPrice', 'Open price')}:</label>
-                        <input type="checkbox" checked={advancedOpenPrice} onChange={(e) => setAdvancedOpenPrice(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                        <label className="flex items-center gap-2 min-w-[180px] max-w-[180px] text-pos-text">{tr('control.productModal.advanced.openPrice', 'Open price')}:</label>
+                        <input type="checkbox" checked={advancedOpenPrice} onChange={(e) => setAdvancedOpenPrice(e.target.checked)} className="rounded border-pos-border w-8 h-8" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="flex items-center min-w-[170px] gap-2 text-pos-text">{tr('control.productModal.advanced.libra', 'Libra')}:</label>
-                        <input type="checkbox" checked={advancedWeegschaal} onChange={(e) => setAdvancedWeegschaal(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                        <label className="flex items-center min-w-[180px] max-w-[180px] gap-2 text-pos-text">{tr('control.productModal.advanced.libra', 'Libra')}:</label>
+                        <input type="checkbox" checked={advancedWeegschaal} onChange={(e) => setAdvancedWeegschaal(e.target.checked)} className="rounded border-pos-border w-8 h-8" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="flex items-center min-w-[170px] gap-2 text-pos-text">{tr('control.productModal.advanced.subproductRequires', 'Subproduct requires')} :</label>
-                        <input type="checkbox" checked={advancedSubproductRequires} onChange={(e) => setAdvancedSubproductRequires(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                        <label className="flex items-center min-w-[180px] max-w-[180px] gap-2 text-pos-text">{tr('control.productModal.advanced.subproductRequires', 'Subproduct requires')} :</label>
+                        <input type="checkbox" checked={advancedSubproductRequires} onChange={(e) => setAdvancedSubproductRequires(e.target.checked)} className="rounded border-pos-border w-8 h-8" />
                       </div>
                       <div className="flex items-center gap-1">
-                        <label className="block text-pos-text mb-1 min-w-[170px] text-md">{tr('control.productModal.advanced.emptyPrice', 'Empty price')}:</label>
+                        <label className="block text-pos-text mb-1 min-w-[180px] max-w-[180px] text-md">{tr('control.productModal.advanced.emptyPrice', 'Empty price')}:</label>
                         <input type="text" value={advancedLeeggoedPrijs} onChange={(e) => setAdvancedLeeggoedPrijs(e.target.value)} onFocus={() => setProductActiveField('leeggoedPrijs')} className="w-full h-[40px] border border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text max-w-[100px]" />
                       </div>
                     </div>
                     <div className="flex flex-col gap-4">
                       <div className='flex items-center'>
-                        <label className="flex min-w-[140px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.pagerRequired', 'Pager required')}:</label>
-                        <input type="checkbox" checked={advancedPagerVerplicht} onChange={(e) => setAdvancedPagerVerplicht(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                        <label className="flex min-w-[170px] max-w-[170px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.pagerRequired', 'Pager required')}:</label>
+                        <input type="checkbox" checked={advancedPagerVerplicht} onChange={(e) => setAdvancedPagerVerplicht(e.target.checked)} className="rounded border-pos-border w-8 h-8" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="flex min-w-[140px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.boldPrint', 'Bold print')}:</label>
-                        <input type="checkbox" checked={advancedBoldPrint} onChange={(e) => setAdvancedBoldPrint(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                        <label className="flex min-w-[170px] max-w-[170px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.boldPrint', 'Bold print')}:</label>
+                        <input type="checkbox" checked={advancedBoldPrint} onChange={(e) => setAdvancedBoldPrint(e.target.checked)} className="rounded border-pos-border w-8 h-8" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="flex min-w-[140px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.groupingReceipt', 'Grouping receipt')}:</label>
-                        <input type="checkbox" checked={advancedGroupingReceipt} onChange={(e) => setAdvancedGroupingReceipt(e.target.checked)} className="rounded border-pos-border w-5 h-5" />
+                        <label className="flex min-w-[170px] max-w-[170px] items-center gap-2 text-pos-text">{tr('control.productModal.advanced.groupingReceipt', 'Grouping receipt')}:</label>
+                        <input type="checkbox" checked={advancedGroupingReceipt} onChange={(e) => setAdvancedGroupingReceipt(e.target.checked)} className="rounded border-pos-border w-8 h-8" />
                       </div>
                     </div>
                     <div className="flex flex-col gap-3 ml-10">
                       <div className="flex items-center">
-                        <label className="block min-w-[150px] text-pos-text mb-1">{tr('control.productModal.advanced.labelExtraInfo', 'Label extra info')}:</label>
+                        <label className="block min-w-[170px] max-w-[170px] text-pos-text">{tr('control.productModal.advanced.labelExtraInfo', 'Label extra info')}:</label>
                         <input type="text" value={advancedLabelExtraInfo} onChange={(e) => setAdvancedLabelExtraInfo(e.target.value)} onFocus={() => setProductActiveField('labelExtraInfo')} className="w-full h-[40px] border border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text max-w-[160px]" />
                       </div>
                       <div className="flex items-center">
-                        <label className="block min-w-[150px] text-pos-text mb-1">{tr('control.productModal.advanced.cashRegisterPhoto', 'Cash register photo')}:</label>
+                        <label className="block min-w-[170px] max-w-[170px] text-pos-text">{tr('control.productModal.advanced.cashRegisterPhoto', 'Cash register photo')}:</label>
                         <div className="flex items-center gap-3">
                           {!advancedKassaPhotoPreview ? (
-                            <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0 text-md">
+                            <label className="px-4 py-2 border border-pos-border rounded-lg text-black active:text-white active:bg-rose-500 cursor-pointer shrink-0 text-md">
                               {tr('control.productModal.chooseFileSimple', 'Select')}
                               <input
                                 type="file"
-                                className="hidden focus:border-green-500 focus:outline-none"
+                                className="hidden focus:border-rose-500 focus:outline-none"
                                 accept="image/*"
                                 onChange={async (e) => {
                                   const file = e.target.files?.[0];
@@ -404,7 +404,7 @@ export function ControlViewProductModal({
                               <img src={advancedKassaPhotoPreview} alt="Cash register" className="w-16 h-16 object-cover rounded-lg border border-pos-border shrink-0" />
                               <button
                                 type="button"
-                                className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 shrink-0"
+                                className="px-4 py-2 border border-pos-border rounded-lg text-black active:text-white active:bg-rose-500 shrink-0"
                                 onClick={() => {
                                   setAdvancedKassaPhotoPreview(null);
                                 }}
@@ -416,21 +416,21 @@ export function ControlViewProductModal({
                         </div>
                       </div>
                       <div className="flex items-center">
-                        <label className="block min-w-[150px] text-pos-text">{tr('control.productModal.advanced.prepackExpiryType', 'Pre-pack expiry type')}:</label>
+                        <label className="block min-w-[170px] max-w-[170px] text-pos-text">{tr('control.productModal.advanced.prepackExpiryType', 'Pre-pack expiry type')}:</label>
                         <Dropdown options={VERVALTYPE_OPTIONS} value={advancedVoorverpakVervaltype} onChange={setAdvancedVoorverpakVervaltype} placeholder={tr('control.productModal.select', 'Select…')} className="bg-pos-bg text-pos-text min-w-[160px]" />
                       </div>
                       <div className="flex items-center">
-                        <label className="block min-w-[150px] text-pos-text">{tr('control.productModal.advanced.shelfLife', 'Shelf life')}:</label>
+                        <label className="block min-w-[170px] max-w-[170px] text-pos-text">{tr('control.productModal.advanced.shelfLife', 'Shelf life')}:</label>
                         <input type="text" value={advancedHoudbareDagen} onChange={(e) => setAdvancedHoudbareDagen(e.target.value)} onFocus={() => setProductActiveField('houdbareDagen')} className="w-full h-[40px] border border-pos-border max-w-[160px] rounded-lg px-3 py-2 bg-pos-bg text-pos-text text-md" />
                       </div>
                       <div className="flex text-md">
-                        <label className="block min-w-[150px] text-pos-text">{tr('control.productModal.advanced.storageUse', 'Storage, use')}:</label>
+                        <label className="block min-w-[170px] max-w-[170px] text-pos-text">{tr('control.productModal.advanced.storageUse', 'Storage, use')}:</label>
                         <textarea value={advancedBewarenGebruik} onChange={(e) => setAdvancedBewarenGebruik(e.target.value)} onFocus={() => setProductActiveField('bewarenGebruik')} rows={4} className="w-full border border-pos-border max-w-[160px] rounded-lg px-3 py-2 bg-pos-bg text-pos-text resize-none" />
                       </div>
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                    <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
                       <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                       {tr('control.save', 'Save')}
                     </button>
@@ -448,7 +448,7 @@ export function ControlViewProductModal({
                   <div
                     ref={extraPricesScrollRef}
                     onScroll={syncExtraPricesScrollEdges}
-                    className="max-h-[250px] overflow-x-auto overflow-y-auto text-sm border-collapse border border-pos-border scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden]"
+                    className="max-h-[270px] overflow-x-auto overflow-y-auto text-sm border-collapse border border-pos-border scroll-smooth"
                   >
                     <table className="w-full h-full rounded-lg text-pos-text">
                       <tbody className="w-full">
@@ -464,7 +464,7 @@ export function ControlViewProductModal({
                                   value={row.otherName}
                                   onChange={(e) => setExtraPricesRows((prev) => prev.map((r, i) => i === idx ? { ...r, otherName: e.target.value } : r))}
                                   onFocus={() => { setExtraPricesSelectedIndex(idx); setProductActiveField('extraOtherName'); }}
-                                  className="w-full max-w-[150px] min-h-[40px] max-h-[40px] rounded-lg px-3 py-2 border border-pos-border flex justify-center bg-pos-panel text-pos-text"
+                                  className="w-full max-w-[150px] min-h-[40px] max-h-[40px] rounded-lg px-3 py-2 border border-pos-border flex justify-center text-pos-text"
                                 />
                               </div>
                             </td>
@@ -487,7 +487,7 @@ export function ControlViewProductModal({
                                 value={row.otherPrice}
                                 onChange={(e) => setExtraPricesRows((prev) => prev.map((r, i) => i === idx ? { ...r, otherPrice: e.target.value } : r))}
                                 onFocus={() => { setExtraPricesSelectedIndex(idx); setProductActiveField('extraOtherPrice'); }}
-                                className="w-full min-h-[40px] max-h-[40px] rounded-lg ml-[50px] max-w-[120px] px-3 py-2 border border-pos-border bg-pos-panel text-pos-text"
+                                className="w-full min-h-[40px] max-h-[40px] rounded-lg ml-[50px] max-w-[120px] px-3 py-2 border border-pos-border text-pos-text"
                               />
                             </td>
                           </tr>
@@ -498,7 +498,7 @@ export function ControlViewProductModal({
                   <div className="flex items-center justify-around px-[200px]">
                     <button
                       type="button"
-                      className="p-2 px-4 bg-pos-panel rounded-lg text-white active:bg-green-500 disabled:opacity-50 text-lg font-medium"
+                      className="p-2 px-4 rounded-lg text-black border border-pos-border active:bg-rose-500 active:text-white disabled:opacity-50 text-xl font-medium"
                       disabled={extraPricesScrollEdges.atTop}
                       onClick={() => {
                         const el = extraPricesScrollRef.current;
@@ -512,7 +512,7 @@ export function ControlViewProductModal({
                     </button>
                     <button
                       type="button"
-                      className="p-2 px-4 rounded-lg bg-pos-panel text-white active:bg-green-500 disabled:opacity-50 text-lg font-medium"
+                      className="p-2 px-4 rounded-xl text-black border border-pos-border active:bg-rose-500 active:text-white disabled:opacity-50 text-lg font-medium"
                       disabled={extraPricesScrollEdges.atBottom}
                       onClick={() => {
                         const el = extraPricesScrollRef.current;
@@ -526,7 +526,7 @@ export function ControlViewProductModal({
                     </button>
                   </div>
                   <div className="flex justify-center text-md">
-                    <button type="button" className="flex text-md items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                    <button type="button" className="flex text-md items-center gap-4 px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
                       <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                       {tr('control.save', 'Save')}
                     </button>
@@ -534,7 +534,7 @@ export function ControlViewProductModal({
                 </div>
               )}
               {productTab === 'purchase_stock' && (
-                <div className="p-6 flex flex-col gap-6 text-sm">
+                <div className="p-6 flex flex-col gap-6 text-lg">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="flex flex-col gap-3">
                       <div className='flex items-center'>
@@ -570,32 +570,32 @@ export function ControlViewProductModal({
                     </div>
                     <div className="flex flex-col gap-3">
                       <div className='flex items-center'>
-                        <label className="block text-pos-text min-w-[105px]">{tr('control.productModal.purchase.supplier', 'Supplier')}:</label>
+                        <label className="block text-pos-text max-w-[140px] min-w-[140px]">{tr('control.productModal.purchase.supplier', 'Supplier')}:</label>
                         <Dropdown options={PURCHASE_SUPPLIER_OPTIONS} value={purchaseSupplier} onChange={setPurchaseSupplier} placeholder="--" className="min-w-[150px] bg-pos-bg text-pos-text" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="block text-pos-text min-w-[105px]">{tr('control.productModal.purchase.supplierCode', 'Supplier code')}:</label>
-                        <input type="text" value={supplierCode} onChange={(e) => setSupplierCode(e.target.value)} onFocus={() => setProductActiveField('supplierCode')} className="border max-w-[150px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
+                        <label className="block text-pos-text min-w-[140px] max-w-[140px]">{tr('control.productModal.purchase.supplierCode', 'Supplier code')}:</label>
+                        <input type="text" value={supplierCode} onChange={(e) => setSupplierCode(e.target.value)} onFocus={() => setProductActiveField('supplierCode')} className="border max-w-[140px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="flex min-w-[105px] items-centertext-pos-text">
+                        <label className="flex min-w-[140px] min-w-[140px] items-centertext-pos-text">
                           {tr('control.productModal.purchase.stockNotification', 'Stock notification')}
                         </label>
-                        <input type="checkbox" checked={stockNotification} onChange={(e) => setStockNotification(e.target.checked)} className="rounded w-5 h-5 border-pos-border" />
+                        <input type="checkbox" checked={stockNotification} onChange={(e) => setStockNotification(e.target.checked)} className="rounded w-9 h-9 border-pos-border" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="blockflex min-w-[105px] text-pos-text">{tr('control.productModal.purchase.expirationDate', 'Expiration date')}:</label>
+                        <label className="blockflex min-w-[140px] text-pos-text">{tr('control.productModal.purchase.expirationDate', 'Expiration date')}:</label>
                         <input type="text" value={expirationDate} onChange={(e) => setExpirationDate(e.target.value)} onFocus={() => setProductActiveField('expirationDate')} className="border border-pos-border max-w-[150px] h-[40px] rounded-lg px-3 py-2 bg-pos-bg text-pos-text" placeholder="" />
                       </div>
                       <div className='flex items-center'>
-                        <label className="blockflex min-w-[105px] max-w-[105px] text-pos-text">{tr('control.productModal.purchase.declarationOfExpiry', 'Declaration of expiry')}:</label>
+                        <label className="blockflex min-w-[140px] max-w-[140px] text-pos-text">{tr('control.productModal.purchase.declarationOfExpiry', 'Declaration of expiry')}:</label>
                         <div className="flex items-center gap-2">
                           <input type="text" value={declarationExpiryDays} onChange={(e) => setDeclarationExpiryDays(e.target.value)} onFocus={() => setProductActiveField('declarationExpiryDays')} className="border max-w-[50px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
                           <span className="text-pos-text">{tr('control.productModal.purchase.daysInAdvance', 'days in advance')}</span>
                         </div>
                       </div>
                       <div className='flex items-center'>
-                        <label className="blockflex min-w-[105px] max-w-[105px] text-pos-text">{tr('control.productModal.purchase.notificationSoldOut', 'Notification sold out')}:</label>
+                        <label className="blockflex min-w-[140px] max-w-[140px] text-pos-text">{tr('control.productModal.purchase.notificationSoldOut', 'Notification sold out')}:</label>
                         <div className="flex items-center gap-2">
                           <input type="text" value={notificationSoldOutPieces} onChange={(e) => setNotificationSoldOutPieces(e.target.value)} onFocus={() => setProductActiveField('notificationSoldOutPieces')} className="border max-w-[50px] h-[40px] border-pos-border rounded-lg px-3 py-2 bg-pos-bg text-pos-text" />
                           <span className="text-pos-text">{tr('control.productModal.purchase.piecesInAdvance', 'pieces in advance')}</span>
@@ -604,7 +604,7 @@ export function ControlViewProductModal({
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
                       <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                       {tr('control.save', 'Save')}
                     </button>
@@ -613,15 +613,15 @@ export function ControlViewProductModal({
               )}
               {productTab === 'webshop' && (
                 <div className="p-6 flex flex-col gap-6">
-                  <div className="grid text-sm grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid text-lg grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex flex-col gap-3">
                       <div className='flex items-center'>
                         <label className="flex min-w-[150px] items-center text-pos-text">{tr('control.productModal.webshop.inWebshop', 'In webshop')}:</label>
-                        <input type="checkbox" checked={productInWebshop} onChange={(e) => setProductInWebshop(e.target.checked)} className="w-5 h-5 rounded border-pos-border" />
+                        <input type="checkbox" checked={productInWebshop} onChange={(e) => setProductInWebshop(e.target.checked)} className="w-9 h-9 rounded border-pos-border" />
                       </div>
                       <div className='flex items-center'>
                         <label className="flex items-center min-w-[150px] text-pos-text">{tr('control.productModal.webshop.onlineOrderable', 'Online orderable')}:</label>
-                        <input type="checkbox" checked={webshopOnlineOrderable} onChange={(e) => setWebshopOnlineOrderable(e.target.checked)} className="w-5 h-5 rounded border-pos-border" />
+                        <input type="checkbox" checked={webshopOnlineOrderable} onChange={(e) => setWebshopOnlineOrderable(e.target.checked)} className="w-9 h-9 rounded border-pos-border" />
                       </div>
                       <div className='flex items-center'>
                         <label className="block text-pos-text min-w-[150px]">{tr('control.productModal.webshop.websiteRemark', 'Website remark')}:</label>
@@ -640,17 +640,17 @@ export function ControlViewProductModal({
                       <div className='flex items-center'>
                         <label className="block text-pos-text min-w-[150px]">{tr('control.productModal.webshop.websitePhoto', 'Website photo')}:</label>
                         <div className="flex gap-3 items-center">
-                          <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0">
+                          <label className="px-4 py-2 border border-pos-border rounded-lg text-black active:text-white active:bg-rose-500 cursor-pointer shrink-0">
                             {tr('control.productModal.chooseFile', 'Choose File')}
-                            <input type="file" className="hidden focus:border-green-500 focus:outline-none" accept="image/*" onChange={(e) => setWebsitePhotoFileName(e.target.files?.[0]?.name ?? '')} />
+                            <input type="file" className="hidden focus:border-rose-500 focus:outline-none" accept="image/*" onChange={(e) => setWebsitePhotoFileName(e.target.files?.[0]?.name ?? '')} />
                           </label>
-                          <span className="text-pos-muted">{websitePhotoFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
+                          <span className="text-black">{websitePhotoFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="flex justify-center pt-20">
-                    <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                    <button type="button" className="flex items-center gap-4 px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:text-white active:bg-rose-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
                       <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                       {tr('control.save', 'Save')}
                     </button>
@@ -659,7 +659,7 @@ export function ControlViewProductModal({
               )}
               {productTab === 'kiosk' && (
                 <div className="p-6 flex flex-col gap-6">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-4 text-lg">
                     <div className='flex flex-col gap-5'>
                       <div className='flex items-center'>
                         <label className="block w-[150px] text-pos-text">{tr('control.productModal.kiosk.kioskInfo', 'Kiosk info')}:</label>
@@ -669,7 +669,7 @@ export function ControlViewProductModal({
                         <label className="flex min-w-[150px] items-center text-pos-text">
                           {tr('control.productModal.kiosk.kioskTakeAway', 'Kiosk take away')}:
                         </label>
-                        <input type="checkbox" checked={kioskTakeAway} onChange={(e) => setKioskTakeAway(e.target.checked)} className="w-5 h-5 rounded border-pos-border" />
+                        <input type="checkbox" checked={kioskTakeAway} onChange={(e) => setKioskTakeAway(e.target.checked)} className="w-9 h-9 rounded border-pos-border" />
                       </div>
                       <div className='flex items-center'>
                         <label className="block w-[150px] text-pos-text">{tr('control.productModal.kiosk.kioskEatIn', 'Kiosk eat in')}:</label>
@@ -692,18 +692,18 @@ export function ControlViewProductModal({
                       <div className='flex items-center'>
                         <label className="block text-pos-text pr-10">{tr('control.productModal.kiosk.kioskPicture', 'Kiosk picture')}:</label>
                         <div className="flex items-center gap-2">
-                          <label className="px-4 py-2 border border-pos-border rounded-lg text-pos-text active:bg-green-500 cursor-pointer shrink-0">
+                          <label className="px-4 py-2 border border-pos-border rounded-lg text-black active:text-white active:bg-rose-500 cursor-pointer shrink-0">
                             {tr('control.productModal.chooseFile', 'Choose File')}
-                            <input type="file" className="hidden focus:border-green-500 focus:outline-none" accept="image/*" onChange={(e) => setKioskPictureFileName(e.target.files?.[0]?.name ?? '')} />
+                            <input type="file" className="hidden focus:border-rose-500 focus:outline-none" accept="image/*" onChange={(e) => setKioskPictureFileName(e.target.files?.[0]?.name ?? '')} />
                           </label>
-                          <span className="text-pos-muted pl-5">{kioskPictureFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
+                          <span className="text-black pl-5">{kioskPictureFileName || tr('control.productModal.noFileChosen', 'No file chosen')}</span>
                         </div>
 
                       </div>
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
+                    <button type="button" className="flex items-center text-md gap-4 px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50" onClick={handleSaveProduct} disabled={savingProduct}>
                       <svg fill="#ffffff" width="14px" height="14px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M-5.732,2.97-7.97.732a2.474,2.474,0,0,0-1.483-.7A.491.491,0,0,0-9.591,0H-18.5A2.5,2.5,0,0,0-21,2.5v11A2.5,2.5,0,0,0-18.5,16h11A2.5,2.5,0,0,0-5,13.5V4.737A2.483,2.483,0,0,0-5.732,2.97ZM-13,1V5.455h-3.591V1Zm-4.272,14V10.545h8.544V15ZM-6,13.5A1.5,1.5,0,0,1-7.5,15h-.228V10.045a.5.5,0,0,0-.5-.5h-9.544a.5.5,0,0,0-.5.5V15H-18.5A1.5,1.5,0,0,1-20,13.5V2.5A1.5,1.5,0,0,1-18.5,1h.909V5.955a.5.5,0,0,0,.5.5h7.5a.5.5,0,0,0,.5-.5v-4.8a1.492,1.492,0,0,1,.414.285l2.238,2.238A1.511,1.511,0,0,1-6,4.737Z" transform="translate(21)" /></svg>
                       {tr('control.save', 'Save')}
                     </button>

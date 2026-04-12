@@ -19,13 +19,15 @@ export function Dropdown({ options = [], value, onChange, placeholder = 'Selectâ
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
   const ref = useRef(null);
+  const buttonRef = useRef(null);
   const listRef = useRef(null);
 
   useEffect(() => {
     if (!open || inline) return;
     const updatePosition = () => {
-      if (ref.current) {
-        const rect = ref.current.getBoundingClientRect();
+      const el = buttonRef.current || ref.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
         const gap = 6;
         const viewportPadding = 8;
         const desiredHeight = 240;
@@ -46,6 +48,10 @@ export function Dropdown({ options = [], value, onChange, placeholder = 'Selectâ
   }, [open, inline]);
 
   useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  useEffect(() => {
     const handleClickOutside = (e) => {
       const inTrigger = ref.current && ref.current.contains(e.target);
       const inList = listRef.current && listRef.current.contains(e.target);
@@ -58,21 +64,37 @@ export function Dropdown({ options = [], value, onChange, placeholder = 'Selectâ
   const selected = options.find((opt) => opt.value === value);
   const displayLabel = selected ? selected.label : placeholder;
 
-  const listCommonClasses = `w-full py-1 bg-pos-bg border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto z-[10000] [scrollbar-width:thin] [scrollbar-color:#9ca3af_#34495e] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-pos-panel [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-pos-panel active:[&::-webkit-scrollbar-thumb]:bg-gray-300 ${labelClassName}`;
+  const listScrollStyles =
+    '[scrollbar-width:thin] [scrollbar-color:#9ca3af_#e5e7eb] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-white [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-white active:[&::-webkit-scrollbar-thumb]:bg-gray-300';
+  /** Portaled list must not use w-full (resolves to viewport); width comes from inline style matching the trigger. */
+  const listClassesPortal = `py-1 bg-white border border-black/15 rounded-lg shadow-lg max-h-60 overflow-x-hidden overflow-y-auto z-[10000] text-black box-border ${listScrollStyles} ${labelClassName}`;
+  const listClassesInline = `absolute top-full left-0 mt-1 w-full py-1 bg-white border border-black/15 rounded-lg shadow-lg max-h-60 overflow-x-hidden overflow-y-auto z-[10000] text-black box-border ${listScrollStyles} ${labelClassName}`;
 
   const listContent = open ? (
     <ul
       ref={listRef}
-      className={inline ? `absolute top-full left-0 mt-1 ${listCommonClasses}` : `fixed ${listCommonClasses}`}
+      className={inline ? listClassesInline : `fixed ${listClassesPortal}`}
       role="listbox"
-      style={inline ? undefined : { top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
+      style={
+        inline
+          ? undefined
+          : {
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              minWidth: position.width,
+              maxWidth: position.width,
+              maxHeight: position.maxHeight,
+              boxSizing: 'border-box'
+            }
+      }
     >
       {options.map((opt) => (
         <li
           key={opt.value}
           role="option"
           aria-selected={opt.value === value}
-          className={`px-4 py-2 cursor-pointer text-white text-md transition-colors ${opt.value === value ? 'bg-pos-panel font-medium' : 'text-gray-800 active:bg-green-500'}`}
+          className={`px-4 py-2 cursor-pointer text-lg text-black active:text-white transition-colors ${opt.value === value ? 'bg-rose-500 text-white font-medium' : 'active:bg-rose-500 bg-white'}`}
           onClick={() => {
             onChange(opt.value);
             setOpen(false);
@@ -87,16 +109,17 @@ export function Dropdown({ options = [], value, onChange, placeholder = 'Selectâ
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen((prev) => !prev)}
-        className="w-full flex items-center h-[40px] justify-between gap-2 px-4 py-3 text-left border border-gray-300 rounded-lg bg-pos-panel text-white text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full flex items-center h-[40px] justify-between gap-2 px-4 py-3 text-left border border-black/15 rounded-lg text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed active:border-black/20 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={displayLabel}
       >
         <span className="min-w-0 truncate">{displayLabel}</span>
-        <svg className={`w-5 h-5 text-gray-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={`w-5 h-5 text-gray-700 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>

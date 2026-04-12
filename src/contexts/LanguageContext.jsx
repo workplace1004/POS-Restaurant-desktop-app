@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { getT, getStoredLang, setStoredLang } from '../translations';
+import { getT, getStoredLang, setStoredLang, hasPersistedLangPreference } from '../translations';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 
 const LanguageContext = createContext(null);
@@ -8,11 +8,12 @@ export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(getStoredLang);
   const t = useCallback((key) => getT(lang)(key), [lang]);
 
-  // Sync with backend: fetch language on mount (handheld saves to API)
+  // Sync with backend when no local choice exists yet (first visit). Avoid overwriting flag picker / stored lang.
   useEffect(() => {
     fetch(`${API}/settings/language`)
       .then((r) => r.json())
       .then((data) => {
+        if (hasPersistedLangPreference()) return;
         const apiLang = data?.value;
         if (apiLang && ['en', 'nl', 'fr', 'tr'].includes(apiLang)) {
           setLangState(apiLang);

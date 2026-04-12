@@ -28,8 +28,8 @@ export function ControlViewProductSubproductsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative bg-pos-bg rounded-xl min-w-[600px] border border-pos-border shadow-2xl p-6 text-sm max-h-[90vh] overflow-auto [scrollbar-width:none]" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="absolute top-2 right-4 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeProductSubproductsModal} aria-label="Close">
+      <div className="relative bg-pos-bg rounded-xl min-w-[800px] border border-pos-border shadow-2xl p-6 text-lg max-h-[90vh] overflow-auto [scrollbar-width:none]" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="absolute top-2 right-4 p-2 rounded text-pos-muted active:text-pos-text active:bg-rose-500" onClick={closeProductSubproductsModal} aria-label="Close">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
 
@@ -41,7 +41,7 @@ export function ControlViewProductSubproductsModal({
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
                   <path d="M21 12a9 9 0 00-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                 </svg>
-                <span className="text-sm">{tr('control.productSubproducts.loading', 'Loading...')}</span>
+                <span className="text-lg">{tr('control.productSubproducts.loading', 'Loading...')}</span>
               </div>
             </div>
           )}
@@ -60,7 +60,7 @@ export function ControlViewProductSubproductsModal({
               <div className="px-3 py-2 border-b border-pos-border bg-pos-panel/50 font-medium text-pos-text shrink-0">
                 {tr('control.productSubproducts.available', 'Available in group')}
               </div>
-              <label className="flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500">
+              <label className="flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-rose-500">
                 <input
                   type="checkbox"
                   checked={productSubproductsAvailable.length > 0 && productSubproductsAvailable.every((sp) => productSubproductsLeftSelectedIds.has(sp.id))}
@@ -77,7 +77,7 @@ export function ControlViewProductSubproductsModal({
               </label>
               <div
                 ref={productSubproductsLeftListRef}
-                className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                className="flex-1 overflow-y-auto p-2 min-h-[650px] max-h-[650px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 {!productSubproductsGroupId ? (
                   <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.selectGroupFirst', 'Select a group above')}</div>
@@ -87,7 +87,7 @@ export function ControlViewProductSubproductsModal({
                   <ul className="space-y-1">
                     {productSubproductsAvailable.map((sp) => (
                       <li key={sp.id}>
-                        <label className="flex items-center gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text">
+                        <label className="flex items-center gap-2 px-3 py-2 rounded cursor-pointer active:bg-rose-500 text-pos-text">
                           <input
                             type="checkbox"
                             checked={productSubproductsLeftSelectedIds.has(sp.id)}
@@ -111,7 +111,7 @@ export function ControlViewProductSubproductsModal({
               <div className="px-3 py-2 border-t border-pos-border shrink-0">
                 <button
                   type="button"
-                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-green-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-green-600/80 active:bg-rose-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleAddProductSubproductLinks}
                   disabled={!productSubproductsLeftSelectedIds.size}
                 >
@@ -131,7 +131,7 @@ export function ControlViewProductSubproductsModal({
               <div className="px-3 py-2 border-b border-pos-border bg-pos-panel/50 font-medium text-pos-text shrink-0">
                 {tr('control.productSubproducts.linked', 'Linked to product')}
               </div>
-              <label className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-green-500 ${!productSubproductsLinked.length ? 'opacity-50 pointer-events-none' : ''}`}>
+              <label className={`flex items-center gap-2 px-3 py-2 border-b border-pos-border text-pos-text shrink-0 cursor-pointer active:bg-rose-500 ${!productSubproductsLinked.length ? 'opacity-50 pointer-events-none' : ''}`}>
                 <input
                   type="checkbox"
                   checked={productSubproductsLinked.length > 0 && productSubproductsLinked.every((l) => productSubproductsRightSelectedIds.has(l.subproductId))}
@@ -148,7 +148,7 @@ export function ControlViewProductSubproductsModal({
               </label>
               <div
                 ref={productSubproductsListRef}
-                className="flex-1 overflow-y-auto p-2 min-h-[350px] max-h-[350px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                className="flex-1 overflow-y-auto p-2 min-h-[650px] max-h-[650px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
               >
                 {loadingProductSubproductsLinked ? (
                   <div className="text-pos-muted px-2 py-4">{tr('control.productSubproducts.loading', 'Loading...')}</div>
@@ -158,7 +158,7 @@ export function ControlViewProductSubproductsModal({
                   <ul className="space-y-1">
                     {productSubproductsLinked.map((link) => (
                       <li key={link.subproductId}>
-                        <label className="flex items-center justify-between gap-2 px-3 py-2 rounded cursor-pointer active:bg-green-500 text-pos-text group">
+                        <label className="flex items-center justify-between gap-2 px-3 py-2 rounded cursor-pointer active:bg-rose-500 text-pos-text group">
                           <div className="flex items-center gap-2 min-w-0">
                             <input
                               type="checkbox"
@@ -178,7 +178,7 @@ export function ControlViewProductSubproductsModal({
                           </div>
                           <button
                             type="button"
-                            className="p-1 rounded active:bg-green-500 text-pos-muted active:text-red-400 shrink-0 opacity-0 group-active:opacity-100 transition-opacity"
+                            className="p-1 rounded active:bg-rose-500 text-pos-muted active:text-red-400 shrink-0 opacity-0 group-active:opacity-100 transition-opacity"
                             onClick={(e) => {
                               e.preventDefault();
                               removeProductSubproductLink(link.subproductId);
@@ -196,7 +196,7 @@ export function ControlViewProductSubproductsModal({
               <div className="px-3 py-2 border-t border-pos-border shrink-0">
                 <button
                   type="button"
-                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-red-600/80 active:bg-green-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 rounded bg-red-600/80 active:bg-rose-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleRemoveProductSubproductLinks}
                   disabled={!productSubproductsRightSelectedIds.size}
                 >
@@ -211,7 +211,7 @@ export function ControlViewProductSubproductsModal({
         <div className="mt-6 flex justify-center shrink-0">
           <button
             type="button"
-            className="px-6 py-3 rounded-lg bg-green-600 text-white text-sm font-medium active:bg-green-500 disabled:opacity-50"
+            className="px-[100px] py-3 rounded-lg bg-rose-600 text-white text-2xl font-medium active:bg-rose-500 disabled:opacity-50"
             onClick={handleSaveProductSubproducts}
             disabled={savingProductSubproducts || !productSubproductsProduct}
           >

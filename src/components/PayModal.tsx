@@ -1,15 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { publicAssetUrl } from '../lib/publicAssetUrl.js';
 import { formatPaymentAmount, roundCurrency, sumAmountsByIntegration } from '../lib/payDifferentlyUtils.js';
-
-const KEYPAD = [
-    ['7', '8', '9'],
-    ['4', '5', '6'],
-    ['1', '2', '3'],
-    ['C', '0', '.'],
-];
 
 const PAY_METHOD_ICON_PNG = {
     manual_cash: '/cash.png',
@@ -35,7 +28,7 @@ export function PayModal({
     onClose,
     onProceedAfterTerminals,
     onPaymentError,
-    overlayClassName = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4',
+    overlayClassName = 'z-50',
     payworldOverlayClassName = 'fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4',
 }) {
     const { t } = useLanguage();
@@ -49,10 +42,12 @@ export function PayModal({
     const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState(null);
     const [payModalTargetTotal, setPayModalTargetTotal] = useState(0);
-    const [payModalKeypadInput, setPayModalKeypadInput] = useState('');
     const [payConfirmLoading, setPayConfirmLoading] = useState(false);
     const [showPayworldStatusModal, setShowPayworldStatusModal] = useState(false);
     const [payworldStatus, setPayworldStatus] = useState({ state: 'IDLE', message: '', details: null });
+    const [payModalLayerVisible, setPayModalLayerVisible] = useState(false);
+    const [payModalExiting, setPayModalExiting] = useState(false);
+    const payModalExitingRef = useRef(false);
 
     const activeCashmaticSessionIdRef = useRef(null);
     const cancelCashmaticRequestedRef = useRef(false);
@@ -66,12 +61,48 @@ export function PayModal({
         [onPaymentError],
     );
 
+    const finalizePayModalClose = useCallback(() => {
+        if (!payModalExitingRef.current) return;
+        payModalExitingRef.current = false;
+        setPayModalExiting(false);
+        setPayModalLayerVisible(false);
+        onClose?.();
+    }, [onClose]);
+
+    const beginPayModalExit = useCallback(() => {
+        if (payModalExitingRef.current || !payModalLayerVisible) return;
+        payModalExitingRef.current = true;
+        setPayModalExiting(true);
+    }, [payModalLayerVisible]);
+
+    const handlePayModalPanelAnimationEnd = useCallback(
+        (e: React.AnimationEvent<HTMLDivElement>) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.animationName !== 'kiosk-subproduct-modal-panel-out') return;
+            finalizePayModalClose();
+        },
+        [finalizePayModalClose],
+    );
+
+    useLayoutEffect(() => {
+        if (open) {
+            payModalExitingRef.current = false;
+            setPayModalExiting(false);
+            setPayModalLayerVisible(true);
+        }
+    }, [open]);
+
+    useEffect(() => {
+        if (!open && payModalLayerVisible && !payModalExitingRef.current) {
+            beginPayModalExit();
+        }
+    }, [open, payModalLayerVisible, beginPayModalExit]);
+
     useEffect(() => {
         if (!open) return undefined;
         let cancelled = false;
         const tt = Math.max(0, roundCurrency(targetTotal));
         setPayModalTargetTotal(tt);
-        setPayModalKeypadInput(tt.toFixed(2));
         setPaymentAmounts({});
         setSelectedPayment(null);
         setActivePaymentMethods([]);
@@ -110,55 +141,26 @@ export function PayModal({
         (sum, m) => sum + (Number(paymentAmounts[m.id]) || 0),
         0,
     );
-    const payModalKeypadValue = parseFloat(String(payModalKeypadInput || '').replace(',', '.')) || 0;
-    const payModalWouldExceedTotal =
-        payModalKeypadValue > 0 &&
-        roundCurrency(payModalTotalAssigned + payModalKeypadValue) - payModalTargetTotal > 0.009;
     const payModalSplitComplete =
         (payModalTargetTotal <= 0.009 && payModalTotalAssigned <= 0.009) ||
         (payModalTargetTotal > 0.009 && Math.abs(payModalTotalAssigned - payModalTargetTotal) <= 0.009);
-
-    const handlePayModalKeypad = (key) => {
-        if (payModalSplitComplete) return;
-        if (key === 'C') {
-            setPayModalKeypadInput('');
-            return;
-        }
-        setPayModalKeypadInput((prev) => {
-            if (prev === payModalTargetTotal.toFixed(2)) return key;
-            return prev + key;
-        });
-    };
+    const remainingToAssign = roundCurrency(Math.max(0, payModalTargetTotal - payModalTotalAssigned));
 
     const handlePaymentMethodClick = (method) => {
-        if (!method?.id || payModalSplitComplete || payModalWouldExceedTotal) return;
-        const value = parseFloat(String(payModalKeypadInput || '').replace(',', '.')) || 0;
-        if (value > 0) {
+        if (!method?.id || payModalSplitComplete) return;
+        if (remainingToAssign > 0.009) {
             setPaymentAmounts((prev) => ({
                 ...prev,
-                [method.id]: (Number(prev[method.id]) || 0) + value,
+                [method.id]: (Number(prev[method.id]) || 0) + remainingToAssign,
             }));
-            setPayModalKeypadInput('');
+            setSelectedPayment(method.id);
         } else {
             setSelectedPayment(method.id);
         }
     };
 
-    const handlePayHalfAmount = () => {
-        if (payModalSplitComplete) return;
-        const half = roundCurrency(payModalTargetTotal / 2);
-        setPayModalKeypadInput(half.toFixed(2));
-    };
-
-    const handlePayRemaining = () => {
-        if (payModalSplitComplete) return;
-        const remaining = roundCurrency(Math.max(0, payModalTargetTotal - payModalTotalAssigned));
-        setPayModalKeypadInput(remaining.toFixed(2));
-    };
-
     const handlePayReset = () => {
         setPaymentAmounts(Object.fromEntries(activePaymentMethods.map((m) => [m.id, 0])));
-        setPayModalKeypadInput(payModalTargetTotal.toFixed(2));
         setSelectedPayment(null);
     };
 
@@ -335,6 +337,7 @@ export function PayModal({
     };
 
     const handleCancel = async () => {
+        if (payModalExitingRef.current) return;
         if (payConfirmLoading) {
             cancelCashmaticRequestedRef.current = true;
             cancelPayworldRequestedRef.current = true;
@@ -349,11 +352,11 @@ export function PayModal({
             setShowPayworldStatusModal(false);
             reportError(tr('orderPanel.paymentCancelled', 'Payment cancelled.'));
         }
-        onClose?.();
+        beginPayModalExit();
     };
 
     const handleConfirmPayment = async () => {
-        if (payConfirmLoading) return;
+        if (payConfirmLoading || payModalExiting) return;
         if (paymentMethodsLoading || activePaymentMethods.length === 0) {
             reportError(tr('orderPanel.noPaymentMethods', 'No active payment methods. Add them under Control → Payment types.'));
             return;
@@ -401,20 +404,31 @@ export function PayModal({
         }
     };
 
-    if (!open) return null;
+    if (!payModalLayerVisible && !showPayworldStatusModal) return null;
 
     return (
         <>
+            {payModalLayerVisible ? (
             <div
-                className={overlayClassName}
+                className={`fixed inset-0 flex items-center justify-center ${overlayClassName}`}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="pay-differently-title"
-                onClick={handleCancel}
             >
+                <button
+                    type="button"
+                    tabIndex={-1}
+                    className={`kiosk-subproduct-modal-backdrop absolute inset-0 border-0 bg-black/50 p-0 cursor-default${payModalExiting ? ' kiosk-subproduct-modal-backdrop--exiting' : ''}`}
+                    aria-label={tr('orderPanel.closePaymentModal', 'Close')}
+                    onClick={() => {
+                        if (!payModalExiting) void handleCancel();
+                    }}
+                />
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
                 <div
-                    className="flex flex-col bg-white rounded-xl shadow-2xl max-w-[1800px] w-full overflow-auto text-black"
+                    className={`kiosk-subproduct-modal-panel flex flex-col bg-white rounded-xl shadow-2xl max-w-[1800px] w-full max-h-[90vh] overflow-auto text-black${payModalExiting ? ' kiosk-subproduct-modal-panel--exiting pointer-events-none' : ' pointer-events-auto'}`}
                     onClick={(e) => e.stopPropagation()}
+                    onAnimationEnd={handlePayModalPanelAnimationEnd}
                 >
                     <h2 id="pay-differently-title" className="sr-only">
                         {t('payDifferently')}
@@ -445,7 +459,7 @@ export function PayModal({
                                             <div key={m.id} className="flex flex-col items-center gap-1.5">
                                                 <button
                                                     type="button"
-                                                    disabled={payModalSplitComplete || payModalWouldExceedTotal}
+                                                    disabled={payModalSplitComplete || payModalExiting}
                                                     onClick={() => handlePaymentMethodClick(m)}
                                                         className={`rounded-lg border-2 p-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHighlighted ? 'bg-rose-500 border-rose-700' : 'bg-white border-black'
                                                         }`}
@@ -483,65 +497,21 @@ export function PayModal({
                                 )}
                             </div>
                         </div>
-                        <div className="p-6">
-                            <div className="text-3xl font-semibold mb-2 flex justify-center">
-                                {t('assigned')}: €{payModalTotalAssigned.toFixed(2)}
-                            </div>
-                            <div className="flex justify-center mt-2">
+                        <div className="p-6 w-full">
+                            <div className="flex flex-wrap items-center justify-center gap-4 mb-4">
+                                <span className="text-3xl font-semibold tabular-nums whitespace-nowrap">
+                                    {t('assigned')}: €{payModalTotalAssigned.toFixed(2)}
+                                </span>
                                 <input
                                     readOnly
-                                    className="w-[200px] py-2 px-3 bg-gray-200 border-2 border-black rounded-lg text-3xl mb-3 outline-none cursor-default focus:border-rose-500 focus:outline-none"
-                                    value={payModalKeypadInput}
-                                    aria-label={t('amountKeypad')}
+                                    className="w-[200px] py-2 px-3 border-2 border-black rounded-lg text-3xl outline-none cursor-default focus:border-rose-500 focus:outline-none"
+                                    value={remainingToAssign.toFixed(2)}
+                                    aria-label={tr('orderPanel.remainingToAssign', 'Remaining to assign')}
                                 />
-                            </div>
-
-                        </div>
-                        <div className="flex items-center justify-center gap-20">
-                            <div className="flex gap-2 flex-1 min-h-0 mt-3">
-                                <div className="flex flex-col gap-3 flex-1">
-                                    {KEYPAD.map((row, ri) => (
-                                        <div key={ri} className="grid grid-cols-3 gap-3">
-                                            {row.map((key) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    disabled={payModalSplitComplete}
-                                                    className={`py-4 rounded-lg w-[120px] h-[100px] text-3xl font-medium ${payModalSplitComplete
-                                                        ? 'border-2 border-black text-black cursor-not-allowed'
-                                                        : 'border-2 border-black text-black active:bg-rose-500'
-                                                        }`}
-                                                    onClick={() => handlePayModalKeypad(key)}
-                                                >
-                                                    {key}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="flex flex-col items-center justify-center gap-4 p-6">
                                 <button
                                     type="button"
-                                    disabled={payModalSplitComplete}
-                                    className={`py-2 px-4 w-[300px] h-[100px] rounded-lg text-3xl font-medium ${payModalSplitComplete ? 'bg-white text-black cursor-not-allowed' : 'bg-white text-black active:bg-rose-500'
-                                        }`}
-                                    onClick={handlePayHalfAmount}
-                                >
-                                    {t('halfAmount')}
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={payModalSplitComplete}
-                                    className={`py-2 px-4 w-[300px] h-[100px] rounded-lg text-3xl font-medium ${payModalSplitComplete ? 'bg-white text-black cursor-not-allowed' : 'bg-white text-black active:bg-rose-500'
-                                        }`}
-                                    onClick={handlePayRemaining}
-                                >
-                                    {t('remainingAmount')}
-                                </button>
-                                <button
-                                    type="button"
-                                    className="py-2 px-4 bg-white w-[300px] h-[100px] rounded-lg text-3xl font-medium active:bg-rose-500"
+                                    disabled={payModalExiting}
+                                    className="py-2 px-6 min-h-[56px] rounded-lg text-3xl font-medium border-2 border-black bg-white text-black active:text-white active:border-white active:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                     onClick={handlePayReset}
                                 >
                                     {t('reset')}
@@ -552,7 +522,8 @@ export function PayModal({
                     <div className="flex justify-around px-6 gap-4 w-full pt-6 pb-6">
                         <button
                             type="button"
-                            className="w-[300px] h-[70px] py-2 px-4 rounded-lg text-3xl font-medium bg-white text-black active:bg-rose-500"
+                            disabled={payModalExiting}
+                            className="w-[300px] h-[70px] py-2 px-4 rounded-lg text-3xl font-medium bg-white text-black active:text-white active:border-white active:bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => void handleCancel()}
                         >
                             {t('cancel')}
@@ -560,17 +531,19 @@ export function PayModal({
                         <button
                             type="button"
                             disabled={
+                                payModalExiting ||
                                 Math.abs(payModalTotalAssigned - payModalTargetTotal) > 0.009 ||
                                 payConfirmLoading ||
                                 paymentMethodsLoading ||
                                 activePaymentMethods.length === 0
                             }
-                            className={`w-[300px] h-[70px] py-2 px-4 rounded-lg text-3xl font-medium ${Math.abs(payModalTotalAssigned - payModalTargetTotal) > 0.009 ||
+                            className={`w-[300px] h-[70px] py-2 px-4 rounded-lg text-3xl font-medium ${payModalExiting ||
+                                Math.abs(payModalTotalAssigned - payModalTargetTotal) > 0.009 ||
                                 payConfirmLoading ||
                                 paymentMethodsLoading ||
                                 activePaymentMethods.length === 0
-                                ? 'bg-white text-black cursor-not-allowed'
-                                : 'bg-white text-black active:bg-rose-500'
+                                ? 'bg-rose-500/40 text-white cursor-not-allowed'
+                                : 'bg-rose-600 text-white active:text-white active:border-white active:bg-rose-500 cursor-pointer'
                                 }`}
                             onClick={() => void handleConfirmPayment()}
                         >
@@ -578,7 +551,9 @@ export function PayModal({
                         </button>
                     </div>
                 </div>
+                </div>
             </div>
+            ) : null}
 
             {showPayworldStatusModal ? (
                 <div

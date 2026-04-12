@@ -3,7 +3,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { resolveMediaSrc } from '../lib/publicAssetUrl.js';
 import { POS_API_PREFIX as API } from '../lib/apiOrigin.js';
 import { buildPaymentBreakdown, formatPaymentAmount, roundCurrency } from '../lib/payDifferentlyUtils.js';
+import { loadKioskServiceType } from '../lib/kioskServiceType.js';
 import { PayModal } from './PayModal.tsx';
+import { PosBackendSettingsModal } from './PosBackendSettingsModal.jsx';
 const KIOSK_W = 1080;
 const KIOSK_H = 1920;
 const PAGE_SIZE = 48;
@@ -43,6 +45,45 @@ function formatKioskPrice(value) {
   return `€${n.toFixed(2).replace('.', ',')}`;
 }
 
+/** `unlimited` / empty → no cap; `"1"`…`"10"` from product kiosk min/max subs. */
+function parseKioskSubsLimit(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim().toLowerCase();
+  if (s === '' || s === 'unlimited') return null;
+  const n = parseInt(s, 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.min(10, n);
+}
+
+function normalizeKioskSubPickLimits(product) {
+  let min = parseKioskSubsLimit(product?.kioskMinSubs);
+  let max = parseKioskSubsLimit(product?.kioskMaxSubs);
+  if (min != null && max != null && max < min) max = min;
+  return { min, max };
+}
+
+/** One line of min/max copy for a single kiosk group config (stepped subproduct UI). */
+function kioskGroupPickHintLine(t, gc) {
+  if (!gc) return '';
+  const minG = parseKioskSubsLimit(gc.minKiosk);
+  const maxG = parseKioskSubsLimit(gc.maxKiosk);
+  if (minG != null && maxG != null) {
+    if (minG === maxG) {
+      return t('kiosk.subproductsPickExact', 'Select exactly {{n}} subproducts.').replace(/\{\{n\}\}/g, String(minG));
+    }
+    return t('kiosk.subproductsPickRange', 'Select between {{min}} and {{max}} subproducts.')
+      .replace(/\{\{min\}\}/g, String(minG))
+      .replace(/\{\{max\}\}/g, String(maxG));
+  }
+  if (minG != null) {
+    return t('kiosk.subproductsPickMin', 'Select at least {{min}} subproducts.').replace(/\{\{min\}\}/g, String(minG));
+  }
+  if (maxG != null) {
+    return t('kiosk.subproductsPickMax', 'You can select at most {{max}} subproducts.').replace(/\{\{max\}\}/g, String(maxG));
+  }
+  return '';
+}
+
 /** Kiosk product tile / basket: prefer kiosk image from configuration, then cash-register photo. */
 function kioskProductPhotoPath(product) {
   if (!product || typeof product !== 'object') return '';
@@ -56,6 +97,60 @@ function kioskBasketGroupKeyFromRow(row) {
   const gid = String(row.groupInstanceId || '').trim();
   if (gid) return `gi:${gid}`;
   return `line:${row.lineId}`;
+}
+
+function isKioskPlainProductGroup(lines) {
+  const first = lines[0];
+  return (
+    lines.length === 1 &&
+    first != null &&
+    (first.subproductId === undefined ||
+      first.subproductId === null ||
+      String(first.subproductId).trim() === '')
+  );
+}
+
+/** Order lines for POST /orders: parent base price once per kiosk group, merged into the first variant line’s unit price. */
+function buildKioskOrderItems(lines) {
+  const keyToRows = new Map();
+  const keyOrder = [];
+  for (const row of lines) {
+    const key = kioskBasketGroupKeyFromRow(row);
+    if (!keyToRows.has(key)) {
+      keyToRows.set(key, []);
+      keyOrder.push(key);
+    }
+    keyToRows.get(key).push(row);
+  }
+  const items = [];
+  for (const key of keyOrder) {
+    const groupLines = keyToRows.get(key);
+    if (isKioskPlainProductGroup(groupLines)) {
+      const row = groupLines[0];
+      const nameSafe = String(row.name || '').replace(/[,;]/g, '.');
+      items.push({
+        productId: String(row.parentProductId).trim(),
+        quantity: row.quantity ?? 1,
+        price: roundCurrency(Number(row.price) || 0),
+        notes: nameSafe ? `${nameSafe}::0` : null,
+      });
+      continue;
+    }
+    const parent = roundCurrency(Number(groupLines[0]?.parentProductPrice) || 0);
+    groupLines.forEach((row, i) => {
+      const nameSafe = String(row.name || '').replace(/[,;]/g, '.');
+      const q = row.quantity ?? 1;
+      const subUnit = roundCurrency(Number(row.price) || 0);
+      const unit = i === 0 ? roundCurrency((parent + subUnit * q) / q) : subUnit;
+      items.push({
+        productId: String(row.parentProductId).trim(),
+        quantity: q,
+        price: unit,
+        notes: nameSafe ? `${nameSafe}::0` : null,
+      });
+    });
+  }
+  return items;
 }
 
 /** Same contract as OrderPanel `printTicketAutomatically` (validates printer response). */
@@ -162,11 +257,31 @@ function getSubproductExtra() {
   }
 }
 
+/**
+ * Kiosk subproduct image: path on the subproduct row, then Control `pos_subproduct_extra` by id.
+ * (API Subproduct model has no image column; extras are the usual source.)
+ */
+function resolveSubproductKioskPicture(sp, extraMap) {
+  if (!sp || typeof sp !== 'object') return '';
+  const fromObj = String(sp.kioskPicture ?? '').trim();
+  if (fromObj) return fromObj;
+  const sid = sp.id;
+  const map = extraMap ?? getSubproductExtra();
+  if (sid != null && map && typeof map === 'object') {
+    const ex = map[sid];
+    if (ex && ex.kioskPicture != null) {
+      const p = String(ex.kioskPicture).trim();
+      if (p) return p;
+    }
+  }
+  return '';
+}
+
 function hydrateSubproducts(list) {
   const extraMap = getSubproductExtra();
   return (Array.isArray(list) ? list : []).map((sp) => ({
     ...sp,
-    kioskPicture: extraMap?.[sp.id]?.kioskPicture || '',
+    kioskPicture: resolveSubproductKioskPicture(sp, extraMap),
   }));
 }
 
@@ -228,6 +343,13 @@ export function KioskView({
   onOpenConfiguration,
 }) {
   const { t } = useLanguage();
+  const tr = useMemo(
+    () => (key, fallback) => {
+      const v = t(key);
+      return v === key ? fallback : v;
+    },
+    [t],
+  );
   const [scale, setScale] = useState(1);
   const [page, setPage] = useState(0);
   const [subproductsByProductId, setSubproductsByProductId] = useState(() => new Map());
@@ -240,24 +362,46 @@ export function KioskView({
   const [loadingModalSubproducts, setLoadingModalSubproducts] = useState(false);
   /** Multi-select subproduct ids (string keys) in the kiosk subproduct modal */
   const [selectedSubproductIds, setSelectedSubproductIds] = useState(() => new Set());
+  /** Per subproduct-group rules from Control “kiosk configuration” (API). */
+  const [kioskGroupConfigByGroupId, setKioskGroupConfigByGroupId] = useState({});
+  /** Stepped subproduct modal: one group index at a time. */
+  const [subproductGroupStep, setSubproductGroupStep] = useState(0);
+  const kioskDefaultsAppliedRef = useRef(false);
   /** Each confirmed subproduct line for the kiosk basket / order list */
   const [basketLines, setBasketLines] = useState([]);
   const basketLinesRef = useRef(basketLines);
   const [kioskBasketHydrated, setKioskBasketHydrated] = useState(false);
   const [showBasketModal, setShowBasketModal] = useState(false);
+  const [basketModalExiting, setBasketModalExiting] = useState(false);
+  const basketModalExitingRef = useRef(false);
   /** lineId awaiting delete confirmation (cancel order modal) */
   const [basketDeleteLineId, setBasketDeleteLineId] = useState(null);
   const [showClearBasketConfirm, setShowClearBasketConfirm] = useState(false);
+  const [clearBasketConfirmLayerVisible, setClearBasketConfirmLayerVisible] = useState(false);
+  const [clearBasketConfirmExiting, setClearBasketConfirmExiting] = useState(false);
+  const clearBasketConfirmExitingRef = useRef(false);
   /** Same flow as OrderPanel “Pay differently” (shared PayDifferentlyModal). */
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [kioskPayModalTotal, setKioskPayModalTotal] = useState(0);
   const [kioskPaymentError, setKioskPaymentError] = useState('');
   const [kioskPaymentSuccess, setKioskPaymentSuccess] = useState('');
+  const [paymentErrorLayerVisible, setPaymentErrorLayerVisible] = useState(false);
+  const [paymentErrorExiting, setPaymentErrorExiting] = useState(false);
+  const paymentErrorExitingRef = useRef(false);
+  const paymentErrorNavigateAfterCloseRef = useRef(false);
+  const [paymentSuccessLayerVisible, setPaymentSuccessLayerVisible] = useState(false);
+  const [paymentSuccessExiting, setPaymentSuccessExiting] = useState(false);
+  const paymentSuccessExitingRef = useRef(false);
+  /** After order is paid, if printing fails, dismiss error then return to language picker. */
+  const kioskPaidNavigateToLanguageRef = useRef(false);
+  /** PayModal calls onClose after exit animation; do not clear success/error overlay until user taps OK. */
+  const kioskPaymentResultPendingRef = useRef(false);
   const modalRequestIdRef = useRef(0);
   const categoriesListRef = useRef(null);
   const basketButtonRef = useRef(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
+  const [showBackendSettingsModal, setShowBackendSettingsModal] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
   const pageStart = page * PAGE_SIZE;
@@ -272,6 +416,48 @@ export function KioskView({
     }
     return m;
   }, [products]);
+
+  /** Subproduct lines: never use parent photo as stand-in (shows wrong duplicate thumbs). */
+  const resolveBasketLineThumbPic = useCallback(
+    (row) => {
+      const sid =
+        row.subproductId !== undefined && row.subproductId !== null ? String(row.subproductId).trim() : '';
+      const hasSub = sid !== '';
+      const stored = String(row.kioskPicture || '').trim();
+
+      if (hasSub) {
+        if (stored) return stored;
+        const extraMap = getSubproductExtra();
+        const fromExtra = sid && extraMap?.[sid]?.kioskPicture != null ? String(extraMap[sid].kioskPicture).trim() : '';
+        if (fromExtra) return fromExtra;
+        const parentId = String(row.parentProductId || '').trim();
+        let list = subproductsByProductId.get(parentId);
+        if (list == null) {
+          for (const k of subproductsByProductId.keys()) {
+            if (String(k) === parentId) {
+              list = subproductsByProductId.get(k);
+              break;
+            }
+          }
+        }
+        if (Array.isArray(list)) {
+          const sp = list.find((s) => s && String(s.id) === sid);
+          if (sp) {
+            const p = resolveSubproductKioskPicture(sp, extraMap);
+            if (p) return p;
+          }
+        }
+        return '';
+      }
+
+      if (stored) return stored;
+      return (
+        String(row.parentKioskPicture || '').trim() ||
+        String(productPhotoById.get(String(row.parentProductId || '')) || '').trim()
+      );
+    },
+    [subproductsByProductId, productPhotoById],
+  );
 
   const updateScrollState = useCallback(() => {
     const el = categoriesListRef.current;
@@ -303,9 +489,12 @@ export function KioskView({
 
   /** 5 taps in bottom-right within 2s → configuration (staff). */
   const configTapRef = useRef({ count: 0, timerId: null });
+  /** 5 taps on menu title within 2s → backend IP/port (same as language screen logo). */
+  const backendMenuTitleTapRef = useRef({ count: 0, timerId: null });
   useEffect(() => {
     return () => {
       if (configTapRef.current.timerId != null) clearTimeout(configTapRef.current.timerId);
+      if (backendMenuTitleTapRef.current.timerId != null) clearTimeout(backendMenuTitleTapRef.current.timerId);
     };
   }, []);
   const handleConfigurationTapZone = useCallback(() => {
@@ -324,6 +513,22 @@ export function KioskView({
       r.timerId = null;
     }, 2000);
   }, [onOpenConfiguration]);
+
+  const handleMenuTitleBackendTap = useCallback(() => {
+    const r = backendMenuTitleTapRef.current;
+    if (r.timerId != null) clearTimeout(r.timerId);
+    r.count += 1;
+    if (r.count >= 5) {
+      r.count = 0;
+      r.timerId = null;
+      setShowBackendSettingsModal(true);
+      return;
+    }
+    r.timerId = window.setTimeout(() => {
+      r.count = 0;
+      r.timerId = null;
+    }, 2000);
+  }, []);
 
   const kioskBasketLoadOkRef = useRef(false);
   const kioskBasketLastSyncedJsonRef = useRef(null);
@@ -432,6 +637,7 @@ export function KioskView({
     setModalSubproducts([]);
     setLoadingModalSubproducts(false);
     setSelectedSubproductIds(new Set());
+    setSubproductGroupStep(0);
     const fn = pendingAfterSubproductCloseRef.current;
     pendingAfterSubproductCloseRef.current = null;
     fn?.();
@@ -456,15 +662,46 @@ export function KioskView({
     [finalizeSubproductModalClose]
   );
 
-  const toggleSubproductSelection = useCallback((spId) => {
-    const id = String(spId);
-    setSelectedSubproductIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleSubproductSelection = useCallback(
+    (spId) => {
+      const id = String(spId);
+      const sp = modalSubproducts.find((x) => String(x.id) === id);
+      const gid = sp ? String(sp.groupId || sp.group?.id || '') : '';
+      const gc = kioskGroupConfigByGroupId[gid];
+      const usePerGroup = Object.keys(kioskGroupConfigByGroupId).length > 0;
+      const globalMax = normalizeKioskSubPickLimits(selectedProduct).max;
+
+      const countInGroup = (set, g) =>
+        modalSubproducts.filter(
+          (o) => String(o.groupId || o.group?.id || '') === g && set.has(String(o.id))
+        ).length;
+
+      setSelectedSubproductIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+          return next;
+        }
+
+        if (gc && gc.multiselect === false) {
+          for (const o of modalSubproducts) {
+            if (String(o.groupId || o.group?.id || '') === gid) next.delete(String(o.id));
+          }
+        }
+
+        const perGroupMax = gc ? parseKioskSubsLimit(gc.maxKiosk) : null;
+        const effectiveMax = usePerGroup ? perGroupMax : globalMax;
+        if (effectiveMax != null) {
+          const before = countInGroup(next, gid);
+          if (before + 1 > effectiveMax) return prev;
+        }
+
+        next.add(id);
+        return next;
+      });
+    },
+    [selectedProduct, modalSubproducts, kioskGroupConfigByGroupId]
+  );
 
   /** Product with no subproducts: one basket line (same shape as a sub line) + fly from tile image. */
   const addPlainProductToBasket = useCallback((product, tileEl) => {
@@ -519,6 +756,7 @@ export function KioskView({
       if (!product?.id || !fetchSubproductsForProduct) return;
       const requestId = modalRequestIdRef.current + 1;
       modalRequestIdRef.current = requestId;
+      kioskDefaultsAppliedRef.current = false;
       setSelectedSubproductIds(new Set());
 
       const cached = subproductsByProductId.get(product.id);
@@ -575,9 +813,41 @@ export function KioskView({
 
   const confirmSubproductModal = useCallback(() => {
     if (loadingModalSubproducts) return;
-    if (selectedSubproductIds.size === 0) {
-      closeSubproductModal();
+    const { min: minSel, max: maxSel } = normalizeKioskSubPickLimits(selectedProduct);
+    const n = selectedSubproductIds.size;
+    const usePerGroup = Object.keys(kioskGroupConfigByGroupId).length > 0;
+
+    if (n === 0) {
+      if (usePerGroup) {
+        const anyMin = Object.values(kioskGroupConfigByGroupId).some(
+          (gc) => gc && parseKioskSubsLimit(gc.minKiosk) != null
+        );
+        if (!anyMin) closeSubproductModal();
+        return;
+      }
+      if (minSel == null) closeSubproductModal();
       return;
+    }
+
+    if (usePerGroup) {
+      const seen = new Set();
+      for (const sp of modalSubproducts) {
+        const gid = String(sp.groupId || sp.group?.id || '');
+        if (seen.has(gid)) continue;
+        seen.add(gid);
+        const gc = kioskGroupConfigByGroupId[gid];
+        if (!gc) continue;
+        const minG = parseKioskSubsLimit(gc.minKiosk);
+        const maxG = parseKioskSubsLimit(gc.maxKiosk);
+        const cnt = modalSubproducts.filter(
+          (o) => String(o.groupId || o.group?.id || '') === gid && selectedSubproductIds.has(String(o.id))
+        ).length;
+        if (minG != null && cnt < minG) return;
+        if (maxG != null && cnt > maxG) return;
+      }
+    } else {
+      if (minSel != null && n < minSel) return;
+      if (maxSel != null && n > maxSel) return;
     }
 
     const orderedSelected = modalSubproducts.filter((s) => selectedSubproductIds.has(String(s.id)));
@@ -592,6 +862,7 @@ export function KioskView({
     const groupInstanceId = `kgi-${baseTs}-${Math.random().toString(36).slice(2, 11)}`;
     const parentProductPrice = roundCurrency(Number(selectedProduct?.price ?? 0));
     const parentPic = kioskProductPhotoPath(selectedProduct);
+    const extraMap = getSubproductExtra();
     const lines = orderedSelected.map((sp, i) => ({
       lineId: `k-${baseTs}-${i}-${Math.random().toString(36).slice(2, 9)}`,
       parentProductName: parentName,
@@ -601,7 +872,7 @@ export function KioskView({
       subproductId: sp?.id,
       name: sp?.name ?? '',
       price: Number(sp?.price ?? 0),
-      kioskPicture: String(sp?.kioskPicture || '').trim(),
+      kioskPicture: resolveSubproductKioskPicture(sp, extraMap),
       parentKioskPicture: parentPic,
       quantity: 1,
     }));
@@ -638,19 +909,28 @@ export function KioskView({
         pushLines();
       }
     });
-  }, [loadingModalSubproducts, selectedSubproductIds, modalSubproducts, selectedProduct, closeSubproductModal, beginSubproductModalExit]);
+  }, [
+    loadingModalSubproducts,
+    selectedSubproductIds,
+    modalSubproducts,
+    selectedProduct,
+    closeSubproductModal,
+    beginSubproductModalExit,
+    kioskGroupConfigByGroupId
+  ]);
+
+  /** Parent product ids that already have at least one line in the basket (red frame on menu tiles). */
+  const basketParentProductIds = useMemo(() => {
+    const s = new Set();
+    for (const row of basketLines) {
+      const id = String(row.parentProductId || '').trim();
+      if (id) s.add(id);
+    }
+    return s;
+  }, [basketLines]);
 
   const basketCount = useMemo(
     () => basketLines.reduce((n, row) => n + (row.quantity ?? 1), 0),
-    [basketLines]
-  );
-  const basketTotal = useMemo(
-    () =>
-      basketLines.reduce((sum, row) => {
-        const q = row.quantity ?? 1;
-        const p = Number.isFinite(row.price) ? row.price : 0;
-        return sum + p * q;
-      }, 0),
     [basketLines]
   );
 
@@ -677,6 +957,22 @@ export function KioskView({
     }
     return order;
   }, [basketLines]);
+
+  const basketTotal = useMemo(
+    () =>
+      basketGroups.reduce((sum, group) => {
+        const linesSum = group.lines.reduce((s, row) => {
+          const q = row.quantity ?? 1;
+          const p = Number.isFinite(row.price) ? row.price : 0;
+          return s + p * q;
+        }, 0);
+        if (isKioskPlainProductGroup(group.lines)) {
+          return sum + linesSum;
+        }
+        return sum + group.parentProductPrice + linesSum;
+      }, 0),
+    [basketGroups]
+  );
 
   const adjustBasketLineQty = useCallback((lineId, delta) => {
     setBasketLines((prev) =>
@@ -726,14 +1022,288 @@ export function KioskView({
       .map(([gid, data]) => ({ groupId: gid, groupName: data.groupName, items: data.items }));
   }, [modalSubproducts]);
 
-  const closeBasketModal = useCallback(() => {
+  useEffect(() => {
+    if (!showSubproductModal || !selectedProduct?.id) {
+      setKioskGroupConfigByGroupId({});
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API}/products/${selectedProduct.id}/kiosk-group-configuration`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        const m = {};
+        for (const s of data.steps || []) {
+          if (s.groupId === null || s.groupId === undefined) continue;
+          m[String(s.groupId)] = s.config;
+        }
+        setKioskGroupConfigByGroupId(m);
+      } catch {
+        if (!cancelled) setKioskGroupConfigByGroupId({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showSubproductModal, selectedProduct?.id]);
+
+  useEffect(() => {
+    if (!showSubproductModal || !modalSubproducts.length) return;
+    if (!Object.keys(kioskGroupConfigByGroupId).length) return;
+    if (kioskDefaultsAppliedRef.current) return;
+    kioskDefaultsAppliedRef.current = true;
+    const next = new Set();
+    for (const s of modalSubproducts) {
+      const gid = String(s.groupId || s.group?.id || '');
+      const gc = kioskGroupConfigByGroupId[gid];
+      const def = gc?.defaultSubproductId ? String(gc.defaultSubproductId).trim() : '';
+      if (def && String(s.id) === def) next.add(String(s.id));
+    }
+    if (next.size) setSelectedSubproductIds(next);
+  }, [showSubproductModal, modalSubproducts, kioskGroupConfigByGroupId]);
+
+  const kioskSubPickLimits = useMemo(() => normalizeKioskSubPickLimits(selectedProduct), [selectedProduct]);
+
+  const subproductSelectionHint = useMemo(() => {
+    if (Object.keys(kioskGroupConfigByGroupId).length > 0) {
+      return t(
+        'kiosk.subproductsPerGroupHint',
+        'Choose options in each section. Confirm when every section meets the minimum and maximum rules.'
+      );
+    }
+    const { min, max } = kioskSubPickLimits;
+    if (min == null && max == null) return '';
+    if (min != null && max != null) {
+      if (min === max) {
+        return t('kiosk.subproductsPickExact', 'Select exactly {{n}} subproducts.').replace(/\{\{n\}\}/g, String(min));
+      }
+      return t('kiosk.subproductsPickRange', 'Select between {{min}} and {{max}} subproducts.')
+        .replace(/\{\{min\}\}/g, String(min))
+        .replace(/\{\{max\}\}/g, String(max));
+    }
+    if (min != null) {
+      return t('kiosk.subproductsPickMin', 'Select at least {{min}} subproducts.').replace(/\{\{min\}\}/g, String(min));
+    }
+    return t('kiosk.subproductsPickMax', 'You can select at most {{max}} subproducts.').replace(/\{\{max\}\}/g, String(max));
+  }, [kioskGroupConfigByGroupId, kioskSubPickLimits, t]);
+
+  useEffect(() => {
+    if (showSubproductModal) setSubproductGroupStep(0);
+  }, [showSubproductModal, selectedProduct?.id]);
+
+  useEffect(() => {
+    if (!showSubproductModal || subproductsByGroup.length === 0) return;
+    setSubproductGroupStep((s) => Math.min(s, Math.max(0, subproductsByGroup.length - 1)));
+  }, [showSubproductModal, subproductsByGroup.length]);
+
+  const subproductStepHint = useMemo(() => {
+    const groups = subproductsByGroup;
+    if (!groups.length) return '';
+    const g = groups[subproductGroupStep];
+    if (!g) return '';
+    const gidStr = String(g.groupId ?? '');
+    const gc = kioskGroupConfigByGroupId[gidStr];
+    const usePerGroup = Object.keys(kioskGroupConfigByGroupId).length > 0;
+    if (usePerGroup) {
+      const line = kioskGroupPickHintLine(t, gc);
+      if (line) return line;
+      return t('kiosk.subproductsSectionHint', 'Choose the options you want in this section.');
+    }
+    if (subproductGroupStep === 0) return subproductSelectionHint;
+    return '';
+  }, [subproductsByGroup, subproductGroupStep, kioskGroupConfigByGroupId, subproductSelectionHint, t]);
+
+  /** OK stays enabled whenever the modal is usable; min/max are enforced inside confirmSubproductModal. */
+  const subproductModalOkBusy = loadingModalSubproducts || subproductModalExiting;
+
+  const finalizeClearBasketConfirmClose = useCallback(() => {
+    if (!clearBasketConfirmExitingRef.current) return;
+    clearBasketConfirmExitingRef.current = false;
+    setClearBasketConfirmExiting(false);
+    setClearBasketConfirmLayerVisible(false);
+  }, []);
+
+  const beginClearBasketConfirmExit = useCallback(() => {
+    if (clearBasketConfirmExitingRef.current || !clearBasketConfirmLayerVisible) return;
+    clearBasketConfirmExitingRef.current = true;
+    setClearBasketConfirmExiting(true);
+  }, [clearBasketConfirmLayerVisible]);
+
+  const handleClearBasketConfirmPanelAnimationEnd = useCallback(
+    (e) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.animationName !== 'kiosk-subproduct-modal-panel-out') return;
+      finalizeClearBasketConfirmClose();
+    },
+    [finalizeClearBasketConfirmClose],
+  );
+
+  useLayoutEffect(() => {
+    if (showClearBasketConfirm) {
+      clearBasketConfirmExitingRef.current = false;
+      setClearBasketConfirmExiting(false);
+      setClearBasketConfirmLayerVisible(true);
+    }
+  }, [showClearBasketConfirm]);
+
+  useEffect(() => {
+    if (!showClearBasketConfirm && clearBasketConfirmLayerVisible && !clearBasketConfirmExitingRef.current) {
+      beginClearBasketConfirmExit();
+    }
+  }, [showClearBasketConfirm, clearBasketConfirmLayerVisible, beginClearBasketConfirmExit]);
+
+  const resetClearBasketConfirmModalImmediate = useCallback(() => {
+    clearBasketConfirmExitingRef.current = false;
+    setClearBasketConfirmExiting(false);
+    setClearBasketConfirmLayerVisible(false);
+    setShowClearBasketConfirm(false);
+  }, []);
+
+  const resetPaymentResultLayersImmediate = useCallback(() => {
+    paymentErrorExitingRef.current = false;
+    setPaymentErrorExiting(false);
+    setPaymentErrorLayerVisible(false);
+    paymentSuccessExitingRef.current = false;
+    setPaymentSuccessExiting(false);
+    setPaymentSuccessLayerVisible(false);
+  }, []);
+
+  const finalizePaymentErrorClose = useCallback(() => {
+    if (!paymentErrorExitingRef.current) return;
+    paymentErrorExitingRef.current = false;
+    setPaymentErrorExiting(false);
+    setPaymentErrorLayerVisible(false);
+    setKioskPaymentError('');
+    kioskPaidNavigateToLanguageRef.current = false;
+    const go = paymentErrorNavigateAfterCloseRef.current;
+    paymentErrorNavigateAfterCloseRef.current = false;
+    if (go) {
+      onBackToLanguage?.();
+    }
+  }, [onBackToLanguage]);
+
+  const beginPaymentErrorExit = useCallback(() => {
+    if (paymentErrorExitingRef.current || !paymentErrorLayerVisible) return;
+    paymentErrorExitingRef.current = true;
+    setPaymentErrorExiting(true);
+  }, [paymentErrorLayerVisible]);
+
+  const handlePaymentErrorPanelAnimationEnd = useCallback(
+    (e) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.animationName !== 'kiosk-subproduct-modal-panel-out') return;
+      finalizePaymentErrorClose();
+    },
+    [finalizePaymentErrorClose],
+  );
+
+  const finalizePaymentSuccessClose = useCallback(() => {
+    if (!paymentSuccessExitingRef.current) return;
+    paymentSuccessExitingRef.current = false;
+    setPaymentSuccessExiting(false);
+    setPaymentSuccessLayerVisible(false);
+    setKioskPaymentSuccess('');
+    kioskPaymentResultPendingRef.current = false;
+    setBasketLines([]);
+    setBasketDeleteLineId(null);
+    void (async () => {
+      try {
+        await fetch(`${API}/settings/kiosk-basket`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: { lines: [] } }),
+        });
+      } catch {
+        /* ignore */
+      }
+      onBackToLanguage?.();
+    })();
+  }, [onBackToLanguage]);
+
+  const beginPaymentSuccessExit = useCallback(() => {
+    if (paymentSuccessExitingRef.current || !paymentSuccessLayerVisible) return;
+    paymentSuccessExitingRef.current = true;
+    setPaymentSuccessExiting(true);
+  }, [paymentSuccessLayerVisible]);
+
+  const handlePaymentSuccessPanelAnimationEnd = useCallback(
+    (e) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.animationName !== 'kiosk-subproduct-modal-panel-out') return;
+      finalizePaymentSuccessClose();
+    },
+    [finalizePaymentSuccessClose],
+  );
+
+  useLayoutEffect(() => {
+    if (kioskPaymentError) {
+      paymentErrorExitingRef.current = false;
+      setPaymentErrorExiting(false);
+      setPaymentErrorLayerVisible(true);
+    }
+  }, [kioskPaymentError]);
+
+  useEffect(() => {
+    if (!kioskPaymentError && paymentErrorLayerVisible && !paymentErrorExitingRef.current) {
+      beginPaymentErrorExit();
+    }
+  }, [kioskPaymentError, paymentErrorLayerVisible, beginPaymentErrorExit]);
+
+  useLayoutEffect(() => {
+    if (kioskPaymentSuccess) {
+      paymentSuccessExitingRef.current = false;
+      setPaymentSuccessExiting(false);
+      setPaymentSuccessLayerVisible(true);
+    }
+  }, [kioskPaymentSuccess]);
+
+  useEffect(() => {
+    if (!kioskPaymentSuccess && paymentSuccessLayerVisible && !paymentSuccessExitingRef.current) {
+      beginPaymentSuccessExit();
+    }
+  }, [kioskPaymentSuccess, paymentSuccessLayerVisible, beginPaymentSuccessExit]);
+
+  const finalizeBasketModalClose = useCallback(() => {
+    if (!basketModalExitingRef.current) return;
+    basketModalExitingRef.current = false;
+    setBasketModalExiting(false);
     setShowBasketModal(false);
     setBasketDeleteLineId(null);
     setShowClearBasketConfirm(false);
     setShowPaymentModal(false);
     setKioskPaymentError('');
     setKioskPaymentSuccess('');
-  }, []);
+    kioskPaymentResultPendingRef.current = false;
+    kioskPaidNavigateToLanguageRef.current = false;
+    resetPaymentResultLayersImmediate();
+  }, [resetPaymentResultLayersImmediate]);
+
+  const beginBasketModalExit = useCallback(() => {
+    if (basketModalExitingRef.current) return;
+    setBasketDeleteLineId(null);
+    setShowClearBasketConfirm(false);
+    setShowPaymentModal(false);
+    setKioskPaymentError('');
+    setKioskPaymentSuccess('');
+    kioskPaymentResultPendingRef.current = false;
+    kioskPaidNavigateToLanguageRef.current = false;
+    resetPaymentResultLayersImmediate();
+    basketModalExitingRef.current = true;
+    setBasketModalExiting(true);
+  }, [resetPaymentResultLayersImmediate]);
+
+  const handleBasketSheetAnimationEnd = useCallback(
+    (e) => {
+      if (e.animationName !== 'kiosk-basket-sheet-out') return;
+      finalizeBasketModalClose();
+    },
+    [finalizeBasketModalClose],
+  );
+
+  const closeBasketModal = useCallback(() => {
+    beginBasketModalExit();
+  }, [beginBasketModalExit]);
 
   const clearBasketLines = useCallback(() => {
     setBasketLines([]);
@@ -749,16 +1319,33 @@ export function KioskView({
 
   const closeClearBasketConfirm = useCallback(() => setShowClearBasketConfirm(false), []);
 
+  const onPaymentErrorOk = useCallback(() => {
+    if (paymentErrorExiting) return;
+    paymentErrorNavigateAfterCloseRef.current = kioskPaymentResultPendingRef.current;
+    kioskPaymentResultPendingRef.current = false;
+    beginPaymentErrorExit();
+  }, [paymentErrorExiting, beginPaymentErrorExit]);
+
+  const onPaymentSuccessOk = useCallback(() => {
+    if (paymentSuccessExiting) return;
+    beginPaymentSuccessExit();
+  }, [paymentSuccessExiting, beginPaymentSuccessExit]);
+
   const openPaymentModal = useCallback(() => {
     setBasketDeleteLineId(null);
     setShowClearBasketConfirm(false);
+    kioskPaymentResultPendingRef.current = false;
+    setKioskPaymentError('');
     setKioskPaymentSuccess('');
+    resetPaymentResultLayersImmediate();
     setKioskPayModalTotal(roundCurrency(basketTotal));
     setShowPaymentModal(true);
-  }, [basketTotal]);
+  }, [basketTotal, resetPaymentResultLayersImmediate]);
 
   const closePaymentModal = useCallback(() => {
     setShowPaymentModal(false);
+    if (kioskPaymentResultPendingRef.current) return;
+    kioskPaidNavigateToLanguageRef.current = false;
     setKioskPaymentError('');
     setKioskPaymentSuccess('');
   }, []);
@@ -769,6 +1356,7 @@ export function KioskView({
 
   const settleKioskAfterPayment = useCallback(
     async (methods, amounts, modalTargetTotal) => {
+      kioskPaidNavigateToLanguageRef.current = false;
       const lines = basketLinesRef.current;
       if (!lines.length) throw new Error(t('kiosk.basketEmpty'));
 
@@ -778,20 +1366,16 @@ export function KioskView({
         }
       }
 
-      const items = lines.map((row) => {
-        const nameSafe = String(row.name || '').replace(/[,;]/g, '.');
-        return {
-          productId: String(row.parentProductId).trim(),
-          quantity: row.quantity ?? 1,
-          price: roundCurrency(Number(row.price) || 0),
-          notes: nameSafe ? `${nameSafe}::0` : null,
-        };
-      });
+      const items = buildKioskOrderItems(lines);
 
       const createRes = await fetch(`${API}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tableId: null, items }),
+        body: JSON.stringify({
+          tableId: null,
+          kioskServiceType: loadKioskServiceType(),
+          items,
+        }),
       });
       const createData = await createRes.json().catch(() => ({}));
       if (!createRes.ok || !createData?.id) {
@@ -814,6 +1398,8 @@ export function KioskView({
         throw new Error(patchData?.error || t('kiosk.basketPayOrderFailed'));
       }
 
+      kioskPaidNavigateToLanguageRef.current = true;
+
       const modalTotal = roundCurrency(modalTargetTotal);
       const printAmounts = {};
       for (const m of methods) {
@@ -830,10 +1416,15 @@ export function KioskView({
         );
       } catch (printErr) {
         printedSuccessfully = false;
+        kioskPaymentResultPendingRef.current = true;
         setKioskPaymentError(printErr?.message || t('kiosk.basketPrintFailed'));
       }
 
+      onBasketPay?.({ lines: [...lines], total: modalTotal, orderId });
+
       if (printedSuccessfully) {
+        kioskPaidNavigateToLanguageRef.current = false;
+        kioskPaymentResultPendingRef.current = true;
         const methodLines = methods
           .map((m) => {
             const v = Number(amounts[m.id]) || 0;
@@ -851,16 +1442,20 @@ export function KioskView({
         );
       }
 
-      onBasketPay?.({ lines: [...lines], total: modalTotal, orderId });
       setShowPaymentModal(false);
       setBasketLines([]);
       setBasketDeleteLineId(null);
-      setShowClearBasketConfirm(false);
+      resetClearBasketConfirmModalImmediate();
+      basketModalExitingRef.current = false;
+      setBasketModalExiting(false);
+      setShowBasketModal(false);
     },
-    [t, onBasketPay],
+    [t, onBasketPay, resetClearBasketConfirmModalImmediate],
   );
 
   const openBasketModal = useCallback(() => {
+    basketModalExitingRef.current = false;
+    setBasketModalExiting(false);
     setShowBasketModal(true);
     onBasketClick?.();
   }, [onBasketClick]);
@@ -878,15 +1473,15 @@ export function KioskView({
           transformOrigin: 'center center',
         }}
       >
-        <div className="flex items-center justify-center shrink-0">
+        {/* <div className="flex items-center justify-center shrink-0">
           <img
             src="/logo.png"
             alt="Logo"
             className="h-[400px] -mt-10 w-auto object-contain"
             draggable={false}
           />
-        </div>
-        <div className="flex flex-row -mt-10 flex-1 min-h-0 min-w-0 overflow-hidden">
+        </div> */}
+        <div className="flex flex-row  flex-1 min-h-0 min-w-0 overflow-hidden">
           <aside className="w-[300px] shrink-0 flex flex-col bg-white pb-3 px-2">
             <div className="flex h-[100px] items-center gap-3 p-2 min-w-0 bg-white">
               <button
@@ -897,12 +1492,17 @@ export function KioskView({
               >
                 <IconBack className="h-10 w-10" />
               </button>
-              <h1 className="min-w-0 flex-1 text-6xl font-semibold text-black truncate">{t('kiosk.menuTitle')}</h1>
+              <h1
+                className="min-w-0 flex-1 text-6xl font-semibold text-black truncate cursor-default select-none"
+                onClick={handleMenuTitleBackendTap}
+              >
+                {t('kiosk.menuTitle')}
+              </h1>
             </div>
             <div
               ref={categoriesListRef}
               onScroll={updateScrollState}
-              className="kiosk-scrollbar flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1"
+              className="scrollbar-hide flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-2"
             >
               {categories.map((cat) => (
                 <button
@@ -923,7 +1523,7 @@ export function KioskView({
                 type="button"
                 onClick={() => scrollCategories(-1)}
                 disabled={!canScrollUp}
-                className={`flex-1 py-2 rounded-md border border-black text-4xl ${canScrollUp ? 'bg-white active:bg-rose-500' : 'opacity-40 cursor-not-allowed'
+                className={`flex-1 py-2 rounded-md border border-black text-4xl ${canScrollUp ? 'bg-white active:text-white active:border-white active:bg-rose-500' : 'opacity-40 cursor-not-allowed'
                   }`}
               >
                 ↑
@@ -932,7 +1532,7 @@ export function KioskView({
                 type="button"
                 onClick={() => scrollCategories(1)}
                 disabled={!canScrollDown}
-                className={`flex-1 py-2 rounded-md border border-black text-4xl ${canScrollDown ? 'bg-white active:bg-rose-500' : 'opacity-40 cursor-not-allowed'
+                className={`flex-1 py-2 rounded-md border border-black text-4xl ${canScrollDown ? 'bg-white active:text-white active:border-white active:bg-rose-500' : 'opacity-40 cursor-not-allowed'
                   }`}
               >
                 ↓
@@ -983,13 +1583,20 @@ export function KioskView({
                 <div className="grid grid-cols-3 gap-3 content-start mt-1">
                   {pageProducts.map((product) => {
                     const productPic = kioskProductPhotoPath(product);
+                    const pid = String(product.id ?? '').trim();
+                    const inBasket = pid && basketParentProductIds.has(pid);
                     return (
                     <button
                       type="button"
                       key={product.id}
                       onClick={(e) => void handleProductPress(product, e.currentTarget)}
-                      className={`flex flex-col items-center rounded-xl bg-white shadow-md p-3 text-center min-h-[200px] active:brightness-95 ${selectedProduct?.id === product.id ? 'ring-2 ring-rose-500' : ''
-                        }`}
+                      className={`flex flex-col items-center rounded-xl bg-white shadow-md p-3 text-center min-h-[200px] active:brightness-95 ${
+                        inBasket
+                          ? 'ring-4 ring-rose-500'
+                          : selectedProduct?.id === product.id
+                            ? 'ring-2 ring-rose-500'
+                            : ''
+                      }`}
                     >
                       <div className="flex flex-1 w-full min-h-[140px] max-h-[140px] items-center justify-center">
                         {productPic ? (
@@ -1049,6 +1656,13 @@ export function KioskView({
             }}
           />
         ) : null}
+        <PosBackendSettingsModal
+          open={showBackendSettingsModal}
+          onClose={() => setShowBackendSettingsModal(false)}
+          tr={tr}
+          cancelLabel={t('cancel')}
+          overlayClassName="absolute inset-0 z-[225] flex items-center justify-center bg-black/50 p-4"
+        />
       </div>
 
       {showSubproductModal && selectedProduct && (
@@ -1071,68 +1685,112 @@ export function KioskView({
             <h3 id="kiosk-subproducts-title" className="flex py-10 text-6xl font-semibold w-full justify-center text-black min-w-0 pr-2">
               {selectedProduct.name}
             </h3>
+            {subproductStepHint ? (
+              <p className="px-4 pb-4 text-center text-3xl font-medium text-black" role="status">
+                {subproductStepHint}
+              </p>
+            ) : null}
             <div className="space-y-6 pb-[200px]">
               {loadingModalSubproducts && modalSubproducts.length === 0 ? (
                 <div className="py-8 text-center text-black">{t('processing')}</div>
               ) : null}
-              {subproductsByGroup.map(({ groupId, groupName, items }) => (
-                <div key={groupId} className="flex flex-col gap-3">
-                  <h4 className="text-4xl font-semibold text-black mb-4">
-                    {groupName || t('control.sys.deposit.other')}
-                  </h4>
-                  <div className="grid grid-cols-3 gap-3 w-full">
-                    {items.map((sp) => {
-                      const selected = selectedSubproductIds.has(String(sp.id));
-                      return (
-                        <button
-                          key={sp.id}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => toggleSubproductSelection(sp.id)}
-                          {...(selected ? { 'data-kiosk-selected-subproduct': 'true' } : {})}
-                          className={`relative flex flex-col items-center rounded-xl bg-white p-3 text-center min-h-[200px] active:brightness-95 ${selected ? 'ring-2 ring-rose-500' : ''
-                            }`}
-                        >
-                          {selected ? (
-                            <span
-                              className="absolute right-2 top-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white shadow-md"
-                              aria-hidden
-                            >
-                              <IconKioskCheck className="h-7 w-7 text-white" />
+              {(() => {
+                const entry = subproductsByGroup[subproductGroupStep];
+                if (!entry) return null;
+                const { groupId, groupName, items } = entry;
+                const gidStr = String(groupId ?? '');
+                const gc = kioskGroupConfigByGroupId[gidStr];
+                const heading =
+                  (gc?.title && String(gc.title).trim()) || groupName || t('control.sys.deposit.other');
+                const usePerGroup = Object.keys(kioskGroupConfigByGroupId).length > 0;
+                const perGroupMax = gc ? parseKioskSubsLimit(gc.maxKiosk) : null;
+                const effectiveMax = usePerGroup ? perGroupMax : kioskSubPickLimits.max;
+                return (
+                  <div key={groupId} className="flex flex-col gap-3">
+                    <h4 className="text-4xl font-semibold text-black mb-4">{heading}</h4>
+                    <div className="grid grid-cols-3 gap-3 w-full">
+                      {items.map((sp) => {
+                        const selected = selectedSubproductIds.has(String(sp.id));
+                        const countInGroup = items.filter((o) => selectedSubproductIds.has(String(o.id))).length;
+                        const atMax =
+                          effectiveMax != null && !selected && countInGroup >= effectiveMax;
+                        return (
+                          <button
+                            key={sp.id}
+                            type="button"
+                            aria-pressed={selected}
+                            aria-disabled={atMax || undefined}
+                            onClick={() => toggleSubproductSelection(sp.id)}
+                            {...(selected ? { 'data-kiosk-selected-subproduct': 'true' } : {})}
+                            className={`relative flex flex-col items-center rounded-xl bg-white p-3 text-center min-h-[200px] active:brightness-95 ${selected ? 'ring-2 ring-rose-500' : ''
+                              } ${atMax ? 'opacity-45 cursor-not-allowed' : ''}`}
+                          >
+                            {selected ? (
+                              <span
+                                className="absolute right-2 top-2 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-rose-500 text-white shadow-md"
+                                aria-hidden
+                              >
+                                <IconKioskCheck className="h-7 w-7 text-white" />
+                              </span>
+                            ) : null}
+                            <div className="flex flex-1 w-full min-h-[140px] max-h-[140px] items-center justify-center">
+                              {sp.kioskPicture ? (
+                                <img
+                                  src={resolveMediaSrc(sp.kioskPicture)}
+                                  alt={sp.name}
+                                  className="max-h-[140px] max-w-full w-auto h-auto object-contain pointer-events-none"
+                                />
+                              ) : (
+                                <div className="h-[140px] w-full rounded-lg bg-white" aria-hidden />
+                              )}
+                            </div>
+                            <span className="mt-2 text-2xl font-semibold uppercase leading-tight text-black line-clamp-3">
+                              {sp.name}
                             </span>
-                          ) : null}
-                          <div className="flex flex-1 w-full min-h-[140px] max-h-[140px] items-center justify-center">
-                            {sp.kioskPicture ? (
-                              <img
-                                src={resolveMediaSrc(sp.kioskPicture)}
-                                alt={sp.name}
-                                className="max-h-[140px] max-w-full w-auto h-auto object-contain pointer-events-none"
-                              />
-                            ) : (
-                              <div className="h-[140px] w-full rounded-lg bg-white" aria-hidden />
-                            )}
-                          </div>
-                          <span className="mt-2 text-2xl font-semibold uppercase leading-tight text-black line-clamp-3">
-                            {sp.name}
-                          </span>
-                          <span className="mt-1 text-3xl font-semibold text-black">
-                            {formatKioskPrice(sp.price ?? 0)}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            <span className="mt-1 text-3xl font-semibold text-black">
+                              {formatKioskPrice(sp.price ?? 0)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })()}
             </div>
-            <div className="absolute bottom-0 left-0 right-0 py-10 flex justify-center bg-white">
+            <div className="absolute bottom-0 left-0 right-0 flex flex-wrap items-center justify-center gap-4 bg-white px-4 py-10">
               <button
                 type="button"
-                disabled={loadingModalSubproducts || subproductModalExiting}
-                className="flex-1 px-4 py-2 rounded-lg max-w-[300px] h-[70px] bg-rose-500 text-4xl text-white active:bg-rose-500 disabled:opacity-50"
+                disabled={
+                  subproductGroupStep <= 0 || loadingModalSubproducts || subproductModalExiting
+                }
+                className="h-[70px] min-w-[min(200px,28vw)] flex-1 max-w-[280px] rounded-lg border-2 border-black bg-white px-4 text-3xl font-semibold text-black active:bg-black/5 disabled:opacity-40"
+                onClick={() => setSubproductGroupStep((s) => Math.max(0, s - 1))}
+              >
+                {t('backName')}
+              </button>
+              <button
+                type="button"
+                disabled={subproductModalOkBusy}
+                className="h-[70px] min-w-[min(200px,28vw)] flex-1 max-w-[300px] rounded-lg bg-rose-500 px-4 text-4xl text-white active:bg-rose-500 disabled:opacity-50"
                 onClick={confirmSubproductModal}
               >
                 {t('ok')}
+              </button>
+              <button
+                type="button"
+                disabled={
+                  subproductGroupStep >= subproductsByGroup.length - 1 ||
+                  loadingModalSubproducts ||
+                  subproductModalExiting ||
+                  subproductsByGroup.length === 0
+                }
+                className="h-[70px] min-w-[min(200px,28vw)] flex-1 max-w-[280px] rounded-lg border-2 border-black bg-white px-4 text-3xl font-semibold text-black active:bg-black/5 disabled:opacity-40"
+                onClick={() =>
+                  setSubproductGroupStep((s) => Math.min(subproductsByGroup.length - 1, s + 1))
+                }
+              >
+                {t('next')}
               </button>
             </div>
             </div>
@@ -1142,16 +1800,26 @@ export function KioskView({
 
       {showBasketModal ? (
         <div
-          className="fixed inset-0 z-[210] flex flex-col justify-end bg-black/60"
+          className="fixed inset-0 z-[210] flex flex-col"
           role="dialog"
           aria-modal="true"
           aria-labelledby="kiosk-basket-title"
-          onClick={closeBasketModal}
         >
-          <div
-            className="kiosk-basket-sheet relative flex min-h-[700px] max-h-[1700px] min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border-t border-x border-black bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.45)]"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <button
+            type="button"
+            tabIndex={-1}
+            className={`kiosk-basket-backdrop absolute inset-0 border-0 bg-black/60 p-0 cursor-default${basketModalExiting ? ' kiosk-basket-backdrop--exiting' : ''}`}
+            aria-label={t('kiosk.close')}
+            onClick={() => {
+              if (!basketModalExiting) closeBasketModal();
+            }}
+          />
+          <div className="pointer-events-none relative flex min-h-0 flex-1 flex-col justify-end">
+            <div
+              className={`kiosk-basket-sheet relative flex min-h-[700px] max-h-[1700px] min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border-t border-x border-black bg-white shadow-[0_-12px_48px_rgba(0,0,0,0.45)]${basketModalExiting ? ' kiosk-basket-sheet--exiting pointer-events-none' : ' pointer-events-auto'}`}
+              onClick={(e) => e.stopPropagation()}
+              onAnimationEnd={handleBasketSheetAnimationEnd}
+            >
             <div className="flex items-center justify-between gap-4 px-8 py-6 shrink-0">
               <div className="flex items-center gap-4 min-w-0">
                 <IconBasket className="h-14 w-14 shrink-0 text-rose-500" />
@@ -1162,7 +1830,8 @@ export function KioskView({
               <button
                 type="button"
                 onClick={closeBasketModal}
-                className="shrink-0 rounded-xl bg-white p-4 text-black active:bg-rose-500 active:text-white"
+                disabled={basketModalExiting}
+                className="shrink-0 rounded-xl bg-white p-4 text-black active:bg-rose-500 active:text-white disabled:opacity-50"
                 aria-label={t('kiosk.close')}
               >
                 <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1178,21 +1847,13 @@ export function KioskView({
                   {basketGroups.map((group) => {
                     const title = group.parentProductName || t('kiosk.basketProductUnknown');
                     const firstRow = group.lines[0];
-                    const isPlainProductOnly =
-                      group.lines.length === 1 &&
-                      firstRow != null &&
-                      (firstRow.subproductId === undefined ||
-                        firstRow.subproductId === null ||
-                        String(firstRow.subproductId).trim() === '');
+                    const isPlainProductOnly = isKioskPlainProductGroup(group.lines);
 
                     const renderLineRow = (row) => {
                       const qty = row.quantity ?? 1;
                       const unit = Number.isFinite(row.price) ? row.price : 0;
                       const lineSum = unit * qty;
-                      const thumbPic =
-                        String(row.kioskPicture || '').trim() ||
-                        String(row.parentKioskPicture || '').trim() ||
-                        String(productPhotoById.get(String(row.parentProductId || '')) || '').trim();
+                      const thumbPic = resolveBasketLineThumbPic(row);
                       return (
                         <li
                           key={row.lineId}
@@ -1319,7 +1980,7 @@ export function KioskView({
                 <button
                   type="button"
                   onClick={openClearBasketConfirm}
-                  disabled={basketLines.length === 0}
+                  disabled={basketLines.length === 0 || basketModalExiting}
                   className="min-h-[64px] flex flex-1 items-center justify-center gap-3 rounded-xl border-2 border-black bg-white px-8 py-4 text-3xl font-semibold text-black active:bg-rose-500 active:text-white disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-[240px] sm:flex-none"
                 >
                   <IconTrash className="h-9 w-9 shrink-0" />
@@ -1328,13 +1989,14 @@ export function KioskView({
                 <button
                   type="button"
                   onClick={openPaymentModal}
-                  disabled={basketLines.length === 0}
+                  disabled={basketLines.length === 0 || basketModalExiting}
                   className="min-h-[64px] flex flex-1 items-center justify-center gap-3 rounded-xl bg-rose-500 px-8 py-4 text-3xl font-semibold text-white active:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-[240px] sm:flex-none"
                 >
                   <IconCreditCard className="h-9 w-9 shrink-0" />
                   {t('kiosk.basketPay')}
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -1380,37 +2042,50 @@ export function KioskView({
         </div>
       ) : null}
 
-      {showClearBasketConfirm ? (
+      {clearBasketConfirmLayerVisible ? (
         <div
-          className="fixed inset-0 z-[225] flex items-center justify-center bg-black/70 p-6"
+          className="fixed inset-0 z-[225] flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="kiosk-basket-clear-all-title"
-          onClick={closeClearBasketConfirm}
         >
-          <div
-            className="w-full min-w-[80%] max-w-[80%] rounded-2xl border border-black bg-white p-8 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="kiosk-basket-clear-all-title" className="text-5xl w-full text-center font-semibold text-black">
-              {t('kiosk.basketClearAllTitle')}
-            </h3>
-            <p className="mt-4 text-2xl leading-snug text-black w-full text-center">{t('kiosk.basketClearAllMessage')}</p>
-            <div className="mt-10 flex flex-col gap-[120px] sm:flex-row sm:justify-center">
-              <button
-                type="button"
-                onClick={closeClearBasketConfirm}
-                className="min-h-[64px] rounded-xl min-w-[200px] max-w-[200px] border-2 border-black bg-white px-8 text-2xl font-semibold text-black active:bg-rose-500 active:text-white"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={clearBasketLines}
-                className="min-h-[64px] rounded-xl bg-rose-500 min-w-[200px] max-w-[200px] px-8 text-2xl font-semibold text-white active:brightness-90"
-              >
-                {t('kiosk.basketClearConfirm')}
-              </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            className={`kiosk-subproduct-modal-backdrop absolute inset-0 border-0 bg-black/50 p-0 cursor-default${clearBasketConfirmExiting ? ' kiosk-subproduct-modal-backdrop--exiting' : ''}`}
+            aria-label={t('cancel')}
+            onClick={() => {
+              if (!clearBasketConfirmExiting) closeClearBasketConfirm();
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+            <div
+              className={`kiosk-subproduct-modal-panel w-full min-w-[80%] max-w-[80%] rounded-2xl border border-black bg-white p-8 shadow-2xl${clearBasketConfirmExiting ? ' kiosk-subproduct-modal-panel--exiting pointer-events-none' : ' pointer-events-auto'}`}
+              onClick={(e) => e.stopPropagation()}
+              onAnimationEnd={handleClearBasketConfirmPanelAnimationEnd}
+            >
+              <h3 id="kiosk-basket-clear-all-title" className="text-5xl w-full text-center font-semibold text-black">
+                {t('kiosk.basketClearAllTitle')}
+              </h3>
+              <p className="mt-4 text-2xl leading-snug text-black w-full text-center">{t('kiosk.basketClearAllMessage')}</p>
+              <div className="mt-10 flex flex-col gap-[120px] sm:flex-row sm:justify-center">
+                <button
+                  type="button"
+                  disabled={clearBasketConfirmExiting}
+                  onClick={closeClearBasketConfirm}
+                  className="min-h-[64px] rounded-xl min-w-[200px] max-w-[200px] border-2 border-black bg-white px-8 text-2xl font-semibold text-black active:bg-rose-500 active:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={clearBasketConfirmExiting}
+                  onClick={clearBasketLines}
+                  className="min-h-[64px] rounded-xl bg-rose-500 min-w-[200px] max-w-[200px] px-8 text-2xl font-semibold text-white active:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t('kiosk.basketClearConfirm')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1422,63 +2097,77 @@ export function KioskView({
         onClose={closePaymentModal}
         onProceedAfterTerminals={settleKioskAfterPayment}
         onPaymentError={setKioskPaymentError}
-        overlayClassName="fixed inset-0 z-[240] flex items-center justify-center bg-black/50 p-4"
+        overlayClassName="z-[240]"
         payworldOverlayClassName="fixed inset-0 z-[245] flex items-center justify-center bg-black/60 p-4"
       />
 
-      {kioskPaymentError ? (
+      {paymentErrorLayerVisible ? (
         <div
-          className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[250] flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="kiosk-payment-error-title"
-          onClick={() => setKioskPaymentError('')}
         >
           <div
-            className="bg-white rounded-lg shadow-xl px-10 py-8 max-w-4xl w-full mx-4 border border-black"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="kiosk-payment-error-title" className="text-5xl mb-6 font-semibold text-black text-center">
-              {t('paymentErrorTitle')}
-            </h2>
-            <p className="text-3xl text-black text-center mb-8">{kioskPaymentError}</p>
-            <div className="flex justify-center">
-              <button
-                type="button"
-                className="w-[200px] py-4 bg-rose-500 text-white rounded-lg text-3xl active:bg-rose-500"
-                onClick={() => setKioskPaymentError('')}
-              >
-                {t('ok')}
-              </button>
+            className={`kiosk-subproduct-modal-backdrop absolute inset-0 bg-black/50${paymentErrorExiting ? ' kiosk-subproduct-modal-backdrop--exiting' : ''}`}
+            aria-hidden="true"
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`kiosk-subproduct-modal-panel bg-white rounded-lg shadow-xl px-10 py-8 max-w-4xl w-full mx-4 border border-black${paymentErrorExiting ? ' kiosk-subproduct-modal-panel--exiting pointer-events-none' : ' pointer-events-auto'}`}
+              onClick={(e) => e.stopPropagation()}
+              onAnimationEnd={handlePaymentErrorPanelAnimationEnd}
+            >
+              <h2 id="kiosk-payment-error-title" className="text-5xl mb-6 font-semibold text-black text-center">
+                {t('paymentErrorTitle')}
+              </h2>
+              <p className="text-3xl text-black text-center mb-8">{kioskPaymentError}</p>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  disabled={paymentErrorExiting}
+                  className="w-[200px] py-4 bg-rose-500 text-white rounded-lg text-3xl active:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={onPaymentErrorOk}
+                >
+                  {t('ok')}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       ) : null}
 
-      {kioskPaymentSuccess ? (
+      {paymentSuccessLayerVisible ? (
         <div
-          className="fixed inset-0 z-[252] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[252] flex items-center justify-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="kiosk-payment-success-title"
-          onClick={() => setKioskPaymentSuccess('')}
         >
           <div
-            className="bg-white rounded-lg shadow-xl px-10 py-8 max-w-3xl w-full mx-4 border border-black"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="kiosk-payment-success-title" className="text-5xl mb-6 font-semibold text-black text-center">
-              {t('paymentSuccessfulTitle')}
-            </h2>
-            <p className="text-3xl text-black text-center mb-8">{kioskPaymentSuccess}</p>
-            <div className="flex justify-center">
-              <button
-                type="button"
-                className="w-[200px] py-4 bg-white text-black rounded text-3xl active:bg-rose-500"
-                onClick={() => setKioskPaymentSuccess('')}
-              >
-                {t('ok')}
-              </button>
+            className={`kiosk-subproduct-modal-backdrop absolute inset-0 bg-black/50${paymentSuccessExiting ? ' kiosk-subproduct-modal-backdrop--exiting' : ''}`}
+            aria-hidden="true"
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+            <div
+              className={`kiosk-subproduct-modal-panel bg-white rounded-lg shadow-xl px-10 py-8 max-w-3xl w-full mx-4 border border-black${paymentSuccessExiting ? ' kiosk-subproduct-modal-panel--exiting pointer-events-none' : ' pointer-events-auto'}`}
+              onClick={(e) => e.stopPropagation()}
+              onAnimationEnd={handlePaymentSuccessPanelAnimationEnd}
+            >
+              <h2 id="kiosk-payment-success-title" className="text-5xl mb-6 font-semibold text-black text-center">
+                {t('paymentSuccessfulTitle')}
+              </h2>
+              <p className="text-3xl text-black text-center mb-8">{kioskPaymentSuccess}</p>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  disabled={paymentSuccessExiting}
+                  className="w-[200px] py-4 bg-white text-black rounded text-3xl active:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={onPaymentSuccessOk}
+                >
+                  {t('ok')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

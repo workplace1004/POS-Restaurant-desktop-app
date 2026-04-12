@@ -17,6 +17,9 @@ const TABLE_TEMPLATE_OPTIONS = [
 export const SET_TABLES_LAYOUT_CANVAS_WIDTH = 979;
 export const SET_TABLES_LAYOUT_CANVAS_HEIGHT = 614;
 
+/** When true, the Tables top-nav tab in Control (Personalize) is disabled. */
+export const DISABLE_CONTROL_TABLES_TOP_NAV = true;
+
 /** Parse x/y from layout JSON (supports left/top, posX/posY, comma decimals). */
 export function parseLayoutCoord(value) {
   if (value == null || value === '') return 0;

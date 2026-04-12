@@ -16,7 +16,6 @@ export function ControlViewCategoriesProductsContent(props) {
     return (
       <ControlViewPriceGroups
         tr={tr}
-        priceGroupsLoading={props.priceGroupsLoading}
         openPriceGroupModal={props.openPriceGroupModal}
         priceGroups={props.priceGroups}
         priceGroupsListRef={props.priceGroupsListRef}
@@ -35,7 +34,6 @@ export function ControlViewCategoriesProductsContent(props) {
       <ControlViewCategories
         tr={tr}
         categories={props.categories}
-        categoriesLoading={props.categoriesLoading}
         openCategoryModal={props.openCategoryModal}
         categoriesListRef={props.categoriesListRef}
         updateCategoriesScrollState={props.updateCategoriesScrollState}
@@ -56,9 +54,7 @@ export function ControlViewCategoriesProductsContent(props) {
         selectedCategoryId={props.selectedCategoryId}
         selectedProductId={props.selectedProductId}
         setSelectedProductId={props.setSelectedProductId}
-        productsLoading={props.productsLoading}
         openProductModal={props.openProductModal}
-        openProductPositioningModal={props.openProductPositioningModal}
         productSearch={props.productSearch}
         setProductSearch={props.setProductSearch}
         setShowProductSearchKeyboard={props.setShowProductSearchKeyboard}
@@ -71,6 +67,7 @@ export function ControlViewCategoriesProductsContent(props) {
         productHasSubproductsById={props.productHasSubproductsById}
         openProductSubproductsModal={props.openProductSubproductsModal}
         openEditProductModal={props.openEditProductModal}
+        openProductKioskConfiguration={props.openProductKioskConfiguration}
         setDeleteConfirmProductId={props.setDeleteConfirmProductId}
         canProductsScrollUp={props.canProductsScrollUp}
         canProductsScrollDown={props.canProductsScrollDown}
@@ -83,7 +80,6 @@ export function ControlViewCategoriesProductsContent(props) {
     return (
       <ControlViewSubproducts
         tr={tr}
-        subproductsLoading={props.subproductsLoading}
         openSubproductModal={props.openSubproductModal}
         setShowManageGroupsModal={props.setShowManageGroupsModal}
         subproductGroups={props.subproductGroups}
@@ -93,7 +89,6 @@ export function ControlViewCategoriesProductsContent(props) {
         subproductsGroupTabsRef={props.subproductsGroupTabsRef}
         subproductsListRef={props.subproductsListRef}
         updateSubproductsScrollState={props.updateSubproductsScrollState}
-        subproductGroupsLoading={props.subproductGroupsLoading}
         subproducts={props.subproducts}
         selectedSubproductId={props.selectedSubproductId}
         openEditSubproductModal={props.openEditSubproductModal}

@@ -8,33 +8,38 @@ import React from 'react';
  * @param {() => void} onPrev - Called when arrow up is clicked
  * @param {() => void} onNext - Called when arrow down is clicked
  * @param {string} [className] - Optional extra classes for the wrapper
+ * @param {'fixed'|'inline'} [variant] - `fixed`: bottom bar inside a `relative` parent; `inline`: normal flow under content
  */
-export function PaginationArrows({ canPrev, canNext, onPrev, onNext, className = '' }) {
+export function PaginationArrows({ canPrev, canNext, onPrev, onNext, className = '', variant = 'fixed' }) {
+  const layout =
+    variant === 'inline'
+      ? 'relative flex w-full items-center justify-center gap-40 py-4'
+      : 'absolute bottom-0 left-0 right-0 flex items-center justify-center gap-40 py-2 z-10';
   return (
     <div
-      className={`absolute bottom-0 left-0 right-0 flex items-center justify-center gap-40 py-2  z-10 ${className}`.trim()}
+      className={`${layout} ${className}`.trim()}
       role="navigation"
       aria-label="Pagination"
     >
       <button
         type="button"
-        className="p-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+        className="p-5 rounded-lg border border-pos-border active:text-white text-black active:bg-rose-500 disabled:opacity-40 disabled:pointer-events-none transition-colors"
         disabled={!canPrev}
         onClick={onPrev}
         aria-label="Previous page"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path d="M11 17V5.414l3.293 3.293a.999.999 0 101.414-1.414l-5-5a.999.999 0 00-1.414 0l-5 5a.997.997 0 000 1.414.999.999 0 001.414 0L9 5.414V17a1 1 0 102 0z" fill="currentColor" />
         </svg>
       </button>
       <button
         type="button"
-        className="p-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+        className="p-5 rounded-lg border border-pos-border active:text-white text-black active:bg-rose-500 disabled:opacity-40 disabled:pointer-events-none transition-colors"
         disabled={!canNext}
         onClick={onNext}
         aria-label="Next page"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path d="M10.707 17.707l5-5a.999.999 0 10-1.414-1.414L11 14.586V3a1 1 0 10-2 0v11.586l-3.293-3.293a.999.999 0 10-1.414 1.414l5 5a.999.999 0 001.414 0z" fill="currentColor" />
         </svg>
       </button>

@@ -62,6 +62,7 @@ export function ControlViewSystemSettingsModal({
   mapTranslatedOptions,
   showSystemSettingsModal,
   closeSystemSettingsModal,
+  onOpenBackendSettings,
   systemSettingsTab,
   setSystemSettingsTab,
   priceGroups,
@@ -130,57 +131,68 @@ export function ControlViewSystemSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative px-10 text-xl bg-pos-bg rounded-xl shadow-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh] min-h-[705px] max-h-[705px]" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeSystemSettingsModal} aria-label="Close">
+      <div className="relative px-10 text-xl bg-pos-bg rounded-xl shadow-2xl w-full mx-4 overflow-hidden flex flex-col min-h-[845px] min-h-[705px] max-h-[705px]" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="absolute top-4 right-4 z-10 p-2 rounded text-black active:text-white active:bg-rose-500" onClick={closeSystemSettingsModal} aria-label="Close">
           <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
-        <div className="flex mt-10 mb-2 px-10 w-full justify-around text-xl shrink-0 overflow-x-auto">
+        <div className="flex mt-20 mb-2 px-10 w-full justify-around text-xl shrink-0 overflow-x-auto">
           {SYSTEM_SETTINGS_TABS.map((tab) => (
             <button
               key={tab}
               type="button"
-              className={`px-4 pb-2 font-medium whitespace-nowrap border-b-2 transition-colors ${systemSettingsTab === tab ? 'border-blue-500 text-pos-text' : 'border-transparent text-pos-muted active:text-pos-text'} active:bg-green-500`}
+              className={`px-4 pb-2 font-medium whitespace-nowrap border-b-2 transition-colors ${systemSettingsTab === tab ? 'border-rose-600 text-pos-text' : 'border-transparent text-black active:text-white active:bg-rose-500'}`}
               onClick={() => setSystemSettingsTab(tab)}
             >
               {tr(SYSTEM_SETTINGS_TAB_LABEL_KEYS[tab], tab)}
             </button>
           ))}
         </div>
-        <div className="p-6 overflow-auto flex-1 text-sm">
+        <div className="p-6 overflow-auto flex-1 text-lg">
           {systemSettingsTab === 'General' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-3">
+              {typeof onOpenBackendSettings === 'function' ? (
+                <div className="col-span-full flex flex-wrap items-center gap-3 pb-4 mb-2 border-b border-gray-300">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-pos-border px-5 py-3 text-pos-text font-medium active:bg-rose-500 active:text-white"
+                    onClick={onOpenBackendSettings}
+                  >
+                    {tr('control.sys.openBackendSettings', 'Backend IP & port')}
+                  </button>
+                </div>
+              ) : null}
               <div className="flex flex-col gap-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.useStockManagement', 'Use of stock management:')}</span>
-                  <input type="checkbox" checked={sysUseStockManagement} onChange={(e) => setSysUseStockManagement(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysUseStockManagement} onChange={(e) => setSysUseStockManagement(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.usePriceGroups', 'Use of price groups:')}</span>
-                  <input type="checkbox" checked={sysUsePriceGroups} onChange={(e) => setSysUsePriceGroups(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysUsePriceGroups} onChange={(e) => setSysUsePriceGroups(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.loginWithoutCode', 'Log in without code:')}</span>
-                  <input type="checkbox" checked={sysLoginWithoutCode} onChange={(e) => setSysLoginWithoutCode(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysLoginWithoutCode} onChange={(e) => setSysLoginWithoutCode(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.categoriesPerRegister', 'Categories per register:')}</span>
-                  <input type="checkbox" checked={sysCategorieenPerKassa} onChange={(e) => setSysCategorieenPerKassa(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysCategorieenPerKassa} onChange={(e) => setSysCategorieenPerKassa(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.autoAcceptQROrders', 'Automatically accept QR orders:')}</span>
-                  <input type="checkbox" checked={sysAutoAcceptQROrders} onChange={(e) => setSysAutoAcceptQROrders(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysAutoAcceptQROrders} onChange={(e) => setSysAutoAcceptQROrders(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.qrOrdersAutoCheckout', 'QR orders auto checkout:')}</span>
-                  <input type="checkbox" checked={sysQrOrdersAutomatischAfrekenen} onChange={(e) => setSysQrOrdersAutomatischAfrekenen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysQrOrdersAutomatischAfrekenen} onChange={(e) => setSysQrOrdersAutomatischAfrekenen(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.sendOnlyQROrdersToKitchen', 'Send only QR orders to kitchen screen:')}</span>
-                  <input type="checkbox" checked={sysEnkelQROrdersKeukenscherm} onChange={(e) => setSysEnkelQROrdersKeukenscherm(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysEnkelQROrdersKeukenscherm} onChange={(e) => setSysEnkelQROrdersKeukenscherm(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.aspect169Windows', '16:9 aspect (Windows):')}</span>
-                  <input type="checkbox" checked={sysAspect169Windows} onChange={(e) => setSysAspect169Windows(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysAspect169Windows} onChange={(e) => setSysAspect169Windows(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.general.vatRateVariousProducts', 'VAT rate of various products:')}</span>
@@ -190,39 +202,39 @@ export function ControlViewSystemSettingsModal({
               <div className="flex flex-col gap-8">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.arrangeProductsManually', 'Arrange products manually:')}</span>
-                  <input type="checkbox" checked={sysArrangeProductsManually} onChange={(e) => setSysArrangeProductsManually(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysArrangeProductsManually} onChange={(e) => setSysArrangeProductsManually(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.limitOneUserPerTable', 'Limit one user per table:')}</span>
-                  <input type="checkbox" checked={sysLimitOneUserPerTable} onChange={(e) => setSysLimitOneUserPerTable(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysLimitOneUserPerTable} onChange={(e) => setSysLimitOneUserPerTable(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.oneWaitingOrderPerCustomer', 'One waiting order per customer:')}</span>
-                  <input type="checkbox" checked={sysOneWachtorderPerKlant} onChange={(e) => setSysOneWachtorderPerKlant(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysOneWachtorderPerKlant} onChange={(e) => setSysOneWachtorderPerKlant(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.cashButtonVisibleMultiplePayment', 'Cash button visible with multiple payment options:')}</span>
-                  <input type="checkbox" checked={sysCashButtonVisibleMultiplePayment} onChange={(e) => setSysCashButtonVisibleMultiplePayment(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysCashButtonVisibleMultiplePayment} onChange={(e) => setSysCashButtonVisibleMultiplePayment(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.usePlaceSettings', 'Use of place settings:')}</span>
-                  <input type="checkbox" checked={sysUsePlaceSettings} onChange={(e) => setSysUsePlaceSettings(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysUsePlaceSettings} onChange={(e) => setSysUsePlaceSettings(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.autoLoadCredit', 'Auto load credit:')}</span>
-                  <input type="checkbox" checked={sysTegoedAutomatischInladen} onChange={(e) => setSysTegoedAutomatischInladen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysTegoedAutomatischInladen} onChange={(e) => setSysTegoedAutomatischInladen(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.useLatestPrice', 'Use latest price:')}</span>
-                  <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.general.depositReturn', 'Deposit return:')}</span>
-                  <Dropdown options={mapTranslatedOptions(LEEGGOED_OPTIONS)} value={sysLeeggoedTerugname} onChange={setSysLeeggoedTerugname} placeholder={tr('control.external.select', 'Select')} className="min-w-[150px] max-w-[150px]" />
+                  <Dropdown options={mapTranslatedOptions(LEEGGOED_OPTIONS)} value={sysLeeggoedTerugname} onChange={setSysLeeggoedTerugname} placeholder={tr('control.external.select', 'Select')} className="min-w-[200px] max-w-[200px]" />
                 </div>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.general.printCustomerDetailsOnQR', 'Print customer details on QR:')}</span>
-                  <input type="checkbox" checked={sysKlantgegevensQRAfdrukken} onChange={(e) => setSysKlantgegevensQRAfdrukken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysKlantgegevensQRAfdrukken} onChange={(e) => setSysKlantgegevensQRAfdrukken(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
               </div>
             </div>
@@ -237,7 +249,7 @@ export function ControlViewSystemSettingsModal({
                     value={sysPriceTakeAway}
                     onChange={setSysPriceTakeAway}
                     placeholder={tr('control.external.select', 'Select')}
-                    className="text-sm min-w-[150px]"
+                    className="min-w-[150px]"
                   />
                 </div>
                 <div className="flex items-center gap-10">
@@ -247,7 +259,7 @@ export function ControlViewSystemSettingsModal({
                     value={sysPriceDelivery}
                     onChange={setSysPriceDelivery}
                     placeholder={tr('control.external.select', 'Select')}
-                    className="text-sm min-w-[150px]"
+                    className="min-w-[150px]"
                   />
                 </div>
                 <div className="flex items-center gap-10">
@@ -257,7 +269,7 @@ export function ControlViewSystemSettingsModal({
                     value={sysPriceCounterSale}
                     onChange={setSysPriceCounterSale}
                     placeholder={tr('control.external.select', 'Select')}
-                    className="text-sm min-w-[150px]"
+                    className="min-w-[150px]"
                   />
                 </div>
                 <div className="flex items-center gap-10">
@@ -267,7 +279,7 @@ export function ControlViewSystemSettingsModal({
                     value={sysPriceTableSale}
                     onChange={setSysPriceTableSale}
                     placeholder={tr('control.external.select', 'Select')}
-                    className="text-sm min-w-[150px]"
+                    className="min-w-[150px]"
                   />
                 </div>
               </div>
@@ -276,66 +288,66 @@ export function ControlViewSystemSettingsModal({
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.pointsPerEuro', 'Points / euro:')}</span>
                   <div className="flex items-center gap-2">
-                    <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerEuro((n) => Math.max(0, n - 1))}>−</button>
-                    <input type="number" min={0} value={safeNumberInputValue(sysSavingsPointsPerEuro, 0)} onChange={(e) => setSysSavingsPointsPerEuro(Number(e.target.value) || 0)} className="w-20 px-3 py-2 bg-pos-panel border border-pos-border rounded text-pos-text text-xl text-center" />
-                    <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerEuro((n) => n + 1)}>+</button>
+                    <button type="button" className="p-1 px-3 rounded border border-pos-border text-black active:text-white active:bg-rose-500 text-3xl" onClick={() => setSysSavingsPointsPerEuro((n) => Math.max(0, n - 1))}>−</button>
+                    <input type="number" min={0} value={safeNumberInputValue(sysSavingsPointsPerEuro, 0)} onChange={(e) => setSysSavingsPointsPerEuro(Number(e.target.value) || 0)} className="w-20 px-3 py-2 border border-pos-border rounded text-pos-text text-xl text-center" />
+                    <button type="button" className="p-1 px-3 rounded border border-pos-border text-black active:text-white active:bg-rose-500 text-3xl" onClick={() => setSysSavingsPointsPerEuro((n) => n + 1)}>+</button>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.pointsPerDiscount', 'Points / discount:')}</span>
                   <div className="flex items-center gap-2">
-                    <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerDiscount((n) => Math.max(0, n - 1))}>−</button>
-                    <input type="number" min={0} value={safeNumberInputValue(sysSavingsPointsPerDiscount, 0)} onChange={(e) => setSysSavingsPointsPerDiscount(Number(e.target.value) || 0)} className="w-20 px-3 py-2 bg-pos-panel border border-pos-border rounded text-pos-text text-xl text-center" />
-                    <button type="button" className="p-1 px-3 rounded bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 text-3xl" onClick={() => setSysSavingsPointsPerDiscount((n) => n + 1)}>+</button>
+                    <button type="button" className="p-1 px-3 rounded border border-pos-border text-black active:text-white active:bg-rose-500 text-3xl" onClick={() => setSysSavingsPointsPerDiscount((n) => Math.max(0, n - 1))}>−</button>
+                    <input type="number" min={0} value={safeNumberInputValue(sysSavingsPointsPerDiscount, 0)} onChange={(e) => setSysSavingsPointsPerDiscount(Number(e.target.value) || 0)} className="w-20 px-3 py-2 border border-pos-border rounded text-pos-text text-xl text-center" />
+                    <button type="button" className="p-1 px-3 rounded border border-pos-border text-black active:text-white active:bg-rose-500 text-3xl" onClick={() => setSysSavingsPointsPerDiscount((n) => n + 1)}>+</button>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[150px] max-w-[150px] shrink-0">{tr('control.sys.prices.discount', 'Discount:')}</span>
-                  <Dropdown options={mapTranslatedOptions(SAVINGS_DISCOUNT_OPTIONS)} value={sysSavingsDiscount} onChange={setSysSavingsDiscount} placeholder={tr('control.external.disabled', 'Disabled')} className="text-sm min-w-[150px]" />
+                  <Dropdown options={mapTranslatedOptions(SAVINGS_DISCOUNT_OPTIONS)} value={sysSavingsDiscount} onChange={setSysSavingsDiscount} placeholder={tr('control.external.disabled', 'Disabled')} className="min-w-[150px]" />
                 </div>
               </div>
             </div>
           )}
           {systemSettingsTab === 'Ticket' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4">
               <div className="flex flex-col gap-8">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.askVatPrinter', 'Ask for VAT ticket printer:')}</span>
-                  <input type="checkbox" checked={sysUsePlaceSettings} onChange={(e) => setSysUsePlaceSettings(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysUsePlaceSettings} onChange={(e) => setSysUsePlaceSettings(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.productionPrinterCascade', 'Production printer cascade:')}</span>
-                  <input type="checkbox" checked={sysTegoedAutomatischInladen} onChange={(e) => setSysTegoedAutomatischInladen(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysTegoedAutomatischInladen} onChange={(e) => setSysTegoedAutomatischInladen(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.displaySubproductsWithoutPrice', 'Display sub-products without price on VAT ticket:')}</span>
-                  <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.pricePerKiloPrints', 'Price per kilo prints:')}</span>
-                  <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysNieuwstePrijsGebruiken} onChange={(e) => setSysNieuwstePrijsGebruiken(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <span className="text-pos-text min-w-[270px] max-w-[270px]">{tr('control.sys.ticket.printUnitPrice', 'Print unit price:')}</span>
-                  <input type="checkbox" checked={sysKlantgegevensQRAfdrukken} onChange={(e) => setSysKlantgegevensQRAfdrukken(e.target.checked)} className="w-5 h-5 rounded border-gray-300" />
+                  <input type="checkbox" checked={sysKlantgegevensQRAfdrukken} onChange={(e) => setSysKlantgegevensQRAfdrukken(e.target.checked)} className="w-9 h-9 rounded border-gray-300" />
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.typeBarcodeGenerated', 'Type barcode of generated barcode:')}</span>
-                  <Dropdown options={BARCODE_TYPE_OPTIONS} value={sysBarcodeType} onChange={setSysBarcodeType} placeholder="Code39" className="text-sm min-w-[150px]" />
+                  <Dropdown options={BARCODE_TYPE_OPTIONS} value={sysBarcodeType} onChange={setSysBarcodeType} placeholder="Code39" className="min-w-[150px]" />
                 </div>
               </div>
               <div className="flex flex-col gap-8">
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.validityPeriodVoucher', 'Validity period voucher:')}</span>
-                  <Dropdown options={mapTranslatedOptions(TICKET_VOUCHER_VALIDITY_OPTIONS)} value={sysTicketVoucherValidity} onChange={setSysTicketVoucherValidity} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                  <Dropdown options={mapTranslatedOptions(TICKET_VOUCHER_VALIDITY_OPTIONS)} value={sysTicketVoucherValidity} onChange={setSysTicketVoucherValidity} placeholder={tr('control.external.select', 'Select')} className="min-w-[200px]" />
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.scheduledOrdersPrintMode', 'Scheduled orders print mode:')}</span>
-                  <Dropdown options={mapTranslatedOptions(TICKET_SCHEDULED_PRINT_MODE_OPTIONS)} value={sysTicketScheduledPrintMode} onChange={setSysTicketScheduledPrintMode} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                  <Dropdown options={mapTranslatedOptions(TICKET_SCHEDULED_PRINT_MODE_OPTIONS)} value={sysTicketScheduledPrintMode} onChange={setSysTicketScheduledPrintMode} placeholder={tr('control.external.select', 'Select')} className="min-w-[200px]" />
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-pos-text min-w-[270px] max-w-[270px] shrink-0">{tr('control.sys.ticket.scheduledOrdersCustomerSort', 'Scheduled orders customer sort:')}</span>
-                  <Dropdown options={mapTranslatedOptions(TICKET_SCHEDULED_CUSTOMER_SORT_OPTIONS)} value={sysTicketScheduledCustomerSort} onChange={setSysTicketScheduledCustomerSort} placeholder={tr('control.external.select', 'Select')} className="text-sm min-w-[150px]" />
+                  <Dropdown options={mapTranslatedOptions(TICKET_SCHEDULED_CUSTOMER_SORT_OPTIONS)} value={sysTicketScheduledCustomerSort} onChange={setSysTicketScheduledCustomerSort} placeholder={tr('control.external.select', 'Select')} className="min-w-[200px]" />
                 </div>
               </div>
             </div>
@@ -347,7 +359,7 @@ export function ControlViewSystemSettingsModal({
         <div className="w-full flex items-center px-6 py-8 justify-center shrink-0">
           <button
             type="button"
-            className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-xl"
+            className="flex items-center gap-2 px-[70px] py-3 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50 text-xl"
             disabled={savingSystemSettings}
             onClick={handleSaveSystemSettings}
           >

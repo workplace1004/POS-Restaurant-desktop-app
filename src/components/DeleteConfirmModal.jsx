@@ -20,23 +20,23 @@ export function DeleteConfirmModal({ open, onClose, onConfirm, message = 'Are yo
       aria-labelledby="delete-confirm-title"
     >
       <div
-        className="bg-pos-bg rounded-2xl shadow-xl max-w-2xl w-full mx-4 p-7"
+        className="bg-white rounded-2xl shadow-xl max-w-4xl w-full mx-4 p-7"
         onClick={(e) => e.stopPropagation()}
       >
-        <p id="delete-confirm-title" className="text-center text-white text-2xl font-medium py-8 leading-normal">
+        <p id="delete-confirm-title" className="text-center text-black text-4xl font-medium py-8 leading-normal">
           {message}
         </p>
         <div className="flex justify-around mt-10 gap-12">
           <button
             type="button"
-            className="px-8 py-4 rounded-lg text-lg font-semibold bg-rose-500 text-white active:bg-rose-600 focus:outline-none transition-colors"
+            className="px-[70px] py-4 rounded-lg text-2xl font-semibold bg-rose-500 text-white active:text-white active:bg-rose-600 focus:outline-none transition-colors"
             onClick={() => onConfirm?.()}
           >
             {t('yes')}
           </button>
           <button
             type="button"
-            className="px-8 py-4 rounded-lg bg-pos-panel text-lg font-semibold text-white active:text-gray-400 focus:outline-none active:bg-green-500"
+            className="px-[70px] py-4 border-2 border-black active:border-white rounded-lg text-2xl font-semibold text-black active:text-white active:bg-rose-500 focus:outline-none"
             onClick={onClose}
           >
             {t('no')}

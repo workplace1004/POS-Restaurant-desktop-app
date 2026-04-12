@@ -29,8 +29,8 @@ export function ControlViewProductionMessagesModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-5xl justify-center items-center w-full mx-4 overflow-hidden flex flex-col h-[700px]" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-pos-muted active:text-pos-text active:bg-green-500" onClick={closeProductionMessagesModal} aria-label="Close">
+      <div className="relative bg-pos-bg rounded-xl shadow-2xl max-w-5xl justify-center items-center w-full mx-4 overflow-hidden flex flex-col h-[1000px]" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="absolute top-2 right-4 z-10 p-2 rounded text-black active:text-white active:bg-rose-500" onClick={closeProductionMessagesModal} aria-label="Close">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
         <div className="w-full flex items-center justify-center mt-[30px] px-6 gap-4 py-4 shrink-0 pr-14">
@@ -40,11 +40,11 @@ export function ControlViewProductionMessagesModal({
               value={productionMessageInput}
               onChange={(e) => setProductionMessageInput(e.target.value)}
               placeholder="New message"
-              className="px-4 py-2 bg-pos-panel border border-pos-border rounded-lg min-w-[400px] text-pos-text text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg min-w-[400px] text-black text-lg"
             />
             <button
               type="button"
-              className="px-6 py-2 rounded-lg bg-green-600 text-white font-medium active:bg-green-500 disabled:opacity-50 text-sm shrink-0"
+              className="px-6 py-2 rounded-lg bg-rose-600 text-white font-medium active:bg-rose-500 disabled:opacity-50 text-lg shrink-0"
               disabled={!(productionMessageInput || '').trim()}
               onClick={handleAddOrUpdateProductionMessage}
             >
@@ -56,17 +56,17 @@ export function ControlViewProductionMessagesModal({
           <>
             <ul
               ref={productionMessagesListRef}
-              className="overflow-auto min-h-[300px] mx-10 border border-pos-border rounded-xl relative p-2"
+              className="overflow-auto min-h-[600px] mx-10 border border-gray-300 rounded-xl relative p-2"
               onScroll={updateProductionMessagesScrollState}
             >
               {sorted.map((m) => (
-                <li key={m.id} className="flex items-center px-4 py-1 border-b border-pos-border last:border-b-0 gap-2">
-                  <span className="flex-1 text-pos-text text-sm break-words min-w-0">{m.text || ''}</span>
-                  <button type="button" className="p-2 shrink-0 rounded text-pos-text active:bg-green-500" onClick={() => startEditProductionMessage(m)} aria-label="Edit">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                <li key={m.id} className="flex items-center px-4 py-1 border-b border-gray-300 last:border-b-0 gap-2">
+                  <span className="flex-1 text-black text-lg break-words min-w-0">{m.text || ''}</span>
+                  <button type="button" className="p-2 shrink-0 rounded text-black active:text-rose-500" onClick={() => startEditProductionMessage(m)} aria-label="Edit">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                   </button>
-                  <button type="button" className="p-2 shrink-0 rounded text-pos-text active:bg-green-500" onClick={() => setDeleteConfirmProductionMessageId(m.id)} aria-label="Delete">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  <button type="button" className="p-2 shrink-0 rounded text-black active:text-rose-500" onClick={() => setDeleteConfirmProductionMessageId(m.id)} aria-label="Delete">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </button>
                 </li>
               ))}
@@ -74,7 +74,7 @@ export function ControlViewProductionMessagesModal({
             <div className="flex items-center justify-center gap-10 py-3">
               <button
                 type="button"
-                className="p-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="p-3 rounded-lg border border-gray-300 text-black active:text-white active:bg-rose-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 disabled={!canProductionMessagesScrollUp}
                 onClick={() => scrollProductionMessages(-1)}
                 aria-label={tr('scrollUp', 'Scroll up')}
@@ -85,7 +85,7 @@ export function ControlViewProductionMessagesModal({
               </button>
               <button
                 type="button"
-                className="p-3 rounded-lg bg-pos-panel border border-pos-border text-pos-text active:bg-green-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                className="p-3 rounded-lg border border-gray-300 text-black active:text-white active:bg-rose-500 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 disabled={!canProductionMessagesScrollDown}
                 onClick={() => scrollProductionMessages(1)}
                 aria-label={tr('scrollDown', 'Scroll down')}
